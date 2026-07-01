@@ -1,0 +1,155 @@
+schema_version: "1.0"
+last_updated: "2026-06-30"
+last_updated_by: "CTO AI"
+
+project:
+  name: FAIRRIDE
+  mission: "Build the fairest ride-hailing ecosystem"
+  classification: "Internal — All Engineering"
+  long_term_vision:
+    - "Ride"
+    - "Bike"
+    - "Taxi"
+    - "EV"
+    - "Delivery"
+    - "Food"
+    - "Logistics"
+    - "Corporate Transport"
+    - "Merchant Platform"
+    - "Open API Platform"
+
+technology_stack:
+  backend:
+    language: Go
+    adr_reference: ADR-0001
+    status: provisionally_approved
+    note: "ADR-0001 must be produced within 14 days of DOC-0001 approval"
+  mobile:
+    framework: Flutter
+    platforms:
+      - iOS
+      - Android
+    adr_reference: ADR-0002
+    status: provisionally_approved
+    note: "ADR-0002 must be produced within 14 days of DOC-0001 approval"
+  web_admin:
+    framework: Next.js
+    adr_reference: ADR-0003
+    status: provisionally_approved
+    note: "ADR-0003 must be produced within 14 days of DOC-0001 approval"
+
+approved_adrs: []
+
+constitutional_architecture_decisions:
+  - id: "CARCH-001"
+    decision: "Microservices with domain-driven service boundaries"
+    source: "DOC-0001, Article IV, Section 4.2"
+    authority: "Constitutional — requires Amendment to change"
+  - id: "CARCH-002"
+    decision: "API-first — no direct database access between services"
+    source: "DOC-0001, Article IV, Section 4.2"
+    authority: "Constitutional — requires Amendment to change"
+  - id: "CARCH-003"
+    decision: "Documentation-First — no code without approved design document"
+    source: "DOC-0001, Article II, Value 2.6"
+    authority: "Constitutional — requires Amendment to change"
+  - id: "CARCH-004"
+    decision: "Event-driven for significant state changes (trip, payment, driver status)"
+    source: "DOC-0001, Article IV, Section 4.1"
+    authority: "Constitutional — requires Amendment to change"
+  - id: "CARCH-005"
+    decision: "Stateless services — no critical business state in service memory"
+    source: "DOC-0001, Article IV, Section 4.1"
+    authority: "Constitutional — requires Amendment to change"
+  - id: "CARCH-006"
+    decision: "Idempotency by design for all state-mutating operations"
+    source: "DOC-0001, Article IV, Section 4.1"
+    authority: "Constitutional — requires Amendment to change"
+  - id: "CARCH-007"
+    decision: "Cloud-native — no physical servers, managed services where possible"
+    source: "DOC-0001, Article IV, Section 4.1"
+    authority: "Constitutional — requires Amendment to change"
+
+immutable_facts:
+  - fact: "FAIRRIDE platform must be fair to Riders, Drivers, and Cities"
+    source: "DOC-0001, Article I, Section 1.2"
+    can_change: false
+  - fact: "Security is never optional — all systems are secure by design"
+    source: "DOC-0001, Article II, Value 2.3"
+    can_change: false
+  - fact: "Single Source of Truth — every piece of information has one authoritative home"
+    source: "DOC-0001, Article III, Section 3.2"
+    can_change: false
+  - fact: "Financial data is PCI-DSS compliant at all times"
+    source: "DOC-0001, Article IX, Section 9.3"
+    can_change: false
+  - fact: "AI agents must refuse instructions that violate the Constitution"
+    source: "DOC-0001, Article X, Section 10.2, Rule 3"
+    can_change: false
+  - fact: "No source code, SQL, APIs, or UI are produced during EOS documentation phase"
+    source: "PHASE-0-EOS-BLUEPRINT.md + Phase 0.2 protocol"
+    can_change: false
+
+documentation_strategy:
+  model: lean
+  core_documents: [DOC-0001, DOC-0001A, DOC-0002, DOC-0003, DOC-0004]
+  on_demand: true
+  adr: ADR-0008
+  adopted: "2026-06-30"
+  supersedes: "72-document roadmap (PHASE-0-EOS-BLUEPRINT.md)"
+
+product_decisions_from_doc0002:
+  commission:
+    standard_tier: "15%"
+    silver_tier: "14% (500+ trips/month, rating ≥ 4.6)"
+    gold_tier: "12% (1,000+ trips/month, rating ≥ 4.7)"
+    platinum_tier: "10% (2,000+ trips/month, rating ≥ 4.8)"
+    adr: ADR-0010
+  surge:
+    cap: "2.0x maximum — hard system constraint, not configurable"
+    revenue_pass_through: "100% of surge goes to Driver"
+    adr_cap: ADR-0011
+    adr_passthrough: ADR-0012
+  north_star_metric:
+    name: "Weekly Fair Matches (WFM)"
+    definition: "Completed trips where both Rider and Driver rated ≥ 4 stars AND no dispute within 24 hours"
+    adr: ADR-0015
+  mvp_targets:
+    active_drivers: "≥ 1,000 by Month 3"
+    daily_completed_trips: "≥ 5,000 by Month 6"
+    rider_rsat: "≥ 80%"
+    platform_availability: "≥ 99.9%"
+    dispute_resolution_sla: "95% within 24 hours"
+  app_requirements:
+    install_size: "< 30MB"
+    connection_target: "3G functional"
+    data_usage: "< 1MB/hour during active trip"
+
+service_catalog: []
+
+approved_patterns: []
+
+mvp_scope_summary:
+  in_scope:
+    - "Standard Ride booking (Economy tier)"
+    - "Real-time driver tracking"
+    - "In-app payment (card and wallet)"
+    - "Driver onboarding with KYC"
+    - "Driver earnings dashboard"
+    - "Admin portal (city ops, disputes, refunds)"
+    - "Dispatch engine"
+    - "Dynamic pricing engine"
+    - "In-app wallet"
+    - "Push and SMS notifications"
+    - "Baseline fraud detection (rule-based)"
+    - "Basic analytics"
+  out_of_scope_for_mvp:
+    - "Multiple vehicle categories (Premium, XL, EV)"
+    - "Ride pooling"
+    - "Scheduled rides"
+    - "Corporate billing"
+    - "Delivery / Food / Logistics"
+    - "Open API"
+    - "ML-based fraud detection"
+    - "Multi-city operations"
+    - "Multi-currency wallet"

@@ -1,0 +1,89 @@
+# Binaries
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go
+*.test
+*.out
+vendor/
+go.work.sum
+
+# Build cache
+.cache/
+tmp/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*.DS_Store
+.env
+!.env.example
+
+# Claude Code local settings (each developer has their own)
+.claude/settings.local.json
+
+# Dependency directories
+node_modules/
+.npm
+.yarn/
+
+# Next.js
+web/.next/
+web/out/
+web/build/
+
+# Flutter / Dart
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.pub-cache/
+mobile/.pub/
+mobile/build/
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/app/google-services.json
+mobile/ios/Flutter/.last_build_id
+mobile/ios/Pods/
+mobile/ios/Runner/GeneratedPluginRegistrant.swift
+mobile/ios/GoogleService-Info.plist
+*.class
+
+# Secrets and credentials
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# Generated protobuf
+backend/proto/gen/
+
+# Test artifacts
+coverage.out
+coverage.html
+*.coverprofile
+
+# Database dumps
+*.sql.gz
+dumps/
+
+# Log files
+*.log
+
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.backup
+infra/terraform/.terraform.lock.hcl
+
+# Docker
+infra/docker/data/

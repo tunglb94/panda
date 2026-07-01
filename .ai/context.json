@@ -1,0 +1,128 @@
+{
+  "project": "FAIRRIDE",
+  "eos_version": "0.1.0",
+  "documentation_strategy": {
+    "model": "Lean Documentation",
+    "description": "5 permanent core documents + on-demand documents generated as required by implementation phase",
+    "adopted": "2026-06-30",
+    "adr_reference": "ADR-0008 (pending)",
+    "supersedes": "72-document roadmap from PHASE-0-EOS-BLUEPRINT.md"
+  },
+  "current_phase": {
+    "id": "phase-1.5",
+    "name": "Architecture Audit & Fixes",
+    "status": "COMPLETE — awaiting CTO approval",
+    "started": "2026-07-01",
+    "completed": "2026-07-01",
+    "next_phase": "phase-2.1 (User model + RBAC + Permission framework in identity service)"
+  },
+  "implementation": {
+    "mode": "active",
+    "role": "Principal Software Engineer",
+    "started": "2026-07-01",
+    "build_status": "ALL_GREEN",
+    "test_status": "ALL_GREEN",
+    "last_build_verified": "2026-07-01"
+  },
+  "build_state": {
+    "workspace": "backend/go.work",
+    "go_version_required": "1.22",
+    "go_version_installed": "1.26.1",
+    "shared_package": "github.com/fairride/shared",
+    "services": [
+      "identity", "user", "driver", "trip", "dispatch", "geo",
+      "pricing", "wallet", "payment", "promotion", "notification",
+      "review", "analytics", "admin"
+    ],
+    "build_command": "cd backend && go build github.com/fairride/{service}/...",
+    "test_command": "cd backend/shared && go test -race ./..."
+  },
+  "phase_1_5_findings": {
+    "critical_resolved": 3,
+    "high_resolved": 6,
+    "medium_resolved": 5,
+    "low_resolved": 1,
+    "deferred_to_later": ["M-001 (type aliases)", "M-003 (trace ID)", "M-006 (migrations)"],
+    "audit_score_before": 64,
+    "audit_score_after": 92
+  },
+  "document_registry": {
+    "core_documents_planned": 5,
+    "core_documents_generated": 3,
+    "core_documents_approved": 0,
+    "documents": [
+      {
+        "id": "DOC-0001",
+        "title": "Project Constitution",
+        "version": "0.1.0",
+        "status": "Draft",
+        "path": "docs/business/mission/project-constitution-v0.1.md"
+      },
+      {
+        "id": "DOC-0001A",
+        "title": "AI Development Governance",
+        "version": "0.1.0",
+        "status": "Draft",
+        "path": ".ai/governance/ai-development-governance-v0.1.md"
+      },
+      {
+        "id": "DOC-0002",
+        "title": "Product Vision",
+        "version": "0.1.0",
+        "status": "Draft",
+        "path": "docs/product/requirements/product-vision-v0.1.md"
+      }
+    ],
+    "core_documents_remaining": [
+      {
+        "id": "DOC-0003",
+        "title": "System Architecture",
+        "blocked_by": ["DOC-0002 approval", "OQ-001 resolution"]
+      },
+      {
+        "id": "DOC-0004",
+        "title": "Implementation Master Plan",
+        "blocked_by": ["DOC-0003 approval"]
+      }
+    ]
+  },
+  "technology_stack": {
+    "backend": { "language": "Go", "adr": "ADR-0001", "adr_status": "pending" },
+    "mobile": { "framework": "Flutter", "platforms": ["iOS", "Android"], "adr": "ADR-0002", "adr_status": "pending" },
+    "web_admin": { "framework": "Next.js", "adr": "ADR-0003", "adr_status": "pending" }
+  },
+  "naming_convention": {
+    "pattern": "{topic}-{subtopic}-v{major}.{minor}.md",
+    "case": "lowercase",
+    "separator": "hyphen",
+    "version_suffix": "mandatory"
+  },
+  "active_agents": [],
+  "pending_adrs": [
+    "ADR-0001 (backend technology: Go)",
+    "ADR-0002 (mobile technology: Flutter)",
+    "ADR-0003 (admin web technology: Next.js)",
+    "ADR-0004 (documentation-first process)",
+    "ADR-0005 (microservices architecture)",
+    "ADR-0006 (event-driven communication)",
+    "ADR-0007 (ai-first development model)",
+    "ADR-0008 (lean documentation strategy) — P0",
+    "ADR-0009 (primary launch market) — P0",
+    "ADR-0010 (commission model) — P0",
+    "ADR-0011 (surge cap policy) — P0",
+    "ADR-0012 (surge revenue pass-through) — P1",
+    "ADR-0013 (driver tier calculation) — P1",
+    "ADR-0014 (mvp payment methods) — P1",
+    "ADR-0015 (north star metric definition) — P1",
+    "ADR-0016 (driver classification model) — P0"
+  ],
+  "open_questions": {
+    "p0_critical": ["OQ-001", "OQ-006", "OQ-B01"],
+    "p1_high": ["OQ-002", "OQ-007", "OQ-B02", "OQ-B03", "OQ-B04", "OQ-B05", "OQ-B06", "OQ-B07"],
+    "p2_medium": ["OQ-003", "OQ-005", "OQ-A001", "OQ-A002", "OQ-A003", "OQ-A004", "OQ-A005", "OQ-B08"],
+    "p3_low": ["OQ-004", "OQ-008", "OQ-009"]
+  },
+  "unresolved_conflicts": [],
+  "last_updated": "2026-07-01",
+  "last_updated_by": "Principal Engineer AI"
+}

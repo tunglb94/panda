@@ -1,0 +1,19 @@
+go 1.22
+
+use (
+	./shared
+	./services/identity
+	./services/user
+	./services/driver
+	./services/trip
+	./services/dispatch
+	./services/geo
+	./services/pricing
+	./services/wallet
+	./services/payment
+	./services/promotion
+	./services/notification
+	./services/review
+	./services/analytics
+	./services/admin
+)

@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - '.golangci.yml'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - '.golangci.yml'
+
+env:
+  GO_VERSION: '1.22'
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: backend/shared/go.sum
+
+      - name: golangci-lint (shared)
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.59
+          working-directory: backend/shared
+          args: --config ../../.golangci.yml
+
+  # ─────────────────────────────────────────────────────────────────
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fairride
+          POSTGRES_PASSWORD: fairride_test_secret
+          POSTGRES_DB: fairride_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://fairride:fairride_test_secret@localhost:5432/fairride_test
+      REDIS_ADDR: localhost:6379
+      ENVIRONMENT: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: backend/shared/go.sum
+
+      - name: Run tests (shared)
+        working-directory: backend/shared
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: backend/shared/coverage.out
+          flags: backend
+
+  # ─────────────────────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    strategy:
+      matrix:
+        service:
+          - identity
+          - user
+          - driver
+          - trip
+          - dispatch
+          - geo
+          - pricing
+          - wallet
+          - payment
+          - promotion
+          - notification
+          - review
+          - analytics
+          - admin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: backend/shared/go.sum
+
+      - name: Build ${{ matrix.service }}
+        working-directory: backend
+        run: go build github.com/fairride/${{ matrix.service }}/...

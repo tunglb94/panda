@@ -1,0 +1,65 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gofmt
+    - misspell
+    - bodyclose
+    - gocritic
+    - revive
+    - nilerr
+    - exportloopref
+    - godot
+
+linters-settings:
+  gofmt:
+    simplify: true
+
+  govet:
+    enable-all: true
+    disable:
+      - shadow  # too noisy during active development
+
+  revive:
+    rules:
+      - name: exported
+        severity: warning
+      - name: var-naming
+        severity: warning
+      - name: error-return
+        severity: error
+      - name: unused-parameter
+        severity: warning
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+    disabled-checks:
+      - commentedOutCode
+      - whyNoLint
+
+  misspell:
+    locale: US
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gocritic
+    - path: cmd/server/main\.go
+      linters:
+        - revive  # main packages intentionally minimal
+
+  max-issues-per-linter: 50
+  max-same-issues: 5

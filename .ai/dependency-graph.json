@@ -1,0 +1,127 @@
+{
+  "schema_version": "1.1",
+  "last_updated": "2026-06-30",
+  "last_updated_by": "CTO AI",
+  "description": "FAIRRIDE EOS document dependency graph under Lean Documentation Strategy. 5 permanent core documents. All other documents are optional/on-demand.",
+
+  "strategy": "lean",
+  "core_documents": ["DOC-0001", "DOC-0001A", "DOC-0002", "DOC-0003", "DOC-0004"],
+
+  "nodes": [
+    {
+      "id": "DOC-0001",
+      "title": "Project Constitution",
+      "filename": "project-constitution-v0.1.md",
+      "path": "docs/business/mission/project-constitution-v0.1.md",
+      "version": "0.1.0",
+      "status": "Draft",
+      "owner": "CTO",
+      "tier": "core",
+      "lines": 1046,
+      "words": 10200,
+      "created": "2026-06-30"
+    },
+    {
+      "id": "DOC-0001A",
+      "title": "AI Development Governance",
+      "filename": "ai-development-governance-v0.1.md",
+      "path": ".ai/governance/ai-development-governance-v0.1.md",
+      "version": "0.1.0",
+      "status": "Draft",
+      "owner": "CTO",
+      "tier": "core",
+      "lines": 1572,
+      "words": 10116,
+      "created": "2026-06-30"
+    },
+    {
+      "id": "DOC-0002",
+      "title": "Product Vision",
+      "filename": "product-vision-v0.1.md",
+      "path": "docs/product/requirements/product-vision-v0.1.md",
+      "version": "0.1.0",
+      "status": "Draft",
+      "owner": "CPO / CTO",
+      "tier": "core",
+      "lines": 1444,
+      "words": 12999,
+      "created": "2026-06-30",
+      "absorbs_planned_docs": [
+        "project-vision", "business-model", "product-strategy", "roadmap",
+        "competitor-analysis", "success-metrics", "mvp-definition",
+        "user-personas", "user-journeys", "feature-catalog", "out-of-scope"
+      ]
+    }
+  ],
+
+  "edges": [
+    {
+      "from": "DOC-0001A",
+      "to": "DOC-0001",
+      "type": "depends_on",
+      "description": "Constitutional Supplement — operationalizes Article X"
+    },
+    {
+      "from": "DOC-0002",
+      "to": "DOC-0001",
+      "type": "depends_on",
+      "description": "Mission, Values, EOS authority derive from Constitution"
+    },
+    {
+      "from": "DOC-0002",
+      "to": "DOC-0001A",
+      "type": "depends_on",
+      "description": "AI governance governs all document creation sessions"
+    }
+  ],
+
+  "pending_core_nodes": [
+    {
+      "id": "DOC-0003",
+      "title": "System Architecture",
+      "tier": "core",
+      "planned_path": "docs/architecture/system/system-architecture-v0.1.md",
+      "depends_on": ["DOC-0001", "DOC-0001A", "DOC-0002"],
+      "status": "blocked",
+      "blocked_by": "DOC-0002 pending approval; OQ-001, OQ-006, OQ-B01 unresolved; ADR-0009 through ADR-0016 pending"
+    },
+    {
+      "id": "DOC-0004",
+      "title": "Implementation Master Plan",
+      "tier": "core",
+      "planned_path": "docs/product/roadmap/implementation-master-plan-v0.1.md",
+      "depends_on": ["DOC-0001", "DOC-0001A", "DOC-0002", "DOC-0003"],
+      "status": "blocked",
+      "blocked_by": "DOC-0003 not yet generated"
+    }
+  ],
+
+  "optional_on_demand_catalog": {
+    "description": "Documents from the original 72-document plan. Generated only when required by a specific implementation phase. Not generated speculatively.",
+    "source": "PHASE-0-EOS-BLUEPRINT.md — superseded as primary roadmap by Lean Documentation Strategy (ADR-0008)",
+    "status_for_all": "optional/on-demand",
+    "examples": [
+      { "planned_id": "was-DOC-0003", "title": "Project Principles", "would_be_absorbed_into": "DOC-0002 Product Vision (Section 6.3 Core Values)" },
+      { "planned_id": "was-DOC-0004", "title": "Business Model", "absorbed_into": "DOC-0002 Product Vision (Section 6.6 Revenue Model)" },
+      { "planned_id": "was-DOC-0005", "title": "Success Metrics", "absorbed_into": "DOC-0002 Product Vision (Section 6.22–6.24)" },
+      { "planned_id": "was-DOC-0006", "title": "Product Strategy", "absorbed_into": "DOC-0002 Product Vision (Section 6.5 Business Goals, Section 6.10 Competitive Advantages)" },
+      { "planned_id": "was-DOC-0007", "title": "Roadmap", "absorbed_into": "DOC-0002 Product Vision (Section 6.18 Feature Roadmap)" },
+      { "planned_id": "was-DOC-0008", "title": "Competitor Analysis", "absorbed_into": "DOC-0002 Product Vision (Section 6.10 Competitive Advantages)" },
+      { "planned_id": "was-DOC-0009", "title": "Product Requirements", "absorbed_into": "DOC-0002 Product Vision (Section 6.16 Product Scope)" },
+      { "planned_id": "was-DOC-0010", "title": "User Personas", "absorbed_into": "DOC-0002 Product Vision (Section 6.13 User Personas)" },
+      { "planned_id": "was-DOC-0011", "title": "User Journeys", "absorbed_into": "DOC-0002 Product Vision (Section 6.14–6.15)" },
+      { "planned_id": "was-DOC-0012", "title": "Feature Catalog", "absorbed_into": "DOC-0002 Product Vision (Section 6.18 Feature Roadmap)" },
+      { "planned_id": "was-DOC-0013", "title": "Out of Scope", "absorbed_into": "DOC-0002 Product Vision (Section 6.17 Out of Scope)" },
+      { "planned_id": "was-DOC-0014", "title": "MVP Definition", "absorbed_into": "DOC-0002 Product Vision (Section 6.19 MVP Scope, Section 6.25 Definition of Success)" },
+      { "planned_id": "was-DOC-0015", "title": "System Architecture", "becomes": "DOC-0003 (renamed, elevated to core)" },
+      { "planned_id": "was-DOC-0016 to was-DOC-0020", "title": "Architecture sub-documents", "absorbed_into": "DOC-0003 System Architecture (core)" },
+      { "planned_id": "was-DOC-0021 to was-DOC-0025", "title": "Database documents", "status": "On-demand — generated when database design begins" },
+      { "planned_id": "was-DOC-0026 to was-DOC-0032", "title": "API documents", "status": "On-demand — generated when API design begins" },
+      { "planned_id": "was-DOC-0033 to was-DOC-0040", "title": "Security documents", "status": "On-demand — generated at Implementation Gate" },
+      { "planned_id": "was-DOC-0041 to was-DOC-0049", "title": "Domain Engine documents", "status": "On-demand — generated per domain sprint" },
+      { "planned_id": "was-DOC-0050 to was-DOC-0055", "title": "Coding Standard documents", "status": "On-demand — generated before first code sprint" },
+      { "planned_id": "was-DOC-0058 to was-DOC-0065", "title": "Operations documents", "status": "On-demand — generated at Staging Gate" },
+      { "planned_id": "was-DOC-0066 to was-DOC-0073", "title": "AI/Quality documents", "status": "On-demand — generated as AI tooling is configured" }
+    ]
+  }
+}
