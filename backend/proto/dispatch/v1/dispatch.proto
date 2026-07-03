@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package dispatch.v1;
+
+option go_package = "github.com/fairride/dispatch/grpc/dispatchpb";
+
+import "google/protobuf/timestamp.proto";
+
+// DispatchService coordinates matching riders to the nearest available driver.
+// No AI dispatch, driver scoring, heat maps, surge, multi-order assignment,
+// driver ranking, or traffic prediction — nearest available driver wins.
+service DispatchService {
+  // RequestDispatch initiates a dispatch job for a trip.
+  // Called by the trip service when a trip reaches Searching status.
+  rpc RequestDispatch(RequestDispatchRequest) returns (DispatchResponse);
+
+  // AcceptTrip lets a driver accept the current offer.
+  rpc AcceptTrip(AcceptTripRequest) returns (DispatchResponse);
+
+  // RejectTrip lets a driver decline the current offer.
+  // Dispatch immediately retries with the next nearest driver.
+  rpc RejectTrip(RejectTripRequest) returns (DispatchResponse);
+
+  // UpdateDriverLocation updates a driver's GPS coordinates for dispatch matching.
+  // Drivers should call this periodically while online.
+  rpc UpdateDriverLocation(UpdateDriverLocationRequest) returns (UpdateDriverLocationResponse);
+
+  // GetDispatchStatus returns the current dispatch job for a trip.
+  rpc GetDispatchStatus(GetDispatchStatusRequest) returns (DispatchResponse);
+}
+
+// ─── Requests ────────────────────────────────────────────────────────────────
+
+message RequestDispatchRequest {
+  string trip_id        = 1;
+  string rider_id       = 2;
+  double pickup_lat     = 3;
+  double pickup_lon     = 4;
+  // 0 uses the server default (30 s)
+  int32 offer_timeout_sec = 5;
+  // 0 uses the server default (5 attempts)
+  int32 max_attempts    = 6;
+}
+
+message AcceptTripRequest {
+  string trip_id   = 1;
+  string driver_id = 2;
+}
+
+message RejectTripRequest {
+  string trip_id   = 1;
+  string driver_id = 2;
+}
+
+message UpdateDriverLocationRequest {
+  string driver_id = 1;
+  double lat       = 2;
+  double lon       = 3;
+}
+
+message GetDispatchStatusRequest {
+  string trip_id = 1;
+}
+
+// ─── Responses ───────────────────────────────────────────────────────────────
+
+message UpdateDriverLocationResponse {}
+
+message DispatchResponse {
+  DispatchJobProto job = 1;
+}
+
+// ─── Payload ─────────────────────────────────────────────────────────────────
+
+message DispatchJobProto {
+  string trip_id            = 1;
+  string rider_id           = 2;
+  string status             = 3; // pending|searching|assigned|failed|cancelled
+  string current_driver_id  = 4; // driver currently being offered; empty when none
+  string assigned_driver_id = 5; // final assigned driver; empty until accepted
+  int32  attempt_count      = 6;
+  int32  max_attempts       = 7;
+  google.protobuf.Timestamp offer_expires_at = 8; // nil when no active offer
+  google.protobuf.Timestamp created_at       = 9;
+  google.protobuf.Timestamp updated_at       = 10;
+}

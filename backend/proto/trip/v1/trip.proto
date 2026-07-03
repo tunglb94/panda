@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package trip.v1;
+
+option go_package = "github.com/fairride/trip/grpc/trippb";
+
+import "google/protobuf/timestamp.proto";
+
+// TripService manages the FAIRRIDE trip lifecycle.
+// No pricing, dispatch, payment, wallet, or GPS routing in this service.
+service TripService {
+  // CreateTrip creates a new trip in Pending status.
+  rpc CreateTrip(CreateTripRequest) returns (TripResponse);
+
+  // CancelTrip cancels a trip that has not yet started or completed.
+  rpc CancelTrip(CancelTripRequest) returns (TripResponse);
+
+  // GetTrip returns a trip by its ID.
+  rpc GetTrip(GetTripRequest) returns (TripResponse);
+
+  // StartTrip transitions a trip from DriverAssigned/DriverArrived to InProgress.
+  rpc StartTrip(StartTripRequest) returns (TripResponse);
+
+  // CompleteTrip transitions a trip from InProgress to Completed and records the fare.
+  // The caller is responsible for computing the fare before calling this RPC.
+  rpc CompleteTrip(CompleteTripRequest) returns (TripResponse);
+}
+
+// ─── Request messages ────────────────────────────────────────────────────────
+
+message CreateTripRequest {
+  string rider_id        = 1;
+  string pickup_address  = 2;
+  string dropoff_address = 3;
+}
+
+message CancelTripRequest {
+  string trip_id = 1;
+  string reason  = 2;
+}
+
+message GetTripRequest {
+  string trip_id = 1;
+}
+
+message StartTripRequest {
+  string trip_id = 1;
+}
+
+message CompleteTripRequest {
+  string trip_id          = 1;
+  int64  final_fare_total = 2; // smallest currency unit (e.g., cents)
+  string fare_currency    = 3; // ISO 4217 code (e.g., "USD")
+}
+
+// ─── Response ────────────────────────────────────────────────────────────────
+
+message TripResponse {
+  TripProto trip = 1;
+}
+
+// ─── Shared payload ───────────────────────────────────────────────────────────
+
+message TripProto {
+  string trip_id             = 1;
+  string rider_id            = 2;
+  string driver_id           = 3; // empty until driver is assigned
+  string status              = 4;
+  string pickup_address      = 5;
+  string dropoff_address     = 6;
+  string cancellation_reason = 7; // empty unless cancelled
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  int64  final_fare_total              = 10; // 0 until completed
+  string fare_currency                 = 11; // empty until completed
+}

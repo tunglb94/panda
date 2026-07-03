@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package user.v1;
+
+option go_package = "github.com/fairride/user/grpc/userpb";
+
+import "google/protobuf/timestamp.proto";
+
+// UserProfileService manages the public profile of every FAIRRIDE user.
+// Authentication is handled by the Identity service; this service manages
+// presentation data only (name, avatar, date of birth, gender).
+service UserProfileService {
+  // GetProfile returns the profile for the given user ID.
+  rpc GetProfile(GetProfileRequest) returns (GetProfileResponse);
+
+  // UpdateProfile replaces the mutable fields of a user's profile.
+  // Phone and status are not updatable through this RPC.
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+}
+
+// ─── Request / Response messages ─────────────────────────────────────────────
+
+message GetProfileRequest {
+  string user_id = 1;
+}
+
+message GetProfileResponse {
+  UserProfileProto profile = 1;
+}
+
+message UpdateProfileRequest {
+  string user_id   = 1;
+  string full_name = 2;
+  string email     = 3;
+  string avatar    = 4;
+  // date_of_birth is optional; omit or set to nil to clear the field.
+  google.protobuf.Timestamp date_of_birth = 5;
+  string gender = 6;
+}
+
+message UpdateProfileResponse {
+  UserProfileProto profile = 1;
+}
+
+// ─── Shared payload ───────────────────────────────────────────────────────────
+
+message UserProfileProto {
+  string id        = 1;
+  string full_name = 2;
+  string phone     = 3;
+  string email     = 4;
+  string avatar    = 5;
+  google.protobuf.Timestamp date_of_birth = 6;
+  string gender    = 7;
+  string status    = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}

@@ -92,6 +92,18 @@ func createSchema(ctx context.Context, pool *pgxpool.Pool) error {
 			permission_id TEXT NOT NULL REFERENCES identity_permissions(id) ON DELETE CASCADE,
 			PRIMARY KEY (role_id, permission_id)
 		);
+
+		CREATE TABLE IF NOT EXISTS identity_users (
+			id           TEXT        PRIMARY KEY,
+			phone_number TEXT        NOT NULL UNIQUE,
+			name         TEXT        NOT NULL,
+			email        TEXT        NOT NULL DEFAULT '',
+			type         TEXT        NOT NULL,
+			status       TEXT        NOT NULL,
+			role_id      TEXT        NOT NULL,
+			created_at   TIMESTAMPTZ NOT NULL,
+			updated_at   TIMESTAMPTZ NOT NULL
+		);
 	`)
 	return err
 }
@@ -99,6 +111,7 @@ func createSchema(ctx context.Context, pool *pgxpool.Pool) error {
 // dropSchema removes the test tables in dependency order.
 func dropSchema(ctx context.Context, pool *pgxpool.Pool) error {
 	_, err := pool.Exec(ctx, `
+		DROP TABLE IF EXISTS identity_users;
 		DROP TABLE IF EXISTS identity_role_permissions;
 		DROP TABLE IF EXISTS identity_roles;
 		DROP TABLE IF EXISTS identity_permissions;
@@ -111,7 +124,7 @@ func dropSchema(ctx context.Context, pool *pgxpool.Pool) error {
 func setupTest(t *testing.T) {
 	t.Helper()
 	_, err := testPool.Exec(context.Background(),
-		`TRUNCATE identity_role_permissions, identity_roles, identity_permissions`)
+		`TRUNCATE identity_users, identity_role_permissions, identity_roles, identity_permissions`)
 	if err != nil {
 		t.Fatalf("setupTest: truncate: %v", err)
 	}

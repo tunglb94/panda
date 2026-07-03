@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package pricing.v1;
+
+option go_package = "github.com/fairride/pricing/grpc/pricingpb";
+
+// PricingService calculates ride fares from distance and duration inputs.
+// No surge, promotions, coupons, dynamic pricing, or peak-hour pricing in this service.
+// Every fare is fully itemised: base + distance + time + booking fee.
+// Upfront pricing guarantee: Estimate and FinalFare use the same formula.
+service PricingService {
+  // EstimateFare calculates an upfront fare estimate before the trip starts.
+  rpc EstimateFare(EstimateFareRequest) returns (FareResponse);
+
+  // CalculateFinalFare calculates the fare after trip completion using actual values.
+  // Uses the same formula as EstimateFare — no deviation penalty in MVP.
+  rpc CalculateFinalFare(CalculateFinalFareRequest) returns (FareResponse);
+}
+
+// ─── Requests ────────────────────────────────────────────────────────────────
+
+message EstimateFareRequest {
+  string vehicle_type     = 1; // car | motorcycle | van
+  double distance_km      = 2;
+  double duration_minutes = 3;
+}
+
+message CalculateFinalFareRequest {
+  string vehicle_type             = 1; // car | motorcycle | van
+  double actual_distance_km       = 2;
+  double actual_duration_minutes  = 3;
+}
+
+// ─── Response ────────────────────────────────────────────────────────────────
+
+message FareResponse {
+  FareBreakdown fare = 1;
+}
+
+// FareBreakdown is the fully itemised fare.
+// All monetary values are in the smallest unit of the configured currency
+// (e.g., cents for USD, satang for THB, sen for MYR).
+// Booking fee is always added after minimum fare enforcement:
+//   ride_fare = max(base_fare + distance_fare + time_fare, minimum_fare)
+//   total     = ride_fare + booking_fee
+message FareBreakdown {
+  string vehicle_type     = 1;
+  double distance_km      = 2;
+  double duration_minutes = 3;
+  int64  base_fare        = 4; // fixed per-trip component
+  int64  distance_fare    = 5; // per_km_rate × distance_km, rounded
+  int64  time_fare        = 6; // per_minute_rate × duration_minutes, rounded
+  int64  booking_fee      = 7; // fixed platform fee per trip
+  int64  ride_fare        = 8; // base + distance + time, min-enforced
+  int64  total            = 9; // ride_fare + booking_fee
+  string currency_code    = 10;
+  bool   is_final         = 11; // false = estimate; true = post-trip final
+}

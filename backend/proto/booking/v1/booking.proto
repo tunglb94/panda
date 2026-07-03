@@ -1,0 +1,109 @@
+syntax = "proto3";
+
+package booking.v1;
+
+option go_package = "github.com/fairride/booking/grpc/bookingpb";
+
+// BookingService is the orchestration layer for the FAIRRIDE end-to-end booking flow.
+// It composes Trip, Dispatch, and Pricing services to provide a single surface for
+// rider and driver booking actions.
+//
+// The complete flow:
+//   1. Rider  → BookRide             → trip created, dispatch searching
+//   2. Driver ← dispatch offer       (push notification — out of scope for MVP)
+//   3. Driver → AcceptDispatchOffer  → trip status: driver_assigned
+//   4. Driver → StartTrip            → trip status: in_progress
+//   5. Driver → FinishTrip           → fare calculated, trip status: completed
+service BookingService {
+  // BookRide creates a trip and immediately requests dispatch.
+  // Returns as soon as the dispatch search has been triggered (status: searching).
+  rpc BookRide(BookRideRequest) returns (BookRideResponse);
+
+  // AcceptDispatchOffer is called by the driver to accept the pending trip offer.
+  // Delegates to the Dispatch service; trip transitions to driver_assigned.
+  rpc AcceptDispatchOffer(AcceptDispatchOfferRequest) returns (BookingActionResponse);
+
+  // RejectDispatchOffer is called by the driver to reject the pending offer.
+  // Dispatch retries with the next nearest driver.
+  rpc RejectDispatchOffer(RejectDispatchOfferRequest) returns (BookingActionResponse);
+
+  // StartTrip is called by the driver when they begin the ride.
+  // Trip transitions from driver_assigned/driver_arrived to in_progress.
+  rpc StartTrip(StartTripRequest) returns (BookingActionResponse);
+
+  // FinishTrip is called by the driver when the ride ends.
+  // Computes the final fare via Pricing, then marks the trip completed.
+  rpc FinishTrip(FinishTripRequest) returns (FinishedTripResponse);
+
+  // GetBookingDetails returns the current state of a booking (trip + dispatch).
+  rpc GetBookingDetails(GetBookingDetailsRequest) returns (BookingDetailsResponse);
+}
+
+// ─── Requests ────────────────────────────────────────────────────────────────
+
+message BookRideRequest {
+  string rider_id        = 1;
+  string pickup_address  = 2;
+  string dropoff_address = 3;
+  double pickup_lat      = 4;
+  double pickup_lon      = 5;
+}
+
+message AcceptDispatchOfferRequest {
+  string trip_id   = 1;
+  string driver_id = 2;
+}
+
+message RejectDispatchOfferRequest {
+  string trip_id   = 1;
+  string driver_id = 2;
+}
+
+message StartTripRequest {
+  string trip_id = 1;
+}
+
+message FinishTripRequest {
+  string trip_id       = 1;
+  string vehicle_type  = 2; // car | motorcycle | van
+  double distance_km   = 3;
+  double duration_min  = 4;
+}
+
+message GetBookingDetailsRequest {
+  string trip_id = 1;
+}
+
+// ─── Responses ───────────────────────────────────────────────────────────────
+
+message BookRideResponse {
+  string trip_id = 1;
+  string status  = 2; // "searching"
+}
+
+message BookingActionResponse {
+  string trip_id = 1;
+  string status  = 2;
+}
+
+message FinishedTripResponse {
+  string trip_id         = 1;
+  string status          = 2; // "completed"
+  int64  final_fare      = 3; // smallest currency unit
+  string currency        = 4;
+  string vehicle_type    = 5;
+  double distance_km     = 6;
+  double duration_min    = 7;
+}
+
+message BookingDetailsResponse {
+  string trip_id          = 1;
+  string trip_status      = 2;
+  string rider_id         = 3;
+  string driver_id        = 4;
+  string pickup_address   = 5;
+  string dropoff_address  = 6;
+  string dispatch_status  = 7;
+  int64  final_fare       = 8;
+  string currency         = 9;
+}

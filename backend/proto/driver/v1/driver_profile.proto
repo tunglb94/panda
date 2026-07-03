@@ -1,0 +1,91 @@
+syntax = "proto3";
+
+package driver.v1;
+
+option go_package = "github.com/fairride/driver/grpc/driverpb";
+
+import "google/protobuf/timestamp.proto";
+
+// DriverProfileService manages driver profiles in the FAIRRIDE platform.
+// GPS, dispatch and matching are handled by dedicated services.
+service DriverProfileService {
+  // GetDriverProfile returns a driver profile by its driver_id.
+  rpc GetDriverProfile(GetDriverProfileRequest) returns (GetDriverProfileResponse);
+
+  // GetDriverProfileByUserID returns a driver profile by the associated user_id.
+  rpc GetDriverProfileByUserID(GetDriverProfileByUserIDRequest) returns (GetDriverProfileResponse);
+
+  // UpdateDriverProfile replaces vehicle info and license number.
+  rpc UpdateDriverProfile(UpdateDriverProfileRequest) returns (UpdateDriverProfileResponse);
+
+  // UpdateOnlineStatus sets the driver online or offline.
+  // A driver must be verified before they can go online.
+  rpc UpdateOnlineStatus(UpdateOnlineStatusRequest) returns (UpdateOnlineStatusResponse);
+
+  // UpdateVerificationStatus transitions the driver verification state.
+  // This is an admin-only operation.
+  rpc UpdateVerificationStatus(UpdateVerificationStatusRequest) returns (UpdateVerificationStatusResponse);
+}
+
+// ─── Request / Response messages ─────────────────────────────────────────────
+
+message GetDriverProfileRequest {
+  string driver_id = 1;
+}
+
+message GetDriverProfileByUserIDRequest {
+  string user_id = 1;
+}
+
+message GetDriverProfileResponse {
+  DriverProfileProto profile = 1;
+}
+
+message UpdateDriverProfileRequest {
+  string driver_id      = 1;
+  string license_number = 2;
+  string vehicle_type   = 3;
+  string vehicle_brand  = 4;
+  string vehicle_model  = 5;
+  string vehicle_color  = 6;
+  string plate_number   = 7;
+}
+
+message UpdateDriverProfileResponse {
+  DriverProfileProto profile = 1;
+}
+
+message UpdateOnlineStatusRequest {
+  string driver_id     = 1;
+  string online_status = 2; // "online" | "offline"
+}
+
+message UpdateOnlineStatusResponse {
+  DriverProfileProto profile = 1;
+}
+
+message UpdateVerificationStatusRequest {
+  string driver_id            = 1;
+  string verification_status  = 2; // "verified" | "rejected" | "suspended" | "reinstated"
+}
+
+message UpdateVerificationStatusResponse {
+  DriverProfileProto profile = 1;
+}
+
+// ─── Shared payload ───────────────────────────────────────────────────────────
+
+message DriverProfileProto {
+  string driver_id            = 1;
+  string user_id              = 2;
+  string license_number       = 3;
+  string vehicle_type         = 4;
+  string vehicle_brand        = 5;
+  string vehicle_model        = 6;
+  string vehicle_color        = 7;
+  string plate_number         = 8;
+  string online_status        = 9;
+  string verification_status  = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}

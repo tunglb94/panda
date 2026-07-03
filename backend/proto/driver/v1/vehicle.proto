@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package driver.v1;
+
+option go_package = "github.com/fairride/driver/grpc/driverpb";
+
+import "google/protobuf/timestamp.proto";
+
+// VehicleService manages vehicles registered by drivers.
+// No image upload, OCR, or verification in this service.
+service VehicleService {
+  // CreateVehicle registers a new vehicle for a driver.
+  rpc CreateVehicle(CreateVehicleRequest) returns (CreateVehicleResponse);
+
+  // UpdateVehicle replaces mutable vehicle fields.
+  rpc UpdateVehicle(UpdateVehicleRequest) returns (UpdateVehicleResponse);
+
+  // DeleteVehicle permanently removes a vehicle record.
+  rpc DeleteVehicle(DeleteVehicleRequest) returns (DeleteVehicleResponse);
+
+  // ListVehicles returns all vehicles belonging to a driver.
+  rpc ListVehicles(ListVehiclesRequest) returns (ListVehiclesResponse);
+}
+
+// ─── Request / Response messages ─────────────────────────────────────────────
+
+message CreateVehicleRequest {
+  string driver_id    = 1;
+  string type         = 2; // "car" | "motorcycle" | "van"
+  string brand        = 3;
+  string model        = 4;
+  string color        = 5;
+  string plate_number = 6;
+  int32  year         = 7; // manufacturing year; 0 = not provided
+}
+
+message CreateVehicleResponse {
+  VehicleProto vehicle = 1;
+}
+
+message UpdateVehicleRequest {
+  string vehicle_id   = 1;
+  string type         = 2;
+  string brand        = 3;
+  string model        = 4;
+  string color        = 5;
+  string plate_number = 6;
+  int32  year         = 7;
+}
+
+message UpdateVehicleResponse {
+  VehicleProto vehicle = 1;
+}
+
+message DeleteVehicleRequest {
+  string vehicle_id = 1;
+}
+
+message DeleteVehicleResponse {}
+
+message ListVehiclesRequest {
+  string driver_id = 1;
+}
+
+message ListVehiclesResponse {
+  repeated VehicleProto vehicles = 1;
+}
+
+// ─── Shared payload ───────────────────────────────────────────────────────────
+
+message VehicleProto {
+  string vehicle_id   = 1;
+  string driver_id    = 2;
+  string type         = 3;
+  string brand        = 4;
+  string model        = 5;
+  string color        = 6;
+  string plate_number = 7;
+  int32  year         = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}

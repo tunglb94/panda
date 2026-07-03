@@ -9,6 +9,8 @@ use (
 	./services/dispatch
 	./services/geo
 	./services/pricing
+	./services/booking
+	./services/gateway
 	./services/wallet
 	./services/payment
 	./services/promotion

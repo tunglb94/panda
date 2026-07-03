@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package driver.v1;
+
+option go_package = "github.com/fairride/driver/grpc/driverpb";
+
+import "google/protobuf/timestamp.proto";
+
+// DriverAvailabilityService manages real-time driver presence via Redis.
+// No GPS, no dispatch, no WebSocket.
+// Online keys carry a TTL; if heartbeat stops the driver is automatically
+// considered offline once the TTL expires.
+service DriverAvailabilityService {
+  // GoOnline marks a driver as online and starts the heartbeat clock.
+  rpc GoOnline(GoOnlineRequest) returns (AvailabilityResponse);
+
+  // GoOffline explicitly marks a driver as offline.
+  rpc GoOffline(GoOfflineRequest) returns (AvailabilityResponse);
+
+  // Heartbeat refreshes the online TTL.
+  // Returns FailedPrecondition if the driver is not currently online.
+  rpc Heartbeat(HeartbeatRequest) returns (AvailabilityResponse);
+
+  // GetAvailability returns the current online status and last-seen timestamp.
+  // Returns a zero last_seen timestamp if the driver has never been seen.
+  rpc GetAvailability(GetAvailabilityRequest) returns (AvailabilityResponse);
+}
+
+// ─── Request messages ────────────────────────────────────────────────────────
+
+message GoOnlineRequest {
+  string driver_id = 1;
+}
+
+message GoOfflineRequest {
+  string driver_id = 1;
+}
+
+message HeartbeatRequest {
+  string driver_id = 1;
+}
+
+message GetAvailabilityRequest {
+  string driver_id = 1;
+}
+
+// ─── Shared response ─────────────────────────────────────────────────────────
+
+message AvailabilityResponse {
+  string driver_id  = 1;
+  bool   is_online  = 2;
+  // last_seen is omitted from the response when it has never been set.
+  google.protobuf.Timestamp last_seen = 3;
+}
