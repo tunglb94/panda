@@ -2,8 +2,298 @@
 Last updated: 2026-07-06 by Principal Engineer AI
 
 ## Current Phase
-Phase H3-H4 — Hardening: Saga Reliability & Dispatch Lifecycle (COMPLETE)
-Previous: Phase 17 — Pickup & Destination Selection (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
+Phase D-02 — Driver App: Home Dashboard Module (COMPLETE)
+Previous: Phase D-01 — Driver App: Initial Project Scaffold (COMPLETE)
+
+## Phase D-02 — Driver App: Home Dashboard Module (COMPLETE — 2026-07-06)
+
+Reference: `docs/project/MVP_DEVELOPMENT_PLAN.md` Section 6 (Driver App
+Roadmap, stage D3 — UI portion) and Section 12 (Phase Registry). UI only —
+no backend, API, or protobuf changes. No state management library
+introduced.
+
+**New files under `apps/driver/lib/`:**
+| File | Purpose |
+|------|---------|
+| `shared/widgets/async_state_view.dart` | Hand-mirrored copy of `apps/rider`'s `AsyncStateView<T>` (Profile module, R-03) — no shared package between the two apps (D-01 decision), so re-implemented verbatim rather than imported |
+| `features/home/domain/models/driver_availability_status.dart` | `DriverAvailabilityStatus` enum (offline/goingOnline/online/goingOffline) — drives the toggle's own transient states |
+| `features/home/domain/models/driver_activity_status.dart` | `DriverActivityStatus` enum (offline/waitingForTrips/searchingNearby/busy) — drives the Home Status Card; an independent, finer-grained axis from availability (see design note below) |
+| `features/home/domain/models/driver_home_summary.dart` | `DriverHomeSummary` — driver identity, nullable vehicle (drives the Empty state), today's stats |
+| `features/home/data/driver_home_repository.dart` | `DriverHomeDemoMode` enum (normal/empty/error) + `DriverHomeRepository.fetchSummary()` — same dev-preview convention as Rider's Notification Center/Trip History |
+| `features/home/presentation/widgets/driver_summary_header.dart` | Avatar/name/rating/vehicle (or "No vehicle assigned yet") |
+| `features/home/presentation/widgets/home_stats_row.dart` | 3-column stat row: trips today, earnings today, online duration |
+| `features/home/presentation/widgets/availability_toggle.dart` | The large primary switch — owns its own mock transition timing (~1.2s to go online, ~0.9s to go offline), reports every state change (incl. transient) to the parent page |
+| `features/home/presentation/widgets/home_status_card.dart` | 4-message status card, cross-fades on change |
+| `features/home/presentation/widgets/quick_action_card.dart` + `quick_actions_section.dart` | Reusable action card + the 2×2 grid of Earnings/Trip History/Support/Vehicle, all placeholder-nav (SnackBar) only |
+| `features/home/presentation/pages/home_page.dart` | Rewritten (was the D-01 `PlaceholderTabContent` placeholder) — full dashboard, dev "Preview state" menu (Normal/Empty/Error data + Simulate/Clear busy) |
+
+**Design note — two related but distinct state axes:** the task listed 4
+toggle states (Offline/Going Online/Online/Going Offline) and 4 *different*
+status-card messages (Offline/Waiting for trips/Searching nearby/Busy). These
+aren't the same axis: going online settles into "Waiting for trips", then
+auto-advances to "Searching nearby" after ~3s (simulating idle offer
+polling) with no further user action — a real, if mock, animated state
+progression. "Busy" has no natural trigger yet (needs an assigned trip —
+Roadmap D4/D6, not built), so it's only reachable via the dev menu's
+"Simulate busy" / "Clear busy" — consistent with how Rider's R-03/R-04 make
+otherwise-unreachable states demoable.
+
+**Bugs found and fixed during this phase:**
+- `QuickActionCard`'s content (icon + label) overflowed its grid cell by
+  ~12px — `childAspectRatio: 2.4` made cells too short for the content at
+  the tested viewport width. This is a genuine responsive-layout bug (not
+  test-only): fixed by lowering the ratio to `1.6` (taller cells), which
+  also fixed a secondary hit-test-miss warning on the overflowing tile's
+  text (the overflow was corrupting layout enough to throw off tap
+  targeting too).
+- One D-01 test (`DriverApp shows Home tab and all 5 bottom nav
+  destinations`) started failing once this phase added an "Earnings" Quick
+  Action label, which duplicated the existing "Earnings" nav destination
+  label. Not a bug — tightened that assertion (and the others alongside it)
+  to `find.widgetWithText(NavigationDestination, ...)` so it specifically
+  checks the nav bar, unaffected by future same-named labels elsewhere on
+  the page.
+
+**Verified this session:** `flutter analyze` — 0 issues. `flutter test` —
+8/8 pass (3 from D-01, tightened as above + 5 new: dashboard loads
+summary/stats, toggle walks through all 4 states with the status card
+advancing in sync (Offline → Going Online → Online/Waiting → Searching →
+Going Offline → Offline), Empty state (no vehicle) via dev menu, Error state
+via dev menu, Quick Action tap shows its placeholder message).
+
+## Phase D-01 — Driver App: Initial Project Scaffold (COMPLETE — 2026-07-06)
+
+Reference: `docs/project/MVP_DEVELOPMENT_PLAN.md` Section 6 (Driver App
+Roadmap, stage D1) and Section 12 (Phase Registry). UI only — no backend,
+API, or protobuf changes. No state management library introduced. **First
+Driver App phase — `apps/driver` did not exist before this session.**
+
+**Scaffolding method:** ran `flutter create --org com.fairride --project-name
+driver apps/driver` (same approach `apps/rider` used in Phase 12) rather than
+hand-writing `android/`/`ios/` platform files. Bundle ID: `com.fairride.driver`.
+Bumped `flutter_lints` to `^6.0.0` (generator default was `^5.0.0`) to match
+`apps/rider`; SDK constraint (`^3.9.2`) already matched the installed
+toolchain, so — unlike R-01 — no version-mismatch fix was needed here.
+
+**Architecture decision (Roadmap D1 explicitly calls for one):** `apps/driver`
+is a fully separate Flutter project with its own `pubspec.yaml` — **no shared
+Dart package with `apps/rider`.** The design system (typography scale,
+button/card/input shapes) is hand-mirrored into Driver's own `AppTheme`
+rather than imported, with a distinct deep-orange accent (`#EF6C00`) replacing
+Rider's green (`#1A8C4E`) per the branding requirement. This means any future
+Rider design-system change must be manually ported to Driver's `AppTheme` too
+— a real cost, but this task's explicit ask was "decide," so this is
+recorded as a deliberate choice, not an oversight.
+
+**New files under `apps/driver/lib/`:**
+| File | Purpose |
+|------|---------|
+| `main.dart` / `app.dart` | Entry point — `DriverApp`, `MaterialApp.router`, same shape as `apps/rider`'s `main.dart`/`app.dart` |
+| `core/theme/app_theme.dart` | Driver's `AppTheme` — same structure as Rider's (incl. `CardThemeData`, not `CardTheme`, learned from the R-01 fix), distinct accent color |
+| `core/router/app_router.dart` | `go_router` with named routes (`name: 'home'` etc.) + `StatefulShellRoute.indexedStack`, 5 branches |
+| `shared/widgets/scaffold_with_nav.dart` | 5-destination bottom nav shell (Home/Trips/Earnings/Notifications/Profile) |
+| `shared/widgets/placeholder_tab_content.dart` | Reusable placeholder body (icon/title/subtitle), used by 4 of the 5 tabs |
+| `features/home\|trips\|earnings\|notifications/presentation/pages/*_page.dart` | Simple placeholder pages — no `domain`/`data` yet since there is no data to layer for a placeholder |
+| `features/profile/domain/models/app_info.dart` | `AppInfo` model + `BuildModeKind` enum — app version is mock, build mode is **real** (`kReleaseMode`/`kProfileMode`/`kDebugMode`), Flutter version/environment are explicit placeholders |
+| `features/profile/data/mock_app_info_repository.dart` | `MockAppInfoRepository` — the "data" layer requested by this phase's folder-structure requirement |
+| `features/profile/presentation/widgets/info_row.dart` | Reusable label/value row |
+| `features/profile/presentation/pages/profile_page.dart` | Placeholder + one real "Developer" entry point |
+| `features/profile/presentation/pages/developer_page.dart` | Development Utilities screen — the one fully "real" (if mock-data-backed) screen in this phase |
+
+**Folder structure note:** only the Profile feature has the full
+`domain/data/presentation/widgets` layering this phase's requirements
+describe — it's the one feature with actual data (`AppInfo`). The 4 simple
+placeholder tabs only have `presentation/pages/`, matching how `apps/rider`
+itself started (Phase 12: placeholder-only pages, domain layers added only
+when real data arrived in later phases). Profile's layering is the pattern
+future Driver phases (D2+) should follow for Home/Trips/Earnings/Notifications
+once they have real data.
+
+**Bug found and fixed during this phase:** `InfoRow`'s `Row` had no
+`Expanded` around the value `Text`, so the long placeholder strings (e.g.
+"3.35.4 (placeholder — not read at runtime)") overflowed on the Developer
+page — same class of bug as `ReceiptRow` in R-04, fixed the same way
+(`Expanded` + right-aligned wrapping text).
+
+**Verified this session:** `flutter pub get` — succeeds. `flutter analyze` —
+0 issues. `flutter test` — 3/3 pass (tab shell + all 5 destinations render,
+tab switching works, Developer page opens with all 4 diagnostic fields).
+All three commands run independently from `apps/rider`'s — separate Flutter
+projects, separate toolchain runs.
+
+## Phase R-04 — Rider App: Ride History Module (COMPLETE — 2026-07-06)
+
+Reference: `docs/project/MVP_DEVELOPMENT_PLAN.md` Section 5 (Rider App Roadmap,
+new stage R9 — not in the original roadmap, added this phase) and Section 12
+(Phase Registry). UI only — no backend, API, or protobuf changes. No state
+management library introduced.
+
+**New files under `apps/rider/lib/features/history/`:**
+| File | Purpose |
+|------|---------|
+| `domain/models/trip_history_status.dart` | `TripHistoryStatus` enum (completed/cancelled) + label/color/icon — distinct from `RiderTripStatus` (live trip phases in `features/trip`) |
+| `domain/models/trip_history_filters.dart` | `TripHistoryStatusFilter` (All/Completed/Cancelled) + `TripHistoryDateFilter` (All time/Today/This Week/This Month) with `.matches(DateTime)` |
+| `domain/models/trip_timeline_event.dart` | `TripTimelineEvent` (label/time/icon) for the Trip Detail timeline |
+| `domain/models/trip_history_entry.dart` | `TripHistoryEntry` — composed almost entirely from earlier phases' types: `TripSelection` (map/R-01), `MockDriver` (trip/R-02), `MockFareBreakdown` + `PaymentMethod` + `VehicleCategory` (booking/R-01). Plus `matchesQuery()` extension for the search box. |
+| `domain/models/mock_trip_history_catalog.dart` | 5 sample trips spanning today/this week/this month/45 days ago (so every date filter has both a match and a non-match), mixed completed/cancelled |
+| `domain/models/mock_trip_history_repository.dart` | `TripHistoryDemoMode` enum (normal/empty/error) + `MockTripHistoryRepository.fetchHistory()` — same dev-preview convention as Notification Center (R-03) |
+| `presentation/widgets/status_chip.dart` | Reusable Completed/Cancelled chip |
+| `presentation/widgets/trip_history_tile.dart` | Compact list row (driver+vehicle, status, pickup/destination, time, rating, fare) — deliberately its own compact widget rather than `PickupCard`/`DestinationCard` (those are sized for detail screens, not a dense list); still built on the same `TripSelection` data |
+| `presentation/widgets/trip_history_section_header.dart` | Date-group header + shared `labelFor()` day-bucketing logic ("Today"/"Yesterday"/"MMM d, yyyy") |
+| `presentation/widgets/history_filter_bar.dart` | Search field + status/date `ChoiceChip` rows, all client-side |
+| `presentation/widgets/vehicle_info_card.dart` | Dedicated "Vehicle information" block (icon/category/model/plate) — kept separate from `DriverInfoCard` per the phase's explicit item list |
+| `presentation/widgets/distance_duration_card.dart` | Distance/duration stat row, styled like `EtaArrivalCard`/`ProfileStatsRow` |
+| `presentation/widgets/trip_timeline.dart` | Vertical milestone timeline (Requested → Assigned → Started → Completed, or → Cancelled) |
+| `presentation/widgets/payment_method_row.dart` | Read-only payment display — reuses the `PaymentMethod` *model* but not `PaymentMethodCard` (that widget opens a picker, wrong affordance for a past trip) |
+| `presentation/widgets/receipt_row.dart` | `ReceiptRow` (label/value, monospace) + `ReceiptDivider` (dashed rule) — Receipt is deliberately styled distinct from `FareSummaryCard`, not reusing that widget |
+| `presentation/pages/trip_history_page.dart` | Trip History screen — `AsyncStateView<List<TripHistoryEntry>>`, dev "Preview state" menu, grouped-by-day list, in-place "no trips match these filters" message distinct from the repository-level Empty state |
+| `presentation/pages/trip_detail_page.dart` | Trip Detail — reuses `PickupCard`/`DestinationCard`/`FareSummaryCard` (booking) + `DriverInfoCard` (trip) directly |
+| `presentation/pages/receipt_page.dart` | Receipt — Trip ID/rider (`MockRiderProfileCatalog.sample.fullName`, reused from Profile)/driver/vehicle/date/payment/fare breakdown/mock 8% tax/total |
+| `history.dart` | Barrel export |
+
+**Integration point:** added a "Trip History" tile to `ProfilePage`, directly below the existing "Settings" tile (same style) — the original Phase-12 settings list had a "Trip History" entry that R-03 dropped when it replaced the list with the required 9-item set; this restores that access point on the module that now actually implements it.
+
+**Bugs found and fixed during this phase (not just pre-existing toolchain noise, like R-01/R-03):**
+- `TripHistoryPage._load()` called `setState(() => _future = ...)` — an arrow body, so the closure evaluated to (returned) the assigned `Future`, which throws `setState() callback argument returned a Future`. Fixed by switching to a block body `setState(() { _future = ...; })`, matching the pattern already used in `NotificationCenterPage`.
+- `ReceiptRow` had no `Expanded`/`Flexible` around its value `Text`, so a long combined value (e.g. "Toyota Vios (51G-123.45)") overflowed the row on narrow widths — a real responsive-layout bug, not just a test artifact. Fixed by wrapping the value in `Expanded` with right-aligned, wrapping text.
+
+**Verified this session:** `flutter analyze` — 0 issues. `flutter test` — 15/15 pass (9 from R-01/R-02/R-03 + 6 new: Trip History loads/groups by day, Completed filter hides cancelled trips, Empty state via dev menu, Error state via dev menu, Trip Detail shows route/driver/timeline/fare, Receipt shows trip ID/rider/total).
+
+## Phase R-03 — Rider App: Profile Module (COMPLETE — 2026-07-06)
+
+Reference: `docs/project/MVP_DEVELOPMENT_PLAN.md` Section 5 (Rider App Roadmap,
+stage R8 — UI portion only) and Section 12 (Phase Registry). UI only — no
+backend, API, or protobuf changes. No state management library introduced.
+
+**New files under `apps/rider/lib/features/profile/`:**
+| File | Purpose |
+|------|---------|
+| `domain/models/rider_profile.dart` | `MemberLevel` enum (standard/silver/gold/platinum, mock only) + `RiderProfile` model |
+| `domain/models/mock_profile_repository.dart` | `MockProfileRepository.fetchProfile({simulateError})` — simulated delay, sample data |
+| `domain/models/settings_entry.dart` | `SettingsAction` enum (9 required + `developerPreview`) + `SettingsEntry` model + `MockSettingsCatalog` (grouped: account/preferences/support/logout) |
+| `domain/models/notification_item.dart` | `NotificationType` enum + `NotificationItem` model (`copyWith`, `relativeTimeLabel`) |
+| `domain/models/mock_notification_repository.dart` | `NotificationDemoMode` enum (normal/empty/error) + `MockNotificationRepository` + `MockNotificationCatalog.sample()` |
+| `presentation/widgets/async_state_view.dart` | Generic `AsyncStateView<T>` — Loading/Success/Empty/Error wrapper around a `Future`, animated cross-fade between states. Reused by both Profile and Notification Center. |
+| `presentation/widgets/profile_header.dart` | Avatar (initials) + name + phone + member level badge |
+| `presentation/widgets/profile_stats_row.dart` | Rating + total completed trips, side by side |
+| `presentation/widgets/settings_tile.dart` | Reusable settings row (icon/label/chevron, destructive variant for Logout) |
+| `presentation/widgets/settings_section.dart` | Labelled (or unlabelled) group of `SettingsTile`s in a card |
+| `presentation/widgets/developer_preview_section.dart` | Carries the R-02 "Trip UI Preview (dev)" entry point into the new Settings screen, in its own Developer section |
+| `presentation/widgets/unread_badge.dart` | Reusable small count badge, animated in/out |
+| `presentation/widgets/notification_tile.dart` | Single notification row — animated read/unread background, unread dot |
+| `presentation/pages/profile_page.dart` | Rewritten Profile Screen — `AsyncStateView<RiderProfile>`, bell icon + `UnreadBadge`, "Settings" entry point |
+| `presentation/pages/settings_page.dart` | Settings Screen — 3 grouped sections (Account/Preferences/Support) + Developer section + standalone Logout; every non-Notifications/Logout tap shows an explicit placeholder message |
+| `presentation/pages/notification_center_page.dart` | Notification Center — `AsyncStateView<List<NotificationItem>>`, mark-one/mark-all read, dev "Preview state" menu (Normal/Empty/Error) |
+| `profile.dart` | Barrel export |
+
+**Integration points:**
+- `ProfilePage` is a `StatefulWidget` now (was `StatelessWidget`) — needed for the mock profile fetch and unread-count state. Router usage unchanged (`const ProfilePage()`, no params), so `app_router.dart` needed no edit this phase.
+- Notification unread count flows back to `ProfilePage` via `Navigator.push<int>` / `Navigator.pop(context, unreadCount)` — plain Navigator result passing, not a new state layer.
+- The old private `_SettingsTile`/inline settings list from Phase 12 is fully replaced by the new reusable `SettingsTile`/`SettingsSection` components.
+
+**Scoping decision (documented, not a shortcut):** Empty/Error states are demonstrated concretely in the Notification Center (where they're meaningful, via the dev preview menu) rather than forced onto the Profile screen, which only has a genuine Loading→Success path. `AsyncStateView` supports all four generically either way.
+
+**Verified this session:** `flutter analyze` — 0 issues. `flutter test` — 9/9 pass (4 from R-01/R-02 + 5 new: Profile loading→success, Settings lists all 9 entries, Notifications shows mock list, Notifications empty state via dev menu, Notifications error state via dev menu). One test-only fix needed: `ListView` virtualises off-screen children even with a plain `children:` list, so the Settings test grows the test viewport (`tester.view.physicalSize`) rather than asserting on real scroll gestures.
+
+## Phase R-02 — Rider App: Trip Lifecycle UI (COMPLETE — 2026-07-06)
+
+Reference: `docs/project/MVP_DEVELOPMENT_PLAN.md` Section 5 (Rider App Roadmap,
+stage R5 — UI portion only) and Section 12 (Phase Registry). UI only — no
+backend, API, or protobuf changes. No state management library introduced.
+
+**New files under `apps/rider/lib/features/trip/`:**
+| File | Purpose |
+|------|---------|
+| `domain/models/rider_trip_status.dart` | `RiderTripStatus` enum (5 states) + extension: label, short label, status message, icon, progress value, `isCancellable`/`hasDriver`/`showsEta`/`showsSafetyActions` flags |
+| `domain/models/mock_driver.dart` | `MockDriver` model (name, vehicle model, plate, rating, initials for avatar) |
+| `domain/models/mock_trip_catalog.dart` | Sample driver + mock ETA/arrival-time helpers per status |
+| `domain/models/mock_trip_repository.dart` | `MockTripRepository.watchLifecycle()` — async-generator `Stream<RiderTripStatus>`, the "mock repository" driving the timed demo; no HTTP |
+| `presentation/widgets/driver_info_card.dart` | Avatar (initials) + name + rating + vehicle/plate |
+| `presentation/widgets/trip_progress_indicator.dart` | 5-stage animated progress bar + labels |
+| `presentation/widgets/trip_status_banner.dart` | Icon + animated status message |
+| `presentation/widgets/eta_arrival_card.dart` | ETA + estimated arrival time |
+| `presentation/widgets/cancel_ride_button.dart` | Confirm dialog + mock cancel (no API call) |
+| `presentation/widgets/emergency_button.dart` | Placeholder — snackbar explains it's not implemented |
+| `presentation/widgets/contact_driver_button.dart` | Placeholder — snackbar explains it's not wired |
+| `presentation/pages/searching_driver_view.dart` | Searching Driver — pulsing icon animation, Cancel Ride |
+| `presentation/pages/driver_assigned_view.dart` | Driver Assigned — driver info, ETA, Contact/Emergency, Cancel Ride |
+| `presentation/pages/driver_arriving_view.dart` | Driver Arriving — same layout, shorter ETA |
+| `presentation/pages/trip_in_progress_view.dart` | Trip In Progress — no Cancel Ride (trip already started) |
+| `presentation/pages/trip_completed_view.dart` | Trip Completed — reuses Booking's `FareSummaryCard`; Done button; no Cancel/Contact/Emergency |
+| `presentation/pages/trip_lifecycle_page.dart` | `TripLifecyclePage` — persistent Scaffold, `AnimatedSwitcher` (fade+slide) across the 5 views, driven by `MockTripRepository` |
+| `presentation/pages/trip_state_preview_page.dart` | Renders one state in isolation with its own Scaffold — the "independently previewable" entry point |
+| `presentation/pages/trip_preview_menu_page.dart` | Lists all 5 states, navigates to `trip_state_preview_page.dart` for each |
+| `trip.dart` | Barrel export |
+
+**Integration points (minimal, additive, reusing the Booking UI as instructed):**
+- `features/booking/presentation/widgets/booking_form_body.dart` — `_handleBookRide` now pushes `TripLifecyclePage` (with the trip selection + fare captured at booking time) after the mock delay/snackbar, instead of just showing a snackbar
+- `features/profile/presentation/pages/profile_page.dart` — added a "Trip UI Preview (dev)" settings tile (required adding an `onTap` param to the existing private `_SettingsTile`) navigating to `TripPreviewMenuPage`
+- Every trip view reuses `PickupCard`/`DestinationCard` from the Booking module; `TripCompletedView` also reuses `FareSummaryCard` + `MockFareBreakdown`
+
+**Explicitly NOT done (by design — matches Roadmap R5's "real wiring" split):** no live driver location, no real Dispatch/Trip status polling, `MockTripRepository` runs on a fixed local timer only. Cancel/Contact Driver/Emergency are all mock placeholders that clearly tell the user so (snackbar/dialog text), never silently pretending to work.
+
+**Verified this session:** `flutter analyze` — 0 issues. `flutter test` — 4/4 pass (1 from R-01 + 3 new: preview menu lists all 5 states, Driver Assigned preview shows driver info/buttons, Trip Completed preview shows fare + hides Cancel Ride).
+
+## Phase R-01 — Rider App: Booking UI Module (COMPLETE — 2026-07-06)
+
+Reference: `docs/project/MVP_DEVELOPMENT_PLAN.md` Section 5 (Rider App Roadmap,
+stages R1 + R1b) and Section 12 (Phase Registry). UI only — no backend, API, or
+protobuf changes. No state management library introduced (plain
+`StatefulWidget`/`setState`, consistent with the rest of `apps/rider`).
+
+**New files under `apps/rider/lib/features/booking/`:**
+| File | Purpose |
+|------|---------|
+| `domain/models/vehicle_option.dart` | `VehicleCategory` enum + `VehicleOption` model (rates mirror `backend/services/pricing` `DefaultFareConfig` shape — mock only, no import) |
+| `domain/models/payment_method.dart` | `PaymentMethodType` enum + `PaymentMethod` model |
+| `domain/models/promo_result.dart` | `PromoResult` + `MockPromoValidator` (hardcoded codes `FAIRRIDE10`, `WELCOME20`) |
+| `domain/models/mock_trip_metrics.dart` | Haversine distance + rough duration estimate between `TripSelection` pickup/destination — client-side only, no routing API |
+| `domain/models/mock_fare_calculator.dart` | `MockFareBreakdown.calculate()` — mirrors the backend Pricing formula shape (`max(base+distance+time, minimum) + bookingFee`) |
+| `domain/models/mock_booking_catalog.dart` | Central mock data: vehicle list, payment methods, `sampleTripSelection` fallback |
+| `presentation/widgets/trip_point_cards.dart` | `PickupCard` + `DestinationCard` |
+| `presentation/widgets/vehicle_selector.dart` | Horizontally scrollable ride-option selector, animated selection |
+| `presentation/widgets/fare_summary_card.dart` | Itemised fare breakdown, animated total (`TweenAnimationBuilder`) |
+| `presentation/widgets/payment_method_card.dart` | Selected method + modal picker |
+| `presentation/widgets/promo_code_entry.dart` | Promo text entry, shake-on-invalid / check-on-valid animations |
+| `presentation/widgets/book_ride_button.dart` | CTA with idle → loading → success animated states (mock `Future.delayed`, no API call) |
+| `presentation/widgets/booking_form_body.dart` | Composes all of the above; shared by `BookingPage` and `BookingBottomSheet` |
+| `presentation/widgets/booking_bottom_sheet.dart` | Modal `DraggableScrollableSheet` wrapper around `BookingFormBody` |
+| `presentation/pages/booking_page.dart` | Rewritten (was Phase-12 static placeholder) — full-page host for `BookingFormBody` |
+| `booking.dart` | Barrel export (page + bottom sheet), matching the `core/location/location.dart` convention |
+
+**Integration points (minimal, additive):**
+- `core/router/app_router.dart` — Booking route now reads an optional `TripSelection` via `state.extra`
+- `features/map/presentation/pages/map_page.dart` — added a "Book this ride" button to the confirmed pickup/destination panel, opening `BookingBottomSheet` with the real `TripSelection`; no change to the existing selection state machine
+
+**Toolchain verification (Roadmap R1, previously blocked):**
+- This machine has a working Flutter 3.35.4 / Dart 3.9.2 install. `pubspec.yaml`'s `environment.sdk` constraint (`^3.12.2`, set on a machine with a newer/different toolchain) was lowered to `^3.9.2` to match — otherwise `flutter pub get` fails outright with a version-solving error.
+- Fixed to get `flutter analyze` clean: `AppTheme` — `ThemeData.cardTheme` needed `CardThemeData` (not `CardTheme`) on this SDK; `vehicle_selector.dart` — `unnecessary_underscores` lint (`(_, __)` → `(_, _)`); `test/widget_test.dart` — was still the unmodified `flutter create` counter-app template referencing a nonexistent `MyApp` class (real root widget is `RiderApp`), replaced with a real smoke test rendering `BookingPage`.
+- **Verified this session:** `flutter pub get` — succeeds (14 packages have newer versions available, not upgraded). `flutter analyze` — 0 issues. `flutter test` — 1/1 pass.
+
+**Explicitly NOT done (by design — see MVP_DEVELOPMENT_PLAN.md Section 9):** no API client, no real fare/booking/payment/promo backend calls, no auth. All data is mock. Real wiring is Roadmap stage R4 (booking submission) / R6 (payment), tracked separately.
+
+## MVP Development Plan (NEW — 2026-07-06, revised v1.1 same day after team review)
+`docs/project/MVP_DEVELOPMENT_PLAN.md` created — planning-only document, no code/API/proto changes.
+This is now the SSOT for MVP implementation ordering and supersedes ad-hoc phase sequencing
+until DOC-0004 (Implementation Master Plan) is generated. Key conclusions from the repo audit
+that produced it:
+- Identity has no register/login use case or API surface — nothing device-facing can authenticate
+  yet. **v1.1 correction:** this blocks Integration Testing / End-to-End (Milestone M4) only, NOT
+  Rider/Driver UI construction. Both UI tracks build against a MockAuth stub in parallel with real
+  Identity work (Section 9 Parallel Development Matrix, Section 10 tree: Foundation → {Backend
+  Core, Rider UI, Driver UI, Identity Integration} → Integration → Beta). MockAuth's interface
+  must mirror the real auth contract exactly (Section 14 Rule 5) so the swap at M4 is a config
+  change, not a rewrite.
+- CI only runs tests for `backend/shared`; per-service test suites (~460 tests across identity,
+  user, driver, trip, dispatch, pricing, booking, gateway) do not run in CI. CI build matrix is
+  also missing `booking` and `gateway`.
+- `apps/driver` and any admin web project do not exist yet.
+- Section 12 of the doc ("Phase Registry") is the forward-looking phase tracker going forward;
+  historical phases (1–17, H2–H4) remain recorded here and in CHANGELOG.md, not duplicated there.
+- Section 9 ("Parallel Development Matrix") is the fast day-to-day reference: what can be worked
+  on right now vs. what's actually blocked, per module.
+See the document itself for full detail: Current Project Status, Dependency Graph, Parallel
+Development Matrix, Recommended Development Order, per-app roadmaps, Milestones, and Risks.
 
 ## Documentation Strategy Change
 ORIGINAL: 72-document comprehensive roadmap

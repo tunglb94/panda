@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:rider/features/booking/presentation/widgets/booking_bottom_sheet.dart';
 import 'package:rider/features/map/domain/models/trip_selection.dart';
 
 // ─── Location resolution state machine (Phase 14) ────────────────────────────
@@ -259,6 +260,9 @@ class _MapPageState extends State<MapPage> {
             onConfirmDestination: _confirmDestination,
             onEditPickup: _editPickup,
             onEditDestination: _editDestination,
+            onBookRide: _tripSelection != null
+                ? () => BookingBottomSheet.show(context, tripSelection: _tripSelection!)
+                : null,
           ),
         ),
       ],
@@ -303,6 +307,7 @@ class _SelectionPanel extends StatelessWidget {
     required this.onConfirmDestination,
     required this.onEditPickup,
     required this.onEditDestination,
+    this.onBookRide,
   });
 
   final _SelectionMode mode;
@@ -313,6 +318,7 @@ class _SelectionPanel extends StatelessWidget {
   final VoidCallback onConfirmDestination;
   final VoidCallback onEditPickup;
   final VoidCallback onEditDestination;
+  final VoidCallback? onBookRide;
 
   @override
   Widget build(BuildContext context) {
@@ -429,6 +435,12 @@ class _SelectionPanel extends StatelessWidget {
             onPressed: onEditDestination,
             child: const Text('Edit'),
           ),
+        ),
+        const SizedBox(height: 20),
+        FilledButton.icon(
+          onPressed: onBookRide,
+          icon: const Icon(Icons.local_taxi),
+          label: const Text('Book this ride'),
         ),
       ],
     );
