@@ -55,6 +55,14 @@ func (r *stubJobRepo) FindExpiredOffers(_ context.Context, now time.Time) ([]*en
 	}
 	return out, nil
 }
+func (r *stubJobRepo) FindCurrentOfferForDriver(_ context.Context, driverID string) (*entity.DispatchJob, error) {
+	for _, j := range r.jobs {
+		if j.CurrentDriverID == driverID && j.Status == entity.JobStatusSearching {
+			return j, nil
+		}
+	}
+	return nil, domainerrors.NotFound("no active offer for driver: " + driverID)
+}
 
 // stubLocationRepo simulates a geo store with configurable active drivers.
 type stubLocationRepo struct {
@@ -542,6 +550,9 @@ func (r *composedJobRepo) FindByTripID(ctx context.Context, tripID string) (*ent
 }
 func (r *composedJobRepo) FindExpiredOffers(ctx context.Context, now time.Time) ([]*entity.DispatchJob, error) {
 	return r.finder.FindExpiredOffers(ctx, now)
+}
+func (r *composedJobRepo) FindCurrentOfferForDriver(ctx context.Context, driverID string) (*entity.DispatchJob, error) {
+	return r.finder.FindCurrentOfferForDriver(ctx, driverID)
 }
 
 // TestEngine_StartCalledTwiceCreatesOneWorker verifies that calling Start() more than

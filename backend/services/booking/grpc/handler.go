@@ -6,6 +6,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/fairride/booking/app"
 	"github.com/fairride/booking/grpc/bookingpb"
@@ -14,15 +15,16 @@ import (
 // Handler implements bookingpb.BookingServiceServer.
 type Handler struct {
 	bookingpb.UnimplementedBookingServiceServer
-	bookRide      *app.BookRideUseCase
-	acceptOffer   *app.AcceptDispatchOfferUseCase
-	rejectOffer   *app.RejectDispatchOfferUseCase
-	startTrip     *app.StartTripUseCase
-	finishTrip    *app.FinishTripUseCase
-	getDetails    *app.GetBookingDetailsUseCase
+	bookRide       *app.BookRideUseCase
+	acceptOffer    *app.AcceptDispatchOfferUseCase
+	rejectOffer    *app.RejectDispatchOfferUseCase
+	startTrip      *app.StartTripUseCase
+	finishTrip     *app.FinishTripUseCase
+	getDetails     *app.GetBookingDetailsUseCase
+	getDriverOffer *app.GetDriverCurrentOfferUseCase
 }
 
-// NewHandler wires all six booking use cases into a gRPC handler.
+// NewHandler wires all seven booking use cases into a gRPC handler.
 func NewHandler(
 	bookRide *app.BookRideUseCase,
 	acceptOffer *app.AcceptDispatchOfferUseCase,
@@ -30,14 +32,16 @@ func NewHandler(
 	startTrip *app.StartTripUseCase,
 	finishTrip *app.FinishTripUseCase,
 	getDetails *app.GetBookingDetailsUseCase,
+	getDriverOffer *app.GetDriverCurrentOfferUseCase,
 ) *Handler {
 	return &Handler{
-		bookRide:    bookRide,
-		acceptOffer: acceptOffer,
-		rejectOffer: rejectOffer,
-		startTrip:   startTrip,
-		finishTrip:  finishTrip,
-		getDetails:  getDetails,
+		bookRide:       bookRide,
+		acceptOffer:    acceptOffer,
+		rejectOffer:    rejectOffer,
+		startTrip:      startTrip,
+		finishTrip:     finishTrip,
+		getDetails:     getDetails,
+		getDriverOffer: getDriverOffer,
 	}
 }
 
@@ -152,4 +156,28 @@ func (h *Handler) GetBookingDetails(ctx context.Context, req *bookingpb.GetBooki
 		FinalFare:      details.FinalFare,
 		Currency:       details.Currency,
 	}, nil
+}
+
+// GetDriverCurrentOffer implements BookingServiceServer.GetDriverCurrentOffer.
+func (h *Handler) GetDriverCurrentOffer(ctx context.Context, req *bookingpb.GetDriverCurrentOfferRequest) (*bookingpb.GetDriverCurrentOfferResponse, error) {
+	if req.GetDriverId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "driver_id is required")
+	}
+	offer, err := h.getDriverOffer.Execute(ctx, req.GetDriverId())
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if offer == nil {
+		return &bookingpb.GetDriverCurrentOfferResponse{HasOffer: false}, nil
+	}
+	resp := &bookingpb.GetDriverCurrentOfferResponse{
+		HasOffer:       true,
+		TripId:         offer.TripID,
+		PickupAddress:  offer.PickupAddress,
+		DropoffAddress: offer.DropoffAddress,
+	}
+	if !offer.OfferExpiresAt.IsZero() {
+		resp.OfferExpiresAt = timestamppb.New(offer.OfferExpiresAt)
+	}
+	return resp, nil
 }

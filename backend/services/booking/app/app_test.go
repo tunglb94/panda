@@ -132,6 +132,10 @@ func (s *stubDispatch) GetDispatchStatus(_ context.Context, tripID string) (*app
 	return j, nil
 }
 
+func (s *stubDispatch) GetDriverOffer(_ context.Context, _ string) (*app.DriverOfferInfo, error) {
+	return nil, nil
+}
+
 type stubPricing struct {
 	fare     int64
 	currency string

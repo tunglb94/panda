@@ -40,6 +40,9 @@ func NewRouter(
 	mux.Handle("POST /api/v1/rides/{tripID}/start", auth(http.HandlerFunc(bh.StartTrip)))
 	mux.Handle("POST /api/v1/rides/{tripID}/finish", auth(http.HandlerFunc(bh.FinishTrip)))
 
+	// Driver trip offer — auth required (driver polls this endpoint).
+	mux.Handle("GET /api/v1/driver/current-offer", auth(http.HandlerFunc(bh.GetDriverOffer)))
+
 	return middleware.Logging(log)(mux)
 }
 

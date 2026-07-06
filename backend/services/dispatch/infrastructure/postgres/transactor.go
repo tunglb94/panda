@@ -112,6 +112,20 @@ func (r *txDispatchRepository) FindByTripID(ctx context.Context, tripID string) 
 	return scanDispatchJob(r.tx.QueryRow(ctx, q, tripID))
 }
 
+func (r *txDispatchRepository) FindCurrentOfferForDriver(ctx context.Context, driverID string) (*entity.DispatchJob, error) {
+	const q = `
+		SELECT job_id, trip_id, rider_id, pickup_lat, pickup_lon,
+		       status, current_driver_id, assigned_driver_id, offered_driver_ids,
+		       offer_expires_at, offer_timeout_sec, max_attempts, attempt_count,
+		       created_at, updated_at
+		FROM dispatch_jobs
+		WHERE current_driver_id = $1
+		  AND status = 'searching'
+		  AND offer_expires_at > NOW()
+		LIMIT 1`
+	return scanDispatchJob(r.tx.QueryRow(ctx, q, driverID))
+}
+
 func (r *txDispatchRepository) FindExpiredOffers(ctx context.Context, now time.Time) ([]*entity.DispatchJob, error) {
 	const q = `
 		SELECT job_id, trip_id, rider_id, pickup_lat, pickup_lon,

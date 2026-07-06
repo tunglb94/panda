@@ -57,3 +57,20 @@ func (a *DispatchAdapter) GetDispatchStatus(ctx context.Context, tripID string) 
 		AssignedDriverID: job.GetAssignedDriverId(),
 	}, nil
 }
+
+func (a *DispatchAdapter) GetDriverOffer(ctx context.Context, driverID string) (*app.DriverOfferInfo, error) {
+	resp, err := a.client.GetDriverOffer(ctx, &dispatchpb.GetDriverOfferRequest{DriverId: driverID})
+	if err != nil {
+		return nil, err
+	}
+	if !resp.GetHasOffer() {
+		return nil, nil
+	}
+	info := &app.DriverOfferInfo{
+		TripID: resp.GetTripId(),
+	}
+	if ts := resp.GetOfferExpiresAt(); ts != nil {
+		info.OfferExpiresAt = ts.AsTime()
+	}
+	return info, nil
+}

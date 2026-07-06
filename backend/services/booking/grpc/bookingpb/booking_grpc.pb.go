@@ -19,12 +19,13 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	BookingService_BookRide_FullMethodName            = "/booking.v1.BookingService/BookRide"
-	BookingService_AcceptDispatchOffer_FullMethodName = "/booking.v1.BookingService/AcceptDispatchOffer"
-	BookingService_RejectDispatchOffer_FullMethodName = "/booking.v1.BookingService/RejectDispatchOffer"
-	BookingService_StartTrip_FullMethodName           = "/booking.v1.BookingService/StartTrip"
-	BookingService_FinishTrip_FullMethodName          = "/booking.v1.BookingService/FinishTrip"
-	BookingService_GetBookingDetails_FullMethodName   = "/booking.v1.BookingService/GetBookingDetails"
+	BookingService_BookRide_FullMethodName              = "/booking.v1.BookingService/BookRide"
+	BookingService_AcceptDispatchOffer_FullMethodName   = "/booking.v1.BookingService/AcceptDispatchOffer"
+	BookingService_RejectDispatchOffer_FullMethodName   = "/booking.v1.BookingService/RejectDispatchOffer"
+	BookingService_StartTrip_FullMethodName             = "/booking.v1.BookingService/StartTrip"
+	BookingService_FinishTrip_FullMethodName            = "/booking.v1.BookingService/FinishTrip"
+	BookingService_GetBookingDetails_FullMethodName     = "/booking.v1.BookingService/GetBookingDetails"
+	BookingService_GetDriverCurrentOffer_FullMethodName = "/booking.v1.BookingService/GetDriverCurrentOffer"
 )
 
 // BookingServiceClient is the client API for BookingService service.
@@ -48,6 +49,9 @@ type BookingServiceClient interface {
 	FinishTrip(ctx context.Context, in *FinishTripRequest, opts ...grpc.CallOption) (*FinishedTripResponse, error)
 	// GetBookingDetails returns the current state of a booking (trip + dispatch).
 	GetBookingDetails(ctx context.Context, in *GetBookingDetailsRequest, opts ...grpc.CallOption) (*BookingDetailsResponse, error)
+	// GetDriverCurrentOffer returns the current pending trip offer for a driver.
+	// Returns has_offer=false (not an error) when no active offer exists.
+	GetDriverCurrentOffer(ctx context.Context, in *GetDriverCurrentOfferRequest, opts ...grpc.CallOption) (*GetDriverCurrentOfferResponse, error)
 }
 
 type bookingServiceClient struct {
@@ -112,6 +116,15 @@ func (c *bookingServiceClient) GetBookingDetails(ctx context.Context, in *GetBoo
 	return out, nil
 }
 
+func (c *bookingServiceClient) GetDriverCurrentOffer(ctx context.Context, in *GetDriverCurrentOfferRequest, opts ...grpc.CallOption) (*GetDriverCurrentOfferResponse, error) {
+	out := new(GetDriverCurrentOfferResponse)
+	err := c.cc.Invoke(ctx, BookingService_GetDriverCurrentOffer_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BookingServiceServer is the server API for BookingService service.
 // All implementations must embed UnimplementedBookingServiceServer
 // for forward compatibility
@@ -133,6 +146,9 @@ type BookingServiceServer interface {
 	FinishTrip(context.Context, *FinishTripRequest) (*FinishedTripResponse, error)
 	// GetBookingDetails returns the current state of a booking (trip + dispatch).
 	GetBookingDetails(context.Context, *GetBookingDetailsRequest) (*BookingDetailsResponse, error)
+	// GetDriverCurrentOffer returns the current pending trip offer for a driver.
+	// Returns has_offer=false (not an error) when no active offer exists.
+	GetDriverCurrentOffer(context.Context, *GetDriverCurrentOfferRequest) (*GetDriverCurrentOfferResponse, error)
 	mustEmbedUnimplementedBookingServiceServer()
 }
 
@@ -157,6 +173,9 @@ func (UnimplementedBookingServiceServer) FinishTrip(context.Context, *FinishTrip
 }
 func (UnimplementedBookingServiceServer) GetBookingDetails(context.Context, *GetBookingDetailsRequest) (*BookingDetailsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBookingDetails not implemented")
+}
+func (UnimplementedBookingServiceServer) GetDriverCurrentOffer(context.Context, *GetDriverCurrentOfferRequest) (*GetDriverCurrentOfferResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetDriverCurrentOffer not implemented")
 }
 func (UnimplementedBookingServiceServer) mustEmbedUnimplementedBookingServiceServer() {}
 
@@ -279,6 +298,24 @@ func _BookingService_GetBookingDetails_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BookingService_GetDriverCurrentOffer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDriverCurrentOfferRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BookingServiceServer).GetDriverCurrentOffer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BookingService_GetDriverCurrentOffer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BookingServiceServer).GetDriverCurrentOffer(ctx, req.(*GetDriverCurrentOfferRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // BookingService_ServiceDesc is the grpc.ServiceDesc for BookingService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -309,6 +346,10 @@ var BookingService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetBookingDetails",
 			Handler:    _BookingService_GetBookingDetails_Handler,
+		},
+		{
+			MethodName: "GetDriverCurrentOffer",
+			Handler:    _BookingService_GetDriverCurrentOffer_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

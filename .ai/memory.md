@@ -2,7 +2,8 @@
 Last updated: 2026-07-06 by Principal Engineer AI
 
 ## Current Phase
-Phase 20 — Driver Maps & Current Location (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
+Phase 21 — Driver Trip Offer (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
+Previous: Phase 20 — Driver Maps & Current Location (COMPLETE)
 Previous: Phase 19 — Driver Authentication & Availability (COMPLETE)
 Previous: Phase H3-H4 — Hardening: Saga Reliability & Dispatch Lifecycle (COMPLETE)
 
@@ -1308,6 +1309,108 @@ flutter analyze
 
 ### Human Checkpoint
 HC-P20 pending CTO approval to proceed to next phase.
+
+---
+
+## Phase 21 — Driver Trip Offer (COMPLETE — pub get + analyze pending)
+
+### Backend — NEW endpoint chain
+
+**`GET /api/v1/driver/current-offer`** — polls for active trip offer; returns `has_offer=false` when none.
+
+#### Dispatch service
+| File | Change |
+|------|--------|
+| `backend/proto/dispatch/v1/dispatch.proto` | Added `GetDriverOffer` RPC + `GetDriverOfferRequest/Response` messages |
+| `services/dispatch/grpc/dispatchpb/dispatch.pb.go` + `dispatch_grpc.pb.go` | Regenerated (protoc) |
+| `services/dispatch/domain/repository/repository.go` | Added `FindCurrentOfferForDriver` to `DispatchJobRepository` interface |
+| `services/dispatch/infrastructure/postgres/dispatch_repository.go` | Implemented `FindCurrentOfferForDriver` |
+| `services/dispatch/infrastructure/postgres/transactor.go` | Added `FindCurrentOfferForDriver` to `txDispatchRepository` |
+| `services/dispatch/app/get_driver_offer.go` | NEW — `GetDriverOfferUseCase` |
+| `services/dispatch/grpc/handler.go` | Added 6th use case field + `GetDriverOffer` RPC |
+| `services/dispatch/grpc/handler_test.go` | Added `FindCurrentOfferForDriver` stub; updated `newHandler`; added 3 `TestGetDriverOffer_*` tests |
+| `services/dispatch/app/app_test.go` | Added `FindCurrentOfferForDriver` to all stub repos |
+| `services/dispatch/cmd/server/main.go` | Wired `GetDriverOfferUseCase` |
+
+**SQL query:** `SELECT ... FROM dispatch_jobs WHERE current_driver_id = $1 AND status = 'searching' AND offer_expires_at > NOW() LIMIT 1`
+
+**CodeNotFound → `{has_offer: false}`** (not an error at the RPC level).
+
+#### Booking service
+| File | Change |
+|------|--------|
+| `backend/proto/booking/v1/booking.proto` | Added `import timestamp`, `GetDriverCurrentOffer` RPC, `GetDriverCurrentOfferRequest/Response` messages |
+| `services/booking/grpc/bookingpb/booking.pb.go` + `booking_grpc.pb.go` | Regenerated (protoc) |
+| `services/booking/app/clients.go` | Added `DriverOfferInfo` type; added `GetDriverOffer` to `DispatchClient` interface; added `time` import |
+| `services/booking/app/get_driver_offer.go` | NEW — `GetDriverCurrentOfferUseCase` (dispatch.GetDriverOffer + trip.GetTrip) |
+| `services/booking/grpc/adapters/dispatch_adapter.go` | Implemented `GetDriverOffer` |
+| `services/booking/grpc/handler.go` | Added 7th field + `GetDriverCurrentOffer` RPC + `timestamppb` import |
+| `services/booking/grpc/handler_test.go` | Added `GetDriverOffer` stub; updated `newHandler`; added `stubDispatchWithOffer`; added 3 `TestGetDriverCurrentOffer_*` tests |
+| `services/booking/app/app_test.go` | Added `GetDriverOffer` to `stubDispatch` |
+| `services/booking/cmd/server/main.go` | Wired `GetDriverCurrentOfferUseCase` |
+
+**Orchestration:** dispatch returns `{has_offer, trip_id, offer_expires_at}` → booking fetches trip addresses → gateway gets `{has_offer, trip_id, pickup_address, dropoff_address, offer_expires_at}`.
+
+#### Gateway service
+| File | Change |
+|------|--------|
+| `services/gateway/http/handlers/booking_handler.go` | Added `GetDriverCurrentOffer` to `BookingClient` interface; added `GetDriverOffer` HTTP handler |
+| `services/gateway/http/router.go` | Added `GET /api/v1/driver/current-offer` route (auth-gated) |
+| `services/gateway/http/handlers/booking_handler_test.go` | Added `getDriverCurrentOffer` to stub; added 3 `TestGetDriverOffer_*` tests |
+
+#### Test counts after Phase 21
+| Package | Tests |
+|---------|-------|
+| `dispatch/app` | 22 |
+| `dispatch/grpc` | 19 (+3) |
+| `booking/app` | 21 |
+| `booking/grpc` | 17 (+3) |
+| `gateway/http/handlers` | 17 (+3) |
+| **All services** | ✅ 0 failures |
+
+### Flutter Driver App
+
+**New files:**
+| File | Purpose |
+|------|---------|
+| `apps/driver/lib/features/trip/data/trip_offer_repository.dart` | `TripOffer` model + `TripOfferRepository` (getCurrentOffer / acceptOffer / rejectOffer) |
+
+**Modified files:**
+| File | Change |
+|------|--------|
+| `apps/driver/lib/features/trip/presentation/pages/trip_page.dart` | Fully rewritten — polls backend every 5s; shows offer card with countdown; Accept/Reject actions |
+| `apps/driver/lib/core/router/app_router.dart` | TripPage now receives `apiClient` constructor param |
+
+**TripPage state machine (`_PageState`):**
+| State | Trigger | UI |
+|---|---|---|
+| `polling` | initial / no offer / after reject | Spinner + "Waiting for trip offers…" |
+| `offerAvailable` | offer returned from API | `_OfferCard` with countdown badge + Accept/Reject buttons |
+| `acting` | Accept or Reject tapped | Full-screen `CircularProgressIndicator` |
+| `accepted` | Accept success | `_AcceptedView` — check icon + "Head to pickup" — auto-returns to polling after 3s |
+| `error` | network error (poll or action) | `_ErrorView` with Retry button |
+
+**Polling design:**
+- `Timer.periodic(5s)` created in `initState`
+- `_isPollingActive` bool prevents concurrent overlapping polls
+- Poll is skipped when state is `acting` or `accepted`
+- Countdown: `Timer.periodic(1s)`, clamps to 0; auto-dismisses offer when countdown hits 0
+
+**Distance/fare:** displayed as "—" — trip has only string addresses, no coordinates for calculation. Will be added when geocoding is introduced.
+
+**Accept/Reject:** uses existing endpoints — no new backend needed:
+- Accept: `POST /api/v1/rides/{tripId}/accept`
+- Reject: `POST /api/v1/rides/{tripId}/reject`
+
+### Action required on home machine
+```bash
+cd apps/driver
+flutter pub get
+flutter analyze
+```
+
+### Human Checkpoint
+HC-P21 pending CTO approval to proceed to next phase.
 
 ---
 

@@ -17,17 +17,19 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // ─── Stub client ─────────────────────────────────────────────────────────────
 
 type stubBookingClient struct {
-	bookRide            func(ctx context.Context, in *bookingpb.BookRideRequest, opts ...grpc.CallOption) (*bookingpb.BookRideResponse, error)
-	acceptDispatchOffer func(ctx context.Context, in *bookingpb.AcceptDispatchOfferRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error)
-	rejectDispatchOffer func(ctx context.Context, in *bookingpb.RejectDispatchOfferRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error)
-	startTrip           func(ctx context.Context, in *bookingpb.StartTripRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error)
-	finishTrip          func(ctx context.Context, in *bookingpb.FinishTripRequest, opts ...grpc.CallOption) (*bookingpb.FinishedTripResponse, error)
-	getBookingDetails   func(ctx context.Context, in *bookingpb.GetBookingDetailsRequest, opts ...grpc.CallOption) (*bookingpb.BookingDetailsResponse, error)
+	bookRide              func(ctx context.Context, in *bookingpb.BookRideRequest, opts ...grpc.CallOption) (*bookingpb.BookRideResponse, error)
+	acceptDispatchOffer   func(ctx context.Context, in *bookingpb.AcceptDispatchOfferRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error)
+	rejectDispatchOffer   func(ctx context.Context, in *bookingpb.RejectDispatchOfferRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error)
+	startTrip             func(ctx context.Context, in *bookingpb.StartTripRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error)
+	finishTrip            func(ctx context.Context, in *bookingpb.FinishTripRequest, opts ...grpc.CallOption) (*bookingpb.FinishedTripResponse, error)
+	getBookingDetails     func(ctx context.Context, in *bookingpb.GetBookingDetailsRequest, opts ...grpc.CallOption) (*bookingpb.BookingDetailsResponse, error)
+	getDriverCurrentOffer func(ctx context.Context, in *bookingpb.GetDriverCurrentOfferRequest, opts ...grpc.CallOption) (*bookingpb.GetDriverCurrentOfferResponse, error)
 }
 
 func (s *stubBookingClient) BookRide(ctx context.Context, in *bookingpb.BookRideRequest, opts ...grpc.CallOption) (*bookingpb.BookRideResponse, error) {
@@ -47,6 +49,12 @@ func (s *stubBookingClient) FinishTrip(ctx context.Context, in *bookingpb.Finish
 }
 func (s *stubBookingClient) GetBookingDetails(ctx context.Context, in *bookingpb.GetBookingDetailsRequest, opts ...grpc.CallOption) (*bookingpb.BookingDetailsResponse, error) {
 	return s.getBookingDetails(ctx, in, opts...)
+}
+func (s *stubBookingClient) GetDriverCurrentOffer(ctx context.Context, in *bookingpb.GetDriverCurrentOfferRequest, opts ...grpc.CallOption) (*bookingpb.GetDriverCurrentOfferResponse, error) {
+	if s.getDriverCurrentOffer != nil {
+		return s.getDriverCurrentOffer(ctx, in, opts...)
+	}
+	return &bookingpb.GetDriverCurrentOfferResponse{HasOffer: false}, nil
 }
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
@@ -370,5 +378,76 @@ func TestGRPCErrorMapping(t *testing.T) {
 		if w.Code != tc.wantHTTP {
 			t.Errorf("grpc code %v: want HTTP %d, got %d", tc.grpcCode, tc.wantHTTP, w.Code)
 		}
+	}
+}
+
+// ─── GetDriverOffer ──────────────────────────────────────────────────────────
+
+func TestGetDriverOffer_HasOffer(t *testing.T) {
+	expires := time.Date(2026, 1, 1, 13, 0, 0, 0, time.UTC)
+	stub := &stubBookingClient{
+		getDriverCurrentOffer: func(_ context.Context, _ *bookingpb.GetDriverCurrentOfferRequest, _ ...grpc.CallOption) (*bookingpb.GetDriverCurrentOfferResponse, error) {
+			return &bookingpb.GetDriverCurrentOfferResponse{
+				HasOffer:       true,
+				TripId:         "trip1",
+				PickupAddress:  "123 Main St",
+				DropoffAddress: "456 Elm Ave",
+				OfferExpiresAt: timestamppb.New(expires),
+			}, nil
+		},
+	}
+	h := handlers.NewBookingHandler(stub)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/driver/current-offer", nil)
+	req = withClaims(req, "driver-1", "driver")
+	w := httptest.NewRecorder()
+	h.GetDriverOffer(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if body["has_offer"] != true {
+		t.Errorf("has_offer = %v, want true", body["has_offer"])
+	}
+	if body["trip_id"] != "trip1" {
+		t.Errorf("trip_id = %v, want trip1", body["trip_id"])
+	}
+	if body["pickup_address"] != "123 Main St" {
+		t.Errorf("pickup_address = %v, want 123 Main St", body["pickup_address"])
+	}
+}
+
+func TestGetDriverOffer_NoOffer(t *testing.T) {
+	stub := &stubBookingClient{}
+	h := handlers.NewBookingHandler(stub)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/driver/current-offer", nil)
+	req = withClaims(req, "driver-1", "driver")
+	w := httptest.NewRecorder()
+	h.GetDriverOffer(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if body["has_offer"] != false {
+		t.Errorf("has_offer = %v, want false", body["has_offer"])
+	}
+}
+
+func TestGetDriverOffer_MissingClaims(t *testing.T) {
+	stub := &stubBookingClient{}
+	h := handlers.NewBookingHandler(stub)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/driver/current-offer", nil)
+	// no withClaims
+	w := httptest.NewRecorder()
+	h.GetDriverOffer(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", w.Code)
 	}
 }

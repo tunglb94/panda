@@ -4,6 +4,8 @@ package booking.v1;
 
 option go_package = "github.com/fairride/booking/grpc/bookingpb";
 
+import "google/protobuf/timestamp.proto";
+
 // BookingService is the orchestration layer for the FAIRRIDE end-to-end booking flow.
 // It composes Trip, Dispatch, and Pricing services to provide a single surface for
 // rider and driver booking actions.
@@ -37,6 +39,10 @@ service BookingService {
 
   // GetBookingDetails returns the current state of a booking (trip + dispatch).
   rpc GetBookingDetails(GetBookingDetailsRequest) returns (BookingDetailsResponse);
+
+  // GetDriverCurrentOffer returns the current pending trip offer for a driver.
+  // Returns has_offer=false (not an error) when no active offer exists.
+  rpc GetDriverCurrentOffer(GetDriverCurrentOfferRequest) returns (GetDriverCurrentOfferResponse);
 }
 
 // ─── Requests ────────────────────────────────────────────────────────────────
@@ -106,4 +112,16 @@ message BookingDetailsResponse {
   string dispatch_status  = 7;
   int64  final_fare       = 8;
   string currency         = 9;
+}
+
+message GetDriverCurrentOfferRequest {
+  string driver_id = 1;
+}
+
+message GetDriverCurrentOfferResponse {
+  bool   has_offer        = 1;
+  string trip_id          = 2;
+  string pickup_address   = 3;
+  string dropoff_address  = 4;
+  google.protobuf.Timestamp offer_expires_at = 5;
 }

@@ -48,6 +48,14 @@ func (r *stubJobRepo) FindByTripID(_ context.Context, tripID string) (*entity.Di
 func (r *stubJobRepo) FindExpiredOffers(_ context.Context, _ time.Time) ([]*entity.DispatchJob, error) {
 	return nil, nil
 }
+func (r *stubJobRepo) FindCurrentOfferForDriver(_ context.Context, driverID string) (*entity.DispatchJob, error) {
+	for _, j := range r.jobs {
+		if j.CurrentDriverID == driverID && j.Status == entity.JobStatusSearching {
+			return j, nil
+		}
+	}
+	return nil, domainerrors.NotFound("no active offer for driver: " + driverID)
+}
 
 type stubLocRepo struct{ nearby []string }
 
@@ -105,6 +113,7 @@ func newHandler(jobs *stubJobRepo, locs *stubLocRepo, trips *stubTripUpdater) *d
 		app.NewRejectTripUseCase(jobs, locs, trips),
 		app.NewUpdateDriverLocationUseCase(locs),
 		app.NewGetDispatchStatusUseCase(jobs),
+		app.NewGetDriverOfferUseCase(jobs),
 	)
 }
 
@@ -324,6 +333,53 @@ func TestGetDispatchStatus_NotFound(t *testing.T) {
 func TestGetDispatchStatus_MissingTripID(t *testing.T) {
 	h := newHandler(newStubJobRepo(), &stubLocRepo{}, newStubTripUpdater())
 	_, err := h.GetDispatchStatus(context.Background(), &dispatchpb.GetDispatchStatusRequest{})
+	s, _ := status.FromError(err)
+	if s.Code() != codes.InvalidArgument {
+		t.Errorf("code = %v, want InvalidArgument", s.Code())
+	}
+}
+
+// ─── GetDriverOffer ──────────────────────────────────────────────────────────
+
+func TestGetDriverOffer_HasOffer(t *testing.T) {
+	jobs := newStubJobRepo()
+	seedJobWithOffer(jobs, "trip1", "d1")
+	h := newHandler(jobs, &stubLocRepo{}, newStubTripUpdater())
+
+	resp, err := h.GetDriverOffer(context.Background(), &dispatchpb.GetDriverOfferRequest{
+		DriverId: "d1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.HasOffer {
+		t.Error("has_offer = false, want true")
+	}
+	if resp.TripId != "trip1" {
+		t.Errorf("trip_id = %q, want trip1", resp.TripId)
+	}
+	if resp.OfferExpiresAt == nil {
+		t.Error("offer_expires_at is nil, want non-nil")
+	}
+}
+
+func TestGetDriverOffer_NoOffer(t *testing.T) {
+	h := newHandler(newStubJobRepo(), &stubLocRepo{}, newStubTripUpdater())
+
+	resp, err := h.GetDriverOffer(context.Background(), &dispatchpb.GetDriverOfferRequest{
+		DriverId: "d99",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.HasOffer {
+		t.Error("has_offer = true, want false when no offer exists")
+	}
+}
+
+func TestGetDriverOffer_MissingDriverID(t *testing.T) {
+	h := newHandler(newStubJobRepo(), &stubLocRepo{}, newStubTripUpdater())
+	_, err := h.GetDriverOffer(context.Background(), &dispatchpb.GetDriverOfferRequest{})
 	s, _ := status.FromError(err)
 	if s.Code() != codes.InvalidArgument {
 		t.Errorf("code = %v, want InvalidArgument", s.Code())

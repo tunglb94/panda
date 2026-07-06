@@ -17,20 +17,22 @@ import (
 // Handler implements dispatchpb.DispatchServiceServer.
 type Handler struct {
 	dispatchpb.UnimplementedDispatchServiceServer
-	requestDispatch     *app.RequestDispatchUseCase
-	acceptTrip          *app.AcceptTripUseCase
-	rejectTrip          *app.RejectTripUseCase
+	requestDispatch      *app.RequestDispatchUseCase
+	acceptTrip           *app.AcceptTripUseCase
+	rejectTrip           *app.RejectTripUseCase
 	updateDriverLocation *app.UpdateDriverLocationUseCase
-	getDispatchStatus   *app.GetDispatchStatusUseCase
+	getDispatchStatus    *app.GetDispatchStatusUseCase
+	getDriverOffer       *app.GetDriverOfferUseCase
 }
 
-// NewHandler wires all five dispatch use cases into a gRPC handler.
+// NewHandler wires all six dispatch use cases into a gRPC handler.
 func NewHandler(
 	requestDispatch *app.RequestDispatchUseCase,
 	acceptTrip *app.AcceptTripUseCase,
 	rejectTrip *app.RejectTripUseCase,
 	updateDriverLocation *app.UpdateDriverLocationUseCase,
 	getDispatchStatus *app.GetDispatchStatusUseCase,
+	getDriverOffer *app.GetDriverOfferUseCase,
 ) *Handler {
 	if requestDispatch == nil {
 		panic("dispatch grpc: RequestDispatchUseCase must not be nil")
@@ -47,12 +49,16 @@ func NewHandler(
 	if getDispatchStatus == nil {
 		panic("dispatch grpc: GetDispatchStatusUseCase must not be nil")
 	}
+	if getDriverOffer == nil {
+		panic("dispatch grpc: GetDriverOfferUseCase must not be nil")
+	}
 	return &Handler{
 		requestDispatch:      requestDispatch,
 		acceptTrip:           acceptTrip,
 		rejectTrip:           rejectTrip,
 		updateDriverLocation: updateDriverLocation,
 		getDispatchStatus:    getDispatchStatus,
+		getDriverOffer:       getDriverOffer,
 	}
 }
 
@@ -129,6 +135,30 @@ func (h *Handler) GetDispatchStatus(ctx context.Context, req *dispatchpb.GetDisp
 		return nil, toGRPCError(err)
 	}
 	return &dispatchpb.DispatchResponse{Job: toProto(job)}, nil
+}
+
+// GetDriverOffer implements DispatchServiceServer.GetDriverOffer.
+func (h *Handler) GetDriverOffer(ctx context.Context, req *dispatchpb.GetDriverOfferRequest) (*dispatchpb.GetDriverOfferResponse, error) {
+	if req.GetDriverId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "driver_id is required")
+	}
+	job, err := h.getDriverOffer.Execute(ctx, req.GetDriverId())
+	if err != nil {
+		code := domainerrors.GetCode(err)
+		if code == domainerrors.CodeNotFound {
+			return &dispatchpb.GetDriverOfferResponse{HasOffer: false}, nil
+		}
+		return nil, toGRPCError(err)
+	}
+	resp := &dispatchpb.GetDriverOfferResponse{
+		HasOffer: true,
+		TripId:   job.TripID,
+		JobId:    job.JobID,
+	}
+	if !job.OfferExpiresAt.IsZero() {
+		resp.OfferExpiresAt = timestamppb.New(job.OfferExpiresAt)
+	}
+	return resp, nil
 }
 
 // ─── private helpers ──────────────────────────────────────────────────────────

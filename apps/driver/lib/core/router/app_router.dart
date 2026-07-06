@@ -63,7 +63,7 @@ abstract final class AppRouter {
               routes: [
                 GoRoute(
                   path: AppRoutes.trip,
-                  builder: (context, state) => const TripPage(),
+                  builder: (context, state) => TripPage(apiClient: apiClient),
                 ),
               ],
             ),

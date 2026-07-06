@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -124,6 +125,10 @@ func (s *stubDispatch) GetDispatchStatus(_ context.Context, tripID string) (*app
 	return j, nil
 }
 
+func (s *stubDispatch) GetDriverOffer(_ context.Context, _ string) (*app.DriverOfferInfo, error) {
+	return nil, nil
+}
+
 type stubPricing struct {
 	fare     int64
 	currency string
@@ -147,6 +152,7 @@ func newHandler(trip *stubTrip, dispatch *stubDispatch, pricing *stubPricing) *b
 		app.NewStartTripUseCase(trip),
 		app.NewFinishTripUseCase(pricing, trip),
 		app.NewGetBookingDetailsUseCase(trip, dispatch),
+		app.NewGetDriverCurrentOfferUseCase(dispatch, trip),
 	)
 }
 
@@ -353,6 +359,92 @@ func TestGetBookingDetails_OK(t *testing.T) {
 func TestGetBookingDetails_MissingTripID(t *testing.T) {
 	h := newHandler(newStubTrip(), newStubDispatch(), defaultPricing())
 	_, err := h.GetBookingDetails(context.Background(), &bookingpb.GetBookingDetailsRequest{})
+	st, _ := status.FromError(err)
+	if st.Code() != codes.InvalidArgument {
+		t.Errorf("code = %v, want InvalidArgument", st.Code())
+	}
+}
+
+// ─── GetDriverCurrentOffer ────────────────────────────────────────────────────
+
+// stubDispatchWithOffer overrides GetDriverOffer to return a fixed offer.
+type stubDispatchWithOffer struct {
+	*stubDispatch
+	offer *app.DriverOfferInfo
+}
+
+func (s *stubDispatchWithOffer) GetDriverOffer(_ context.Context, _ string) (*app.DriverOfferInfo, error) {
+	return s.offer, nil
+}
+
+func newHandlerWithOfferDispatch(trip *stubTrip, dispatch app.DispatchClient, pricing *stubPricing) *bookinggrpc.Handler {
+	return bookinggrpc.NewHandler(
+		app.NewBookRideUseCase(trip, dispatch),
+		app.NewAcceptDispatchOfferUseCase(dispatch),
+		app.NewRejectDispatchOfferUseCase(dispatch),
+		app.NewStartTripUseCase(trip),
+		app.NewFinishTripUseCase(pricing, trip),
+		app.NewGetBookingDetailsUseCase(trip, dispatch),
+		app.NewGetDriverCurrentOfferUseCase(dispatch, trip),
+	)
+}
+
+func TestGetDriverCurrentOffer_HasOffer(t *testing.T) {
+	trip := newStubTrip()
+	trip.trips["trip1"] = &app.TripInfo{
+		TripID:         "trip1",
+		PickupAddress:  "123 Main St",
+		DropoffAddress: "456 Elm Ave",
+		Status:         "searching",
+	}
+	dispatch := &stubDispatchWithOffer{
+		stubDispatch: newStubDispatch(),
+		offer: &app.DriverOfferInfo{
+			TripID:        "trip1",
+			OfferExpiresAt: time.Date(2026, 1, 1, 13, 0, 0, 0, time.UTC),
+		},
+	}
+	h := newHandlerWithOfferDispatch(trip, dispatch, defaultPricing())
+
+	resp, err := h.GetDriverCurrentOffer(context.Background(), &bookingpb.GetDriverCurrentOfferRequest{
+		DriverId: "d1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetHasOffer() {
+		t.Error("has_offer = false, want true")
+	}
+	if resp.GetTripId() != "trip1" {
+		t.Errorf("trip_id = %q, want trip1", resp.GetTripId())
+	}
+	if resp.GetPickupAddress() != "123 Main St" {
+		t.Errorf("pickup_address = %q, want 123 Main St", resp.GetPickupAddress())
+	}
+	if resp.GetDropoffAddress() != "456 Elm Ave" {
+		t.Errorf("dropoff_address = %q, want 456 Elm Ave", resp.GetDropoffAddress())
+	}
+	if resp.GetOfferExpiresAt() == nil {
+		t.Error("offer_expires_at is nil, want non-nil")
+	}
+}
+
+func TestGetDriverCurrentOffer_NoOffer(t *testing.T) {
+	h := newHandler(newStubTrip(), newStubDispatch(), defaultPricing())
+	resp, err := h.GetDriverCurrentOffer(context.Background(), &bookingpb.GetDriverCurrentOfferRequest{
+		DriverId: "d99",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetHasOffer() {
+		t.Error("has_offer = true, want false when no offer exists")
+	}
+}
+
+func TestGetDriverCurrentOffer_MissingDriverID(t *testing.T) {
+	h := newHandler(newStubTrip(), newStubDispatch(), defaultPricing())
+	_, err := h.GetDriverCurrentOffer(context.Background(), &bookingpb.GetDriverCurrentOfferRequest{})
 	st, _ := status.FromError(err)
 	if st.Code() != codes.InvalidArgument {
 		t.Errorf("code = %v, want InvalidArgument", st.Code())

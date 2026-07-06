@@ -24,6 +24,7 @@ const (
 	DispatchService_RejectTrip_FullMethodName           = "/dispatch.v1.DispatchService/RejectTrip"
 	DispatchService_UpdateDriverLocation_FullMethodName = "/dispatch.v1.DispatchService/UpdateDriverLocation"
 	DispatchService_GetDispatchStatus_FullMethodName    = "/dispatch.v1.DispatchService/GetDispatchStatus"
+	DispatchService_GetDriverOffer_FullMethodName       = "/dispatch.v1.DispatchService/GetDriverOffer"
 )
 
 // DispatchServiceClient is the client API for DispatchService service.
@@ -43,6 +44,9 @@ type DispatchServiceClient interface {
 	UpdateDriverLocation(ctx context.Context, in *UpdateDriverLocationRequest, opts ...grpc.CallOption) (*UpdateDriverLocationResponse, error)
 	// GetDispatchStatus returns the current dispatch job for a trip.
 	GetDispatchStatus(ctx context.Context, in *GetDispatchStatusRequest, opts ...grpc.CallOption) (*DispatchResponse, error)
+	// GetDriverOffer returns the current pending offer for a given driver, if any.
+	// Returns has_offer=false when the driver has no active offer.
+	GetDriverOffer(ctx context.Context, in *GetDriverOfferRequest, opts ...grpc.CallOption) (*GetDriverOfferResponse, error)
 }
 
 type dispatchServiceClient struct {
@@ -98,6 +102,15 @@ func (c *dispatchServiceClient) GetDispatchStatus(ctx context.Context, in *GetDi
 	return out, nil
 }
 
+func (c *dispatchServiceClient) GetDriverOffer(ctx context.Context, in *GetDriverOfferRequest, opts ...grpc.CallOption) (*GetDriverOfferResponse, error) {
+	out := new(GetDriverOfferResponse)
+	err := c.cc.Invoke(ctx, DispatchService_GetDriverOffer_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DispatchServiceServer is the server API for DispatchService service.
 // All implementations must embed UnimplementedDispatchServiceServer
 // for forward compatibility
@@ -115,6 +128,9 @@ type DispatchServiceServer interface {
 	UpdateDriverLocation(context.Context, *UpdateDriverLocationRequest) (*UpdateDriverLocationResponse, error)
 	// GetDispatchStatus returns the current dispatch job for a trip.
 	GetDispatchStatus(context.Context, *GetDispatchStatusRequest) (*DispatchResponse, error)
+	// GetDriverOffer returns the current pending offer for a given driver, if any.
+	// Returns has_offer=false when the driver has no active offer.
+	GetDriverOffer(context.Context, *GetDriverOfferRequest) (*GetDriverOfferResponse, error)
 	mustEmbedUnimplementedDispatchServiceServer()
 }
 
@@ -136,6 +152,9 @@ func (UnimplementedDispatchServiceServer) UpdateDriverLocation(context.Context, 
 }
 func (UnimplementedDispatchServiceServer) GetDispatchStatus(context.Context, *GetDispatchStatusRequest) (*DispatchResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetDispatchStatus not implemented")
+}
+func (UnimplementedDispatchServiceServer) GetDriverOffer(context.Context, *GetDriverOfferRequest) (*GetDriverOfferResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetDriverOffer not implemented")
 }
 func (UnimplementedDispatchServiceServer) mustEmbedUnimplementedDispatchServiceServer() {}
 
@@ -240,6 +259,24 @@ func _DispatchService_GetDispatchStatus_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DispatchService_GetDriverOffer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDriverOfferRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DispatchServiceServer).GetDriverOffer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DispatchService_GetDriverOffer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DispatchServiceServer).GetDriverOffer(ctx, req.(*GetDriverOfferRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DispatchService_ServiceDesc is the grpc.ServiceDesc for DispatchService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -266,6 +303,10 @@ var DispatchService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetDispatchStatus",
 			Handler:    _DispatchService_GetDispatchStatus_Handler,
+		},
+		{
+			MethodName: "GetDriverOffer",
+			Handler:    _DispatchService_GetDriverOffer_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

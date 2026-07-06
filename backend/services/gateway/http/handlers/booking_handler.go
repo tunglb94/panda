@@ -19,6 +19,7 @@ type BookingClient interface {
 	StartTrip(ctx context.Context, in *bookingpb.StartTripRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error)
 	FinishTrip(ctx context.Context, in *bookingpb.FinishTripRequest, opts ...grpc.CallOption) (*bookingpb.FinishedTripResponse, error)
 	GetBookingDetails(ctx context.Context, in *bookingpb.GetBookingDetailsRequest, opts ...grpc.CallOption) (*bookingpb.BookingDetailsResponse, error)
+	GetDriverCurrentOffer(ctx context.Context, in *bookingpb.GetDriverCurrentOfferRequest, opts ...grpc.CallOption) (*bookingpb.GetDriverCurrentOfferResponse, error)
 }
 
 // BookingHandler exposes booking operations over HTTP.
@@ -220,4 +221,35 @@ func (h *BookingHandler) FinishTrip(w http.ResponseWriter, r *http.Request) {
 		"distance_km":  resp.GetDistanceKm(),
 		"duration_min": resp.GetDurationMin(),
 	})
+}
+
+// ─── GET /api/v1/driver/current-offer ────────────────────────────────────────
+
+func (h *BookingHandler) GetDriverOffer(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.ClaimsFromContext(r.Context())
+	if !ok {
+		writeBadRequest(w, "missing auth claims")
+		return
+	}
+	resp, err := h.client.GetDriverCurrentOffer(r.Context(), &bookingpb.GetDriverCurrentOfferRequest{
+		DriverId: claims.UserID,
+	})
+	if err != nil {
+		writeGRPCError(w, err)
+		return
+	}
+	if !resp.GetHasOffer() {
+		writeJSON(w, http.StatusOK, map[string]any{"has_offer": false})
+		return
+	}
+	body := map[string]any{
+		"has_offer":       true,
+		"trip_id":         resp.GetTripId(),
+		"pickup_address":  resp.GetPickupAddress(),
+		"dropoff_address": resp.GetDropoffAddress(),
+	}
+	if ts := resp.GetOfferExpiresAt(); ts != nil {
+		body["offer_expires_at"] = ts.AsTime().UTC().Format("2006-01-02T15:04:05Z")
+	}
+	writeJSON(w, http.StatusOK, body)
 }

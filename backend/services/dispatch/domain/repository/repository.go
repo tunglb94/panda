@@ -21,6 +21,10 @@ type DispatchJobRepository interface {
 	// FindExpiredOffers returns searching jobs whose offer_expires_at is before now.
 	// Used by the background engine to trigger automatic retries.
 	FindExpiredOffers(ctx context.Context, now time.Time) ([]*entity.DispatchJob, error)
+
+	// FindCurrentOfferForDriver returns the searching job that is currently
+	// offering a trip to the given driver, or CodeNotFound if none exists.
+	FindCurrentOfferForDriver(ctx context.Context, driverID string) (*entity.DispatchJob, error)
 }
 
 // DriverLocationRepository manages real-time driver coordinates for dispatch matching.

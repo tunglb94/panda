@@ -3,7 +3,10 @@
 // so every use case is testable without a running service.
 package app
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // TripInfo is a lightweight view of a trip returned by TripClient.
 type TripInfo struct {
@@ -41,12 +44,21 @@ type TripClient interface {
 	CancelTrip(ctx context.Context, tripID, reason string) error
 }
 
+// DriverOfferInfo is the active pending offer directed at a driver.
+type DriverOfferInfo struct {
+	TripID          string
+	PickupAddress   string
+	DropoffAddress  string
+	OfferExpiresAt  time.Time
+}
+
 // DispatchClient abstracts calls to the Dispatch service.
 type DispatchClient interface {
 	RequestDispatch(ctx context.Context, tripID, riderID string, pickupLat, pickupLon float64) error
 	AcceptTrip(ctx context.Context, tripID, driverID string) error
 	RejectTrip(ctx context.Context, tripID, driverID string) error
 	GetDispatchStatus(ctx context.Context, tripID string) (*DispatchInfo, error)
+	GetDriverOffer(ctx context.Context, driverID string) (*DriverOfferInfo, error)
 }
 
 // PricingClient abstracts calls to the Pricing service.
