@@ -1,8 +1,9 @@
 # FAIRRIDE EOS — Project Memory
-Last updated: 2026-07-03 by Principal Engineer AI
+Last updated: 2026-07-06 by Principal Engineer AI
 
 ## Current Phase
-Phase 17 — Pickup & Destination Selection (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
+Phase H2 — Hardening: Atomic Transactions (COMPLETE)
+Previous: Phase 17 — Pickup & Destination Selection (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
 
 ## Documentation Strategy Change
 ORIGINAL: 72-document comprehensive roadmap
@@ -968,6 +969,61 @@ Phase 2.6 — Register / Login use cases (in `services/identity/app/`)
 - `flutter pub get` output (`.flutter-plugins`, `.dart_tool/`) — not generated yet; will be gitignored
 - Google Maps API key — placeholder in `AndroidManifest.xml` and `AppDelegate.swift`
 - Integration tests (Postgres / Redis infra) — skip without env vars; not blocked
+
+---
+
+## Phase H2 — Hardening: Atomic Transactions (COMPLETE — 2026-07-06)
+
+### Problem fixed
+`AcceptTripUseCase` and `RequestDispatchUseCase` each performed two cross-table
+writes sequentially with no transaction. A failure between the two writes left
+the system in a partial state (e.g. trip = `driver_assigned` but dispatch job
+still `searching`).
+
+### Solution
+Added `repository.Transactor` interface:
+```go
+type Transactor interface {
+    WithinTx(ctx context.Context, fn func(DispatchJobRepository, TripUpdater) error) error
+}
+```
+Implemented by `infrastructure/postgres.Transactor` using `pgx.Tx` + deferred
+`Rollback`. Two tx-scoped adapters (`txDispatchRepository`, `txTripUpdater`)
+implement the existing interfaces without changing them.
+
+### Files changed
+| File | Change |
+|------|--------|
+| `domain/repository/repository.go` | Added `Transactor` interface |
+| `infrastructure/postgres/dispatch_repository.go` | Extracted `scanDispatchJob` package-level helper |
+| `infrastructure/postgres/transactor.go` | NEW — `Transactor`, `txDispatchRepository`, `txTripUpdater` |
+| `app/accept_trip.go` | Replaced `tripUpdater` with `transactor`; two writes now atomic |
+| `app/request_dispatch.go` | Replaced `tripUpdater` with `transactor`; SetSearching + Save now atomic |
+| `app/app_test.go` | Added `stubTransactor`, `failingTripUpdater`, `saveFailingJobRepo`; 4 new rollback tests |
+| `grpc/handler_test.go` | Added `stubTransactor`; updated `newHandler` constructor |
+| `cmd/server/main.go` | Wired `dispatchpostgres.NewTransactor(pool)` |
+
+### Test count
+Backend dispatch: **59 tests** (was 55; +4 rollback tests). All pass.
+
+### Rollback flow
+```
+pool.Begin(ctx) → tx
+    fn(txJobRepo, txTripUpdater)
+        trips.AssignDriver(...)   ← UPDATE trips   ┐
+        jobs.Save(...)            ← UPSERT dispatch │ same tx
+                                                    │
+    if fn error → tx.Rollback()  ← both reverted  ┘
+    else        → tx.Commit()
+```
+`defer tx.Rollback(ctx)` is a no-op after a successful `Commit`, so the pattern
+is safe whether fn succeeds or panics.
+
+### Architecture constraint respected
+- No saga, no outbox, no event sourcing introduced.
+- Existing `TripUpdater` and `DispatchJobRepository` interfaces unchanged.
+- `RejectTripUseCase` and `DispatchEngine` unchanged (they only write to
+  `dispatch_jobs`, no cross-entity atomicity risk).
 
 ---
 

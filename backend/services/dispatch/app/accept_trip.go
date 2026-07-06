@@ -9,17 +9,18 @@ import (
 	domainerrors "github.com/fairride/shared/errors"
 )
 
-// AcceptTripUseCase records driver acceptance and updates the trip to DriverAssigned.
+// AcceptTripUseCase records driver acceptance and atomically updates both the
+// trip status and the dispatch job in a single PostgreSQL transaction.
 type AcceptTripUseCase struct {
-	jobRepo     repository.DispatchJobRepository
-	tripUpdater repository.TripUpdater
+	jobRepo    repository.DispatchJobRepository
+	transactor repository.Transactor
 }
 
 func NewAcceptTripUseCase(
 	jobRepo repository.DispatchJobRepository,
-	tripUpdater repository.TripUpdater,
+	transactor repository.Transactor,
 ) *AcceptTripUseCase {
-	return &AcceptTripUseCase{jobRepo: jobRepo, tripUpdater: tripUpdater}
+	return &AcceptTripUseCase{jobRepo: jobRepo, transactor: transactor}
 }
 
 func (uc *AcceptTripUseCase) Execute(ctx context.Context, tripID, driverID string) (*entity.DispatchJob, error) {
@@ -40,11 +41,15 @@ func (uc *AcceptTripUseCase) Execute(ctx context.Context, tripID, driverID strin
 		return nil, err
 	}
 
-	if err := uc.tripUpdater.AssignDriver(ctx, tripID, driverID, now); err != nil {
-		return nil, err
-	}
-
-	if err := uc.jobRepo.Save(ctx, job); err != nil {
+	// Atomic: assign driver on trip + save dispatch job as assigned.
+	// If either write fails the transaction is rolled back and no partial
+	// state is committed.
+	if err := uc.transactor.WithinTx(ctx, func(jobs repository.DispatchJobRepository, trips repository.TripUpdater) error {
+		if err := trips.AssignDriver(ctx, tripID, driverID, now); err != nil {
+			return err
+		}
+		return jobs.Save(ctx, job)
+	}); err != nil {
 		return nil, err
 	}
 

@@ -26,7 +26,7 @@ type RequestDispatchInput struct {
 type RequestDispatchUseCase struct {
 	jobRepo      repository.DispatchJobRepository
 	locationRepo repository.DriverLocationRepository
-	tripUpdater  repository.TripUpdater
+	transactor   repository.Transactor
 	radiusKM     float64
 	searchLimit  int
 }
@@ -34,18 +34,22 @@ type RequestDispatchUseCase struct {
 func NewRequestDispatchUseCase(
 	jobRepo repository.DispatchJobRepository,
 	locationRepo repository.DriverLocationRepository,
-	tripUpdater repository.TripUpdater,
+	transactor repository.Transactor,
 ) *RequestDispatchUseCase {
 	return &RequestDispatchUseCase{
 		jobRepo:      jobRepo,
 		locationRepo: locationRepo,
-		tripUpdater:  tripUpdater,
+		transactor:   transactor,
 		radiusKM:     DefaultSearchRadiusKM,
 		searchLimit:  DefaultSearchLimit,
 	}
 }
 
 func (uc *RequestDispatchUseCase) Execute(ctx context.Context, in RequestDispatchInput) (*entity.DispatchJob, error) {
+	if in.TripID == "" {
+		return nil, domainerrors.InvalidArgument("trip_id is required")
+	}
+
 	jobID, err := generateJobID()
 	if err != nil {
 		return nil, domainerrors.Internal("failed to generate job id")
@@ -62,19 +66,23 @@ func (uc *RequestDispatchUseCase) Execute(ctx context.Context, in RequestDispatc
 		return nil, err
 	}
 
-	// Mark the trip as searching.
-	if err := uc.tripUpdater.SetSearching(ctx, in.TripID, now); err != nil {
-		return nil, err
-	}
-
-	// Persist the job before attempting to find a driver so we have a record even
-	// if the search fails immediately.
-	if err := uc.jobRepo.Save(ctx, job); err != nil {
+	// Atomic: mark trip as searching and persist the initial job record together.
+	// If either write fails neither is committed, preventing a trip stuck in
+	// 'searching' with no corresponding dispatch job.
+	if err := uc.transactor.WithinTx(ctx, func(jobs repository.DispatchJobRepository, trips repository.TripUpdater) error {
+		if err := trips.SetSearching(ctx, in.TripID, now); err != nil {
+			return err
+		}
+		return jobs.Save(ctx, job)
+	}); err != nil {
 		return nil, err
 	}
 
 	// Find the first available driver and issue the offer.
-	if err := offerNextDriver(ctx, job, uc.locationRepo, uc.tripUpdater, uc.jobRepo, uc.radiusKM, uc.searchLimit); err != nil {
+	// This runs outside the transaction: offerNextDriver only writes to
+	// dispatch_jobs (no trip update), so a failure here leaves the trip in
+	// 'searching' with a 'pending' job — a recoverable state the engine retries.
+	if err := offerNextDriver(ctx, job, uc.locationRepo, nil, uc.jobRepo, uc.radiusKM, uc.searchLimit); err != nil {
 		return nil, err
 	}
 

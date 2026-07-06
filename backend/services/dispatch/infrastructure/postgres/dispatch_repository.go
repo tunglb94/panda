@@ -131,15 +131,21 @@ type rowScanner interface {
 }
 
 func (r *DispatchRepository) scanOne(row rowScanner) (*entity.DispatchJob, error) {
+	return scanDispatchJob(row)
+}
+
+// scanDispatchJob is a package-level helper used by both DispatchRepository and
+// txDispatchRepository to reconstruct a DispatchJob from a scanned row.
+func scanDispatchJob(row rowScanner) (*entity.DispatchJob, error) {
 	var (
-		jobID, tripID, riderID         string
-		pickupLat, pickupLon           float64
-		status                         string
+		jobID, tripID, riderID            string
+		pickupLat, pickupLon              float64
+		status                            string
 		currentDriverID, assignedDriverID string
-		offeredDriverIDsCSV            string
-		offerExpiresAt                 *time.Time
+		offeredDriverIDsCSV               string
+		offerExpiresAt                    *time.Time
 		offerTimeoutSec, maxAttempts, attemptCount int
-		createdAt, updatedAt           time.Time
+		createdAt, updatedAt              time.Time
 	)
 
 	err := row.Scan(

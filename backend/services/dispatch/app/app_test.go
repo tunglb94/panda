@@ -57,8 +57,8 @@ func (r *stubJobRepo) FindExpiredOffers(_ context.Context, now time.Time) ([]*en
 
 // stubLocationRepo simulates a geo store with configurable active drivers.
 type stubLocationRepo struct {
-	nearby  []string          // IDs in distance order (nearest first)
-	active  map[string]bool   // which IDs respond as active
+	nearby  []string           // IDs in distance order (nearest first)
+	active  map[string]bool    // which IDs respond as active
 	updated map[string][2]float64 // driverID → [lat, lon]
 }
 
@@ -109,7 +109,46 @@ func (u *stubTripUpdater) AssignDriver(_ context.Context, tripID, driverID strin
 	return nil
 }
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
+// stubTransactor runs fn synchronously with the provided stubs; no real DB tx.
+// Used in unit tests to verify application logic without infrastructure.
+type stubTransactor struct {
+	jobs  repository.DispatchJobRepository
+	trips repository.TripUpdater
+}
+
+var _ repository.Transactor = (*stubTransactor)(nil)
+
+func (s *stubTransactor) WithinTx(_ context.Context, fn func(repository.DispatchJobRepository, repository.TripUpdater) error) error {
+	return fn(s.jobs, s.trips)
+}
+
+// failingTripUpdater returns configured errors to simulate write failures.
+type failingTripUpdater struct {
+	assignErr    error
+	searchingErr error
+}
+
+var _ repository.TripUpdater = (*failingTripUpdater)(nil)
+
+func (f *failingTripUpdater) SetSearching(_ context.Context, _ string, _ time.Time) error {
+	return f.searchingErr
+}
+
+func (f *failingTripUpdater) AssignDriver(_ context.Context, _, _ string, _ time.Time) error {
+	return f.assignErr
+}
+
+// saveFailingJobRepo delegates reads to an embedded stubJobRepo but fails Save.
+type saveFailingJobRepo struct {
+	*stubJobRepo
+	saveErr error
+}
+
+func (r *saveFailingJobRepo) Save(_ context.Context, _ *entity.DispatchJob) error {
+	return r.saveErr
+}
+
+// ──�� helpers ─────────────────────────────────────────────────────────────────
 
 func allActive(ids ...string) map[string]bool {
 	m := make(map[string]bool, len(ids))
@@ -125,7 +164,7 @@ func TestRequestDispatch_OffersNearestDriver(t *testing.T) {
 	jobs := newStubJobRepo()
 	locs := newStubLocationRepo([]string{"d1", "d2", "d3"}, allActive("d1", "d2", "d3"))
 	trips := newStubTripUpdater()
-	uc := app.NewRequestDispatchUseCase(jobs, locs, trips)
+	uc := app.NewRequestDispatchUseCase(jobs, locs, &stubTransactor{jobs: jobs, trips: trips})
 
 	job, err := uc.Execute(context.Background(), app.RequestDispatchInput{
 		TripID:  "trip1",
@@ -149,9 +188,9 @@ func TestRequestDispatch_OffersNearestDriver(t *testing.T) {
 
 func TestRequestDispatch_NoDriversAvailable(t *testing.T) {
 	jobs := newStubJobRepo()
-	locs := newStubLocationRepo(nil, nil) // no nearby drivers
 	trips := newStubTripUpdater()
-	uc := app.NewRequestDispatchUseCase(jobs, locs, trips)
+	locs := newStubLocationRepo(nil, nil) // no nearby drivers
+	uc := app.NewRequestDispatchUseCase(jobs, locs, &stubTransactor{jobs: jobs, trips: trips})
 
 	job, err := uc.Execute(context.Background(), app.RequestDispatchInput{
 		TripID: "trip1", RiderID: "rider1",
@@ -166,10 +205,10 @@ func TestRequestDispatch_NoDriversAvailable(t *testing.T) {
 
 func TestRequestDispatch_SkipsInactiveDrivers(t *testing.T) {
 	jobs := newStubJobRepo()
+	trips := newStubTripUpdater()
 	// d1 is nearby but inactive; d2 is active
 	locs := newStubLocationRepo([]string{"d1", "d2"}, allActive("d2"))
-	trips := newStubTripUpdater()
-	uc := app.NewRequestDispatchUseCase(jobs, locs, trips)
+	uc := app.NewRequestDispatchUseCase(jobs, locs, &stubTransactor{jobs: jobs, trips: trips})
 
 	job, err := uc.Execute(context.Background(), app.RequestDispatchInput{
 		TripID: "trip1", RiderID: "rider1",
@@ -183,7 +222,9 @@ func TestRequestDispatch_SkipsInactiveDrivers(t *testing.T) {
 }
 
 func TestRequestDispatch_MissingTripID(t *testing.T) {
-	uc := app.NewRequestDispatchUseCase(newStubJobRepo(), newStubLocationRepo(nil, nil), newStubTripUpdater())
+	jobs := newStubJobRepo()
+	trips := newStubTripUpdater()
+	uc := app.NewRequestDispatchUseCase(jobs, newStubLocationRepo(nil, nil), &stubTransactor{jobs: jobs, trips: trips})
 	_, err := uc.Execute(context.Background(), app.RequestDispatchInput{RiderID: "r1"})
 	if !domainerrors.IsCode(err, domainerrors.CodeInvalidArgument) {
 		t.Errorf("expected InvalidArgument, got %v", err)
@@ -209,7 +250,7 @@ func TestAcceptTrip_Valid(t *testing.T) {
 	trips := newStubTripUpdater()
 	seedJob(t, jobs, "trip1", "d1")
 
-	uc := app.NewAcceptTripUseCase(jobs, trips)
+	uc := app.NewAcceptTripUseCase(jobs, &stubTransactor{jobs: jobs, trips: trips})
 	job, err := uc.Execute(context.Background(), "trip1", "d1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -227,9 +268,10 @@ func TestAcceptTrip_Valid(t *testing.T) {
 
 func TestAcceptTrip_WrongDriver(t *testing.T) {
 	jobs := newStubJobRepo()
+	trips := newStubTripUpdater()
 	seedJob(t, jobs, "trip1", "d1")
 
-	uc := app.NewAcceptTripUseCase(jobs, newStubTripUpdater())
+	uc := app.NewAcceptTripUseCase(jobs, &stubTransactor{jobs: jobs, trips: trips})
 	_, err := uc.Execute(context.Background(), "trip1", "d2")
 	if !domainerrors.IsCode(err, domainerrors.CodePreconditionFailed) {
 		t.Errorf("expected PreconditionFailed, got %v", err)
@@ -237,10 +279,111 @@ func TestAcceptTrip_WrongDriver(t *testing.T) {
 }
 
 func TestAcceptTrip_NotFound(t *testing.T) {
-	uc := app.NewAcceptTripUseCase(newStubJobRepo(), newStubTripUpdater())
+	jobs := newStubJobRepo()
+	trips := newStubTripUpdater()
+	uc := app.NewAcceptTripUseCase(jobs, &stubTransactor{jobs: jobs, trips: trips})
 	_, err := uc.Execute(context.Background(), "nonexistent", "d1")
 	if !domainerrors.IsCode(err, domainerrors.CodeNotFound) {
 		t.Errorf("expected NotFound, got %v", err)
+	}
+}
+
+// ─── AcceptTrip rollback tests ────────────────────────────────────────────────
+
+// TestAcceptTrip_RollbackOnTripUpdateFailure verifies that when the trip status
+// UPDATE fails, the use case returns an error and jobRepo.Save is never called.
+// In a real PostgreSQL transaction this guarantees neither write is committed.
+func TestAcceptTrip_RollbackOnTripUpdateFailure(t *testing.T) {
+	outerJobs := newStubJobRepo()
+	seedJob(t, outerJobs, "trip1", "d1")
+
+	innerJobs := newStubJobRepo() // separate inner stub to detect spurious Save calls
+	failTrips := &failingTripUpdater{assignErr: domainerrors.Internal("simulated db failure")}
+	txr := &stubTransactor{jobs: innerJobs, trips: failTrips}
+	uc := app.NewAcceptTripUseCase(outerJobs, txr)
+
+	_, err := uc.Execute(context.Background(), "trip1", "d1")
+	if err == nil {
+		t.Fatal("expected error when trip update fails")
+	}
+	// jobs.Save must not have been called — inner stub should be empty
+	if len(innerJobs.jobs) != 0 {
+		t.Errorf("job was saved despite trip update failure — partial write not prevented")
+	}
+}
+
+// TestAcceptTrip_RollbackOnJobSaveFailure verifies that when jobRepo.Save fails,
+// the use case returns an error. In a real PostgreSQL transaction the preceding
+// trip UPDATE is rolled back automatically by the deferred Rollback call.
+func TestAcceptTrip_RollbackOnJobSaveFailure(t *testing.T) {
+	outerJobs := newStubJobRepo()
+	seedJob(t, outerJobs, "trip1", "d1")
+
+	trips := newStubTripUpdater()
+	failJobs := &saveFailingJobRepo{
+		stubJobRepo: newStubJobRepo(),
+		saveErr:     domainerrors.Internal("simulated db failure"),
+	}
+	txr := &stubTransactor{jobs: failJobs, trips: trips}
+	uc := app.NewAcceptTripUseCase(outerJobs, txr)
+
+	_, err := uc.Execute(context.Background(), "trip1", "d1")
+	if err == nil {
+		t.Fatal("expected error when job save fails")
+	}
+	// AssignDriver ran before Save failed ��� in real DB this is rolled back by tx.Rollback.
+	if trips.assignedTrips["trip1"] != "d1" {
+		t.Error("AssignDriver should have been called before Save failed")
+	}
+}
+
+// ─── RequestDispatch rollback tests ──────────────────────────────────────────
+
+// TestRequestDispatch_RollbackOnSetSearchingFailure verifies that when the trip
+// SetSearching UPDATE fails, jobRepo.Save is never called (no orphaned job record).
+func TestRequestDispatch_RollbackOnSetSearchingFailure(t *testing.T) {
+	outerJobs := newStubJobRepo()
+	innerJobs := newStubJobRepo()
+	failTrips := &failingTripUpdater{searchingErr: domainerrors.Internal("simulated db failure")}
+	txr := &stubTransactor{jobs: innerJobs, trips: failTrips}
+	locs := newStubLocationRepo([]string{"d1"}, allActive("d1"))
+
+	uc := app.NewRequestDispatchUseCase(outerJobs, locs, txr)
+	_, err := uc.Execute(context.Background(), app.RequestDispatchInput{
+		TripID: "trip1", RiderID: "rider1",
+	})
+	if err == nil {
+		t.Fatal("expected error when SetSearching fails")
+	}
+	// No dispatch job must have been persisted
+	if len(innerJobs.jobs) != 0 {
+		t.Errorf("job was saved despite SetSearching failure — partial write not prevented")
+	}
+}
+
+// TestRequestDispatch_RollbackOnJobSaveFailure verifies that when the initial
+// jobRepo.Save fails, the use case returns an error. In a real PostgreSQL
+// transaction the preceding trip SetSearching UPDATE is rolled back.
+func TestRequestDispatch_RollbackOnJobSaveFailure(t *testing.T) {
+	outerJobs := newStubJobRepo()
+	trips := newStubTripUpdater()
+	failJobs := &saveFailingJobRepo{
+		stubJobRepo: newStubJobRepo(),
+		saveErr:     domainerrors.Internal("simulated db failure"),
+	}
+	txr := &stubTransactor{jobs: failJobs, trips: trips}
+	locs := newStubLocationRepo([]string{"d1"}, allActive("d1"))
+
+	uc := app.NewRequestDispatchUseCase(outerJobs, locs, txr)
+	_, err := uc.Execute(context.Background(), app.RequestDispatchInput{
+		TripID: "trip1", RiderID: "rider1",
+	})
+	if err == nil {
+		t.Fatal("expected error when job save fails")
+	}
+	// SetSearching ran before Save failed — in real DB this is rolled back by tx.Rollback.
+	if len(trips.searchingTrips) == 0 {
+		t.Error("SetSearching should have been called before Save failed")
 	}
 }
 
@@ -358,12 +501,6 @@ func TestDispatchEngine_RetriesOnTimeout(t *testing.T) {
 	locs := newStubLocationRepo([]string{"d1", "d2"}, allActive("d1", "d2"))
 
 	engine := app.NewDispatchEngine(jobs, locs, trips)
-
-	// Manually trigger processExpiredOffers at a time after offer expiry
-	// We can't call processExpiredOffers directly (unexported), so we use
-	// the exported FindExpiredOffers + engine tick via a short interval.
-	// Instead: verify via direct use-case simulation that a timed-out job is retried.
-	// (Engine is wired in integration; here we verify domain invariants.)
 
 	// Verify via jobs repo that after testNow+2s the offer is expired
 	expired := testNow.Add(2 * time.Second)

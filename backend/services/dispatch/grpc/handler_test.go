@@ -84,12 +84,24 @@ func (u *stubTripUpdater) AssignDriver(_ context.Context, tripID, driverID strin
 	return nil
 }
 
+type stubTransactor struct {
+	jobs  repository.DispatchJobRepository
+	trips repository.TripUpdater
+}
+
+var _ repository.Transactor = (*stubTransactor)(nil)
+
+func (s *stubTransactor) WithinTx(_ context.Context, fn func(repository.DispatchJobRepository, repository.TripUpdater) error) error {
+	return fn(s.jobs, s.trips)
+}
+
 // ─── helper ──────────────────────────────────────────────────────────────────
 
 func newHandler(jobs *stubJobRepo, locs *stubLocRepo, trips *stubTripUpdater) *dispatchgrpc.Handler {
+	txr := &stubTransactor{jobs: jobs, trips: trips}
 	return dispatchgrpc.NewHandler(
-		app.NewRequestDispatchUseCase(jobs, locs, trips),
-		app.NewAcceptTripUseCase(jobs, trips),
+		app.NewRequestDispatchUseCase(jobs, locs, txr),
+		app.NewAcceptTripUseCase(jobs, txr),
 		app.NewRejectTripUseCase(jobs, locs, trips),
 		app.NewUpdateDriverLocationUseCase(locs),
 		app.NewGetDispatchStatusUseCase(jobs),

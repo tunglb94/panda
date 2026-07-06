@@ -49,3 +49,12 @@ type TripUpdater interface {
 	// AssignDriver transitions the trip to DriverAssigned status and records the driver.
 	AssignDriver(ctx context.Context, tripID, driverID string, now time.Time) error
 }
+
+// Transactor executes fn inside a single PostgreSQL transaction.
+// Both DispatchJobRepository and TripUpdater passed to fn are tx-scoped.
+// If fn returns an error the transaction is rolled back and the error is
+// returned unchanged. The caller must not retain the tx-scoped instances
+// after fn returns.
+type Transactor interface {
+	WithinTx(ctx context.Context, fn func(jobs DispatchJobRepository, trips TripUpdater) error) error
+}

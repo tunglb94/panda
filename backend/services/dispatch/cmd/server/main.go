@@ -40,6 +40,7 @@ func register(srv *sharedgrpc.Server, ready *server.ReadinessTracker) {
 
 	jobRepo := dispatchpostgres.NewDispatchRepository(pool)
 	tripUpdater := dispatchpostgres.NewTripUpdater(pool)
+	transactor := dispatchpostgres.NewTransactor(pool)
 
 	var locationRepo *dispatchredis.DriverLocationRepository
 	if redisErr == nil {
@@ -48,8 +49,8 @@ func register(srv *sharedgrpc.Server, ready *server.ReadinessTracker) {
 		locationRepo = dispatchredis.NewDriverLocationRepository(nil) // will fail at runtime
 	}
 
-	requestDispatch := app.NewRequestDispatchUseCase(jobRepo, locationRepo, tripUpdater)
-	acceptTrip := app.NewAcceptTripUseCase(jobRepo, tripUpdater)
+	requestDispatch := app.NewRequestDispatchUseCase(jobRepo, locationRepo, transactor)
+	acceptTrip := app.NewAcceptTripUseCase(jobRepo, transactor)
 	rejectTrip := app.NewRejectTripUseCase(jobRepo, locationRepo, tripUpdater)
 	updateLocation := app.NewUpdateDriverLocationUseCase(locationRepo)
 	getStatus := app.NewGetDispatchStatusUseCase(jobRepo)
