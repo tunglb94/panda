@@ -2,8 +2,8 @@
 Last updated: 2026-07-06 by Principal Engineer AI
 
 ## Current Phase
-Phase 19 — Driver Authentication & Availability (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
-Previous: Phase 18 — Driver App Skeleton (COMPLETE)
+Phase 20 — Driver Maps & Current Location (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
+Previous: Phase 19 — Driver Authentication & Availability (COMPLETE)
 Previous: Phase H3-H4 — Hardening: Saga Reliability & Dispatch Lifecycle (COMPLETE)
 
 ## Documentation Strategy Change
@@ -1245,6 +1245,69 @@ flutter analyze
 
 ### Human Checkpoint
 HC-P19 pending CTO approval to proceed to Phase 20.
+
+---
+
+## Phase 20 — Driver Maps & Current Location (COMPLETE — pub get + analyze pending)
+
+### New files
+| File | Purpose |
+|------|---------|
+| `apps/driver/lib/core/location/location_engine_config.dart` | `LocationEngineConfig` — accuracy, distanceFilter, updateIntervalMs; `copyWith()` |
+| `apps/driver/lib/core/location/location_engine.dart` | `LocationEngine` — broadcast streams: locationStream / gpsStatusStream / permissionStream; start/stop/pause/resume/dispose; GPS re-enable auto-restart; identical architecture to Rider Phase 15 |
+| `apps/driver/lib/core/location/location.dart` | Barrel export for both engine files |
+| `apps/driver/lib/features/map/presentation/pages/map_page.dart` | Driver map page — replaces HomePage as home tab; full-screen GoogleMap + status overlay |
+
+### Modified files
+| File | Change |
+|------|--------|
+| `apps/driver/pubspec.yaml` | Added `google_maps_flutter: ^2.10.0`, `geolocator: ^13.0.0` |
+| `apps/driver/lib/core/router/app_router.dart` | Home branch now routes to `MapPage` (was `HomePage`) |
+
+### Deleted files
+| File | Reason |
+|------|--------|
+| `apps/driver/lib/features/home/presentation/pages/home_page.dart` | Fully superseded by `MapPage` (availability toggle logic moved in) |
+
+### MapPage design
+- **Location state machine** (`_LocationStatus`): `loading → permissionDenied / permissionPermanentlyDenied / gpsDisabled / ready`
+- **Location flow**: `Geolocator.isLocationServiceEnabled()` → `checkPermission()` → `requestPermission()` → `getCurrentPosition(accuracy: high, timeout: 10s)` — same pattern as Rider Phase 14
+- **Ready state**: `Stack` with full-screen `GoogleMap` + `Positioned` bottom `_StatusCard`
+- **GoogleMap config**: `myLocationEnabled: true`, `myLocationButtonEnabled: true`, `zoomControlsEnabled: true`, `compassEnabled: true`, `mapToolbarEnabled: false`, `padding: EdgeInsets.only(bottom: 116)` (keeps map controls above card)
+- **`_StatusCard` overlay**: `Material(elevation: 8, borderRadius: top-20)` floating card with online/offline dot + Switch + error text; absorbs all availability logic from the deleted `HomePage`
+- **Availability concurrency**: `_resolveLocation()` and `_fetchAvailability()` both start in `initState` — independent async paths, status card shows correct state when map becomes ready
+- **Error recovery**: `_resolveLocation` retryable from all error views; `_fetchAvailability` failure is non-fatal (defaults offline)
+
+### Location Engine note
+`LocationEngine` is created as an architecture building block (mirrors Rider Phase 15). It is NOT used by `MapPage` directly — Phase 20 uses `Geolocator.getCurrentPosition()` for the initial fix (same as Rider Phase 14 pattern). The engine is available for future phases that need continuous GPS streaming.
+
+### Platform config — action required on home machine
+Driver app was created manually (no android/ios scaffold). Before building on device:
+```bash
+cd apps/driver
+flutter create . --project-name driver --org com.fairride
+# Then apply these config changes:
+# android/app/src/main/AndroidManifest.xml:
+#   Add: <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+#   Add: <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+#   Add: <meta-data android:name="com.google.android.geo.API_KEY" android:value="YOUR_KEY" />
+# ios/Runner/Info.plist:
+#   Add: NSLocationWhenInUseUsageDescription
+#   Add: NSLocationAlwaysAndWhenInUseUsageDescription
+# ios/Runner/AppDelegate.swift:
+#   Add: import GoogleMaps
+#   Add: GMSServices.provideAPIKey("YOUR_GOOGLE_MAPS_API_KEY")
+```
+
+### flutter analyze action
+```bash
+cd apps/driver
+flutter pub get
+flutter analyze
+```
+
+### Human Checkpoint
+HC-P20 pending CTO approval to proceed to next phase.
 
 ---
 

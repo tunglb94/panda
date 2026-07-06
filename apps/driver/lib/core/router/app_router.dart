@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/earnings/presentation/pages/earnings_page.dart';
-import '../../features/home/presentation/pages/home_page.dart';
+import '../../features/map/presentation/pages/map_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/trip/presentation/pages/trip_page.dart';
 import '../../shared/widgets/scaffold_with_nav.dart';
@@ -51,7 +51,7 @@ abstract final class AppRouter {
               routes: [
                 GoRoute(
                   path: AppRoutes.home,
-                  builder: (context, state) => HomePage(
+                  builder: (context, state) => MapPage(
                     authState: authState,
                     tokenStorage: tokenStorage,
                     apiClient: apiClient,
