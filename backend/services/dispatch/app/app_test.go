@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -483,6 +484,174 @@ func TestGetDispatchStatus_NotFound(t *testing.T) {
 	_, err := uc.Execute(context.Background(), "missing")
 	if !domainerrors.IsCode(err, domainerrors.CodeNotFound) {
 		t.Errorf("expected NotFound, got %v", err)
+	}
+}
+
+// ─── DispatchEngine lifecycle ─────────────────────────────────────────────────
+
+// countingJobRepo wraps stubJobRepo and counts FindExpiredOffers invocations.
+type countingJobRepo struct {
+	*stubJobRepo
+	findCount atomic.Int32
+}
+
+func (r *countingJobRepo) FindExpiredOffers(ctx context.Context, now time.Time) ([]*entity.DispatchJob, error) {
+	r.findCount.Add(1)
+	return r.stubJobRepo.FindExpiredOffers(ctx, now)
+}
+
+// blockOnSaveJobRepo blocks each Save call until saveCh is closed.
+type blockOnSaveJobRepo struct {
+	*stubJobRepo
+	saveCh    chan struct{}
+	saveCount atomic.Int32
+}
+
+func (r *blockOnSaveJobRepo) Save(ctx context.Context, job *entity.DispatchJob) error {
+	r.saveCount.Add(1)
+	<-r.saveCh
+	return r.stubJobRepo.Save(ctx, job)
+}
+
+// alwaysExpiredJobRepo always returns the same job on FindExpiredOffers regardless of
+// in-memory mutations, to create the conditions for deduplication testing.
+type alwaysExpiredJobRepo struct {
+	*stubJobRepo
+	job *entity.DispatchJob
+}
+
+func (r *alwaysExpiredJobRepo) FindExpiredOffers(_ context.Context, _ time.Time) ([]*entity.DispatchJob, error) {
+	cp := *r.job
+	return []*entity.DispatchJob{&cp}, nil
+}
+
+// composedJobRepo combines a custom finder with a custom saver.
+type composedJobRepo struct {
+	finder repository.DispatchJobRepository
+	saver  repository.DispatchJobRepository
+}
+
+func (r *composedJobRepo) Save(ctx context.Context, job *entity.DispatchJob) error {
+	return r.saver.Save(ctx, job)
+}
+func (r *composedJobRepo) FindByID(ctx context.Context, id string) (*entity.DispatchJob, error) {
+	return r.finder.FindByID(ctx, id)
+}
+func (r *composedJobRepo) FindByTripID(ctx context.Context, tripID string) (*entity.DispatchJob, error) {
+	return r.finder.FindByTripID(ctx, tripID)
+}
+func (r *composedJobRepo) FindExpiredOffers(ctx context.Context, now time.Time) ([]*entity.DispatchJob, error) {
+	return r.finder.FindExpiredOffers(ctx, now)
+}
+
+// TestEngine_StartCalledTwiceCreatesOneWorker verifies that calling Start() more than
+// once does not create multiple background goroutines.
+func TestEngine_StartCalledTwiceCreatesOneWorker(t *testing.T) {
+	jobs := &countingJobRepo{stubJobRepo: newStubJobRepo()}
+	locs := newStubLocationRepo(nil, nil)
+
+	engine := app.NewDispatchEngine(jobs, locs, newStubTripUpdater())
+	engine.WithTickInterval(5 * time.Millisecond)
+
+	engine.Start()
+	engine.Start() // must be a no-op
+
+	time.Sleep(40 * time.Millisecond)
+	engine.Stop()
+
+	count := int(jobs.findCount.Load())
+	// 5 ms tick × 40 ms ≈ 8 calls for one goroutine; two goroutines → ~16.
+	if count > 14 {
+		t.Errorf("FindExpiredOffers called %d times; suggests multiple goroutines (want ≤14)", count)
+	}
+	if count == 0 {
+		t.Error("FindExpiredOffers never called; engine may not have started")
+	}
+}
+
+// TestEngine_GracefulStop verifies that Stop() waits for in-flight job goroutines.
+func TestEngine_GracefulStop(t *testing.T) {
+	jobs := newStubJobRepo()
+	job, _ := entity.NewDispatchJob("j1", "trip1", "rider1", 10, 106, 1, 5, testNow)
+	_ = job.OfferToDriver("d1", testNow)
+	_ = jobs.Save(context.Background(), job)
+
+	saveCh := make(chan struct{})
+	slowJobs := &blockOnSaveJobRepo{stubJobRepo: jobs, saveCh: saveCh}
+	locs := newStubLocationRepo([]string{"d2"}, allActive("d2"))
+
+	engine := app.NewDispatchEngine(slowJobs, locs, newStubTripUpdater())
+	engine.WithTickInterval(5 * time.Millisecond)
+	engine.Start()
+
+	// Let a tick fire and the job goroutine start (it blocks at Save).
+	time.Sleep(30 * time.Millisecond)
+
+	stopDone := make(chan struct{})
+	go func() {
+		engine.Stop()
+		close(stopDone)
+	}()
+
+	// While job goroutine is blocked, Stop must not return.
+	select {
+	case <-stopDone:
+		t.Fatal("Stop() returned before job goroutine finished — graceful shutdown broken")
+	case <-time.After(30 * time.Millisecond):
+		// expected: Stop is still waiting
+	}
+
+	// Unblock the goroutine; Stop must now return.
+	close(saveCh)
+	select {
+	case <-stopDone:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Stop() did not return after job goroutine was unblocked")
+	}
+}
+
+// TestEngine_ConcurrentJobsDeduplication verifies that a job already being processed
+// is not started a second time when the next tick fires.
+func TestEngine_ConcurrentJobsDeduplication(t *testing.T) {
+	base := newStubJobRepo()
+	job, _ := entity.NewDispatchJob("j1", "trip1", "rider1", 10, 106, 1, 5, testNow)
+	_ = job.OfferToDriver("d1", testNow)
+	_ = base.Save(context.Background(), job)
+
+	saveCh := make(chan struct{})
+	saver := &blockOnSaveJobRepo{stubJobRepo: base, saveCh: saveCh}
+	finder := &alwaysExpiredJobRepo{stubJobRepo: &stubJobRepo{jobs: base.jobs}, job: job}
+	composed := &composedJobRepo{finder: finder, saver: saver}
+
+	locs := newStubLocationRepo([]string{"d2"}, allActive("d2"))
+	engine := app.NewDispatchEngine(composed, locs, newStubTripUpdater())
+	engine.WithTickInterval(5 * time.Millisecond)
+	engine.Start()
+
+	// Let 2+ ticks fire. Goroutine 1 starts on tick 1 and blocks at Save.
+	// Subsequent ticks see job.JobID in inFlight and skip it.
+	time.Sleep(20 * time.Millisecond)
+
+	// Stop BEFORE unblocking: signals done so no new ticks fire, then waits in wg.Wait().
+	stopDone := make(chan struct{})
+	go func() {
+		engine.Stop()
+		close(stopDone)
+	}()
+	// Give Stop time to signal done and enter wg.Wait().
+	time.Sleep(5 * time.Millisecond)
+
+	// Only goroutine 1 should have reached Save during the blocking window.
+	if count := saver.saveCount.Load(); count != 1 {
+		t.Errorf("Save called %d times during blocking window; want 1 (in-flight deduplication)", count)
+	}
+
+	// Unblock goroutine 1 → wg drains → Stop returns.
+	close(saveCh)
+	select {
+	case <-stopDone:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Stop() did not return after goroutine was unblocked")
 	}
 }
 

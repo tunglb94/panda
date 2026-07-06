@@ -55,6 +55,11 @@ func (a *TripAdapter) GetTrip(ctx context.Context, tripID string) (*app.TripInfo
 	return protoToTripInfo(resp.GetTrip()), nil
 }
 
+func (a *TripAdapter) CancelTrip(ctx context.Context, tripID, reason string) error {
+	_, err := a.client.CancelTrip(ctx, &trippb.CancelTripRequest{TripId: tripID, Reason: reason})
+	return err
+}
+
 func protoToTripInfo(t *trippb.TripProto) *app.TripInfo {
 	if t == nil {
 		return nil

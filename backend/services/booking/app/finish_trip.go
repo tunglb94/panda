@@ -1,6 +1,10 @@
 package app
 
-import "context"
+import (
+	"context"
+
+	domainerrors "github.com/fairride/shared/errors"
+)
 
 // FinishTripInput is the input to FinishTripUseCase.
 type FinishTripInput struct {
@@ -26,13 +30,32 @@ type FinishedTripResult struct {
 type FinishTripUseCase struct {
 	pricing PricingClient
 	trip    TripClient
+	idem    IdempotencyStore // nil = no idempotency checking
 }
 
 func NewFinishTripUseCase(pricing PricingClient, trip TripClient) *FinishTripUseCase {
 	return &FinishTripUseCase{pricing: pricing, trip: trip}
 }
 
+// WithIdempotency attaches an idempotency store. The natural key is "finish:" + tripID,
+// preventing a duplicate finish from triggering a second fare charge.
+func (uc *FinishTripUseCase) WithIdempotency(store IdempotencyStore) *FinishTripUseCase {
+	uc.idem = store
+	return uc
+}
+
 func (uc *FinishTripUseCase) Execute(ctx context.Context, in FinishTripInput) (*FinishedTripResult, error) {
+	if uc.idem != nil {
+		key := "finish:" + in.TripID
+		exists, err := uc.idem.Exists(ctx, key)
+		if err != nil {
+			return nil, domainerrors.Internal("idempotency check failed")
+		}
+		if exists {
+			return nil, domainerrors.AlreadyExists("duplicate finish_trip request")
+		}
+	}
+
 	fare, err := uc.pricing.CalculateFinalFare(ctx, in.VehicleType, in.DistanceKM, in.DurationMin)
 	if err != nil {
 		return nil, err
@@ -41,6 +64,11 @@ func (uc *FinishTripUseCase) Execute(ctx context.Context, in FinishTripInput) (*
 	if err != nil {
 		return nil, err
 	}
+
+	if uc.idem != nil {
+		_ = uc.idem.Record(ctx, "finish:"+in.TripID) // best-effort
+	}
+
 	return &FinishedTripResult{
 		TripID:      tripInfo.TripID,
 		Status:      tripInfo.Status,

@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	sharedconfig "github.com/fairride/shared/config"
 	sharedgrpc "github.com/fairride/shared/grpc"
+	"github.com/fairride/shared/idempotency"
 	"github.com/fairride/shared/server"
 
 	"github.com/fairride/booking/app"
@@ -52,12 +54,40 @@ func register(srv *sharedgrpc.Server, ready *server.ReadinessTracker) {
 	dispatchAdapter := adapters.NewDispatchAdapter(dispatchpb.NewDispatchServiceClient(dispatchConn))
 	pricingAdapter := adapters.NewPricingAdapter(pricingpb.NewPricingServiceClient(pricingConn))
 
+	// Idempotency store: requires a PostgreSQL DB for the booking service.
+	// The DB URL is read from the shared config (BOOKING_DB_URL env var or config file).
+	// If the DB is unavailable the service starts without idempotency rather than refusing to boot.
+	ready.Set("db", false)
+	var idemStore app.IdempotencyStore
+	if cfg.DB.URL != "" {
+		store, closePool, err := idempotency.NewPostgresStoreFromURL(context.Background(), cfg.DB.URL)
+		if err == nil {
+			if initErr := store.Init(context.Background()); initErr == nil {
+				idemStore = store
+				ready.Set("db", true)
+				// closePool is intentionally not deferred — the pool lives for the process lifetime.
+				_ = closePool
+			} else {
+				closePool() // init failed; release the connection pool
+			}
+		}
+	}
+
+	bookRide := app.NewBookRideUseCase(tripAdapter, dispatchAdapter)
+	acceptOffer := app.NewAcceptDispatchOfferUseCase(dispatchAdapter)
+	finishTrip := app.NewFinishTripUseCase(pricingAdapter, tripAdapter)
+	if idemStore != nil {
+		bookRide = bookRide.WithIdempotency(idemStore)
+		acceptOffer = acceptOffer.WithIdempotency(idemStore)
+		finishTrip = finishTrip.WithIdempotency(idemStore)
+	}
+
 	handler := bookinggrpc.NewHandler(
-		app.NewBookRideUseCase(tripAdapter, dispatchAdapter),
-		app.NewAcceptDispatchOfferUseCase(dispatchAdapter),
+		bookRide,
+		acceptOffer,
 		app.NewRejectDispatchOfferUseCase(dispatchAdapter),
 		app.NewStartTripUseCase(tripAdapter),
-		app.NewFinishTripUseCase(pricingAdapter, tripAdapter),
+		finishTrip,
 		app.NewGetBookingDetailsUseCase(tripAdapter, dispatchAdapter),
 	)
 	bookingpb.RegisterBookingServiceServer(srv.Inner(), handler)

@@ -2,7 +2,7 @@
 Last updated: 2026-07-06 by Principal Engineer AI
 
 ## Current Phase
-Phase H2 — Hardening: Atomic Transactions (COMPLETE)
+Phase H3-H4 — Hardening: Saga Reliability & Dispatch Lifecycle (COMPLETE)
 Previous: Phase 17 — Pickup & Destination Selection (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
 
 ## Documentation Strategy Change
@@ -1024,6 +1024,99 @@ is safe whether fn succeeds or panics.
 - Existing `TripUpdater` and `DispatchJobRepository` interfaces unchanged.
 - `RejectTripUseCase` and `DispatchEngine` unchanged (they only write to
   `dispatch_jobs`, no cross-entity atomicity risk).
+
+---
+
+## Phase H3-H4 — Hardening: Saga Reliability & Dispatch Lifecycle (COMPLETE — 2026-07-06)
+
+### Part A — Saga Reliability (booking service)
+
+**Problem 1 — Orphaned trips:**
+When `BookRide` creates a trip successfully but `RequestDispatch` then fails,
+the trip stays in `pending` state with no dispatch job — an orphaned trip.
+
+**Fix:** `BookRideUseCase.Execute` now calls `trip.CancelTrip` (best-effort) when
+`RequestDispatch` fails. Also added `CancelTrip(ctx, tripID, reason)` to the
+`TripClient` interface and implemented it in `TripAdapter` (wraps the existing
+`trippb.CancelTrip` RPC — the Trip service already had this endpoint).
+
+**Problem 2 — Duplicate requests:**
+No protection against duplicate `BookRide`, `AcceptDispatchOffer`, or `FinishTrip`
+calls (network retries, double-submit).
+
+**Fix:** Added `IdempotencyStore` interface to `booking/app` with a PostgreSQL
+implementation in `shared/idempotency.PostgresStore` (persists keys in
+`idempotency_keys` table) and an in-memory implementation
+(`MemoryIdempotencyStore`) for tests. Use cases gain `WithIdempotency(store)` builder
+methods — nil store means no checking (existing constructor unchanged).
+
+| Use Case | Idempotency key |
+|---|---|
+| `BookRide` | caller-supplied `BookRideInput.IdempotencyKey` (empty = no check) |
+| `AcceptDispatchOffer` | `"accept:" + tripID` (natural — one accept per trip) |
+| `FinishTrip` | `"finish:" + tripID` (natural — one completion per trip) |
+
+Duplicates return `domainerrors.AlreadyExists("duplicate ... request")`.
+
+**Files changed (Part A):**
+| File | Change |
+|---|---|
+| `booking/app/clients.go` | Added `CancelTrip` to `TripClient` interface |
+| `booking/app/idempotency.go` | NEW — `IdempotencyStore` interface + `MemoryIdempotencyStore` |
+| `booking/app/book_ride.go` | Compensation logic + idempotency + `WithIdempotency` method |
+| `booking/app/accept_reject.go` | Idempotency for `AcceptDispatchOfferUseCase` + `WithIdempotency` |
+| `booking/app/finish_trip.go` | Idempotency for `FinishTripUseCase` + `WithIdempotency` |
+| `booking/grpc/adapters/trip_adapter.go` | Added `CancelTrip` implementation |
+| `booking/grpc/handler_test.go` | Added `CancelTrip` stub method |
+| `booking/app/app_test.go` | Added `CancelTrip` to `stubTrip`; 4 new tests |
+| `booking/cmd/server/main.go` | Wires `shared/idempotency.PostgresStore` (graceful — boots without DB) |
+| `shared/idempotency/store.go` | NEW — `Store` interface + `PostgresStore` + `NewPostgresStoreFromURL` |
+
+**New tests (booking):** `TestBookRide_DispatchError_CompensatesTrip`, `TestBookRide_DuplicateIdempotentRequest`, `TestAcceptDispatchOffer_DuplicateIdempotentRequest`, `TestFinishTrip_DuplicateIdempotentRequest`
+
+**Architecture note:** `shared/idempotency.PostgresStore` satisfies `booking/app.IdempotencyStore`
+via Go structural typing — no circular imports. `booking/go.mod` does not need a direct pgx dependency
+(the store constructor lives in `shared` which already has pgx).
+
+---
+
+### Part B — Dispatch Engine Lifecycle
+
+**Problems fixed:**
+1. `Start()` called twice → two background goroutines (doubled processing rate, double lock contention)
+2. `Stop()` returned immediately before the goroutine finished (goroutine leak)
+3. A job already being processed could start a second goroutine on the next tick (concurrent duplicate processing)
+4. `FindExpiredOffers` error silently swallowed (`return`)
+5. `offerNextDriver` error silently discarded (`_ = err`)
+
+**Fixes in `dispatch/app/engine.go`:**
+| Mechanism | What it guards |
+|---|---|
+| `sync.Once` (startOnce) | `Start()` idempotent — only first call creates goroutine |
+| `sync.Once` (stopOnce) | `Stop()` idempotent — only first call closes `done` channel |
+| `sync.WaitGroup` | `Stop()` waits for the main goroutine AND all in-flight job goroutines |
+| `sync.Map` (inFlight) | Skips job if its `JobID` is already being processed |
+| Per-job goroutine + `wg.Add(1)` | Each expired job processed concurrently; all jobs waited on by `Stop()` |
+| `log.Error()` / `log.Warn()` (zerolog) | All silenced errors now produce structured log lines with `job_id` field |
+
+`processJob` extracted as separate method for clarity. Uses `now` captured at start of `processExpiredOffers` tick (not re-sampled per-job).
+
+**New tests (dispatch engine):**
+- `TestEngine_StartCalledTwiceCreatesOneWorker` — verifies `FindExpiredOffers` rate ≤14 over 40 ms with 5 ms tick (would be ~16 with two goroutines)
+- `TestEngine_GracefulStop` — verifies `Stop()` blocks while a job goroutine is blocked at `Save`, returns promptly after unblock
+- `TestEngine_ConcurrentJobsDeduplication` — verifies only 1 `Save` call while first goroutine is in-flight + engine stopped before unblock (prevents new goroutines from starting)
+
+**Test helpers added:**
+`countingJobRepo`, `blockOnSaveJobRepo`, `alwaysExpiredJobRepo`, `composedJobRepo`
+
+### Combined test counts after H3-H4
+- `dispatch/app`: **22 tests** (was 19; +3 engine lifecycle)
+- `booking/app`: **21 tests** (was 17; +4 saga/idempotency)
+- `booking/grpc`: **14 tests** (unchanged — stub updated only)
+- All other packages: unchanged
+
+**All modules build and test clean:**
+`go test ./services/dispatch/... ./services/booking/... ./shared/...` → 0 failures
 
 ---
 

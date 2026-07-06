@@ -11,10 +11,12 @@ import (
 // ─── stub clients ────────────────────────────────────────────────────────────
 
 type stubTrip struct {
-	trips    map[string]*app.TripInfo
-	nextID   string
-	createErr error
-	startErr  error
+	trips      map[string]*app.TripInfo
+	nextID     string
+	createErr  error
+	startErr   error
+	cancelErr  error
+	cancelled  []string // IDs cancelled via CancelTrip
 }
 
 func newStubTrip() *stubTrip {
@@ -65,6 +67,17 @@ func (s *stubTrip) GetTrip(_ context.Context, tripID string) (*app.TripInfo, err
 		return nil, errors.New("trip not found")
 	}
 	return t, nil
+}
+
+func (s *stubTrip) CancelTrip(_ context.Context, tripID, _ string) error {
+	if s.cancelErr != nil {
+		return s.cancelErr
+	}
+	s.cancelled = append(s.cancelled, tripID)
+	if t, ok := s.trips[tripID]; ok {
+		t.Status = "cancelled"
+	}
+	return nil
 }
 
 type stubDispatch struct {
@@ -475,5 +488,93 @@ func TestFullBookingFlow(t *testing.T) {
 	}
 	if details.FinalFare != 325 {
 		t.Errorf("step 6: FinalFare = %d, want 325", details.FinalFare)
+	}
+}
+
+// ─── Saga Compensation ────────────────────────────────────────────────────────
+
+// TestBookRide_DispatchError_CompensatesTrip verifies that when RequestDispatch fails
+// after a trip has been created, CancelTrip is called to prevent orphaned trips.
+func TestBookRide_DispatchError_CompensatesTrip(t *testing.T) {
+	trip := newStubTrip()
+	dispatch := newStubDispatch()
+	dispatch.requestErr = errors.New("dispatch unavailable")
+	uc := app.NewBookRideUseCase(trip, dispatch)
+
+	_, err := uc.Execute(context.Background(), app.BookRideInput{
+		RiderID:        "r1",
+		PickupAddress:  "pickup",
+		DropoffAddress: "dropoff",
+	})
+	if err == nil {
+		t.Fatal("expected error when dispatch fails")
+	}
+	// CancelTrip must have been called for the created trip
+	if len(trip.cancelled) != 1 {
+		t.Errorf("CancelTrip calls = %d, want 1 (saga compensation)", len(trip.cancelled))
+	}
+	if len(trip.cancelled) == 1 && trip.cancelled[0] != trip.nextID {
+		t.Errorf("cancelled trip = %q, want %q", trip.cancelled[0], trip.nextID)
+	}
+}
+
+// ─── Idempotency ──────────────────────────────────────────────────────────────
+
+func TestBookRide_DuplicateIdempotentRequest(t *testing.T) {
+	trip := newStubTrip()
+	dispatch := newStubDispatch()
+	store := app.NewMemoryIdempotencyStore()
+	uc := app.NewBookRideUseCase(trip, dispatch).WithIdempotency(store)
+
+	in := app.BookRideInput{
+		RiderID:        "r1",
+		PickupAddress:  "pickup",
+		DropoffAddress: "dropoff",
+		IdempotencyKey: "key-abc",
+	}
+
+	// First call succeeds.
+	if _, err := uc.Execute(context.Background(), in); err != nil {
+		t.Fatalf("first call: unexpected error: %v", err)
+	}
+	// Second call with same key must return AlreadyExists.
+	_, err := uc.Execute(context.Background(), in)
+	if err == nil {
+		t.Fatal("second call: expected AlreadyExists error, got nil")
+	}
+}
+
+func TestAcceptDispatchOffer_DuplicateIdempotentRequest(t *testing.T) {
+	dispatch := newStubDispatch()
+	dispatch.jobs["t1"] = &app.DispatchInfo{TripID: "t1", Status: "searching"}
+	store := app.NewMemoryIdempotencyStore()
+	uc := app.NewAcceptDispatchOfferUseCase(dispatch).WithIdempotency(store)
+
+	// First accept succeeds.
+	if err := uc.Execute(context.Background(), "t1", "d1"); err != nil {
+		t.Fatalf("first call: unexpected error: %v", err)
+	}
+	// Second accept with same tripID must return AlreadyExists.
+	if err := uc.Execute(context.Background(), "t1", "d1"); err == nil {
+		t.Fatal("second call: expected AlreadyExists error, got nil")
+	}
+}
+
+func TestFinishTrip_DuplicateIdempotentRequest(t *testing.T) {
+	trip := newStubTrip()
+	trip.trips["t1"] = &app.TripInfo{TripID: "t1", Status: "in_progress"}
+	pricing := newStubPricing(100, "USD")
+	store := app.NewMemoryIdempotencyStore()
+	uc := app.NewFinishTripUseCase(pricing, trip).WithIdempotency(store)
+
+	in := app.FinishTripInput{TripID: "t1", VehicleType: "car", DistanceKM: 5.0, DurationMin: 15.0}
+
+	// First finish succeeds.
+	if _, err := uc.Execute(context.Background(), in); err != nil {
+		t.Fatalf("first call: unexpected error: %v", err)
+	}
+	// Second finish with same tripID must return AlreadyExists.
+	if _, err := uc.Execute(context.Background(), in); err == nil {
+		t.Fatal("second call: expected AlreadyExists error, got nil")
 	}
 }

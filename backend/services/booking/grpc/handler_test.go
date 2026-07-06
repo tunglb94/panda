@@ -67,6 +67,13 @@ func (s *stubTrip) GetTrip(_ context.Context, tripID string) (*app.TripInfo, err
 	return t, nil
 }
 
+func (s *stubTrip) CancelTrip(_ context.Context, tripID, _ string) error {
+	if t, ok := s.trips[tripID]; ok {
+		t.Status = "cancelled"
+	}
+	return nil
+}
+
 type stubDispatch struct {
 	jobs       map[string]*app.DispatchInfo
 	acceptErr  error

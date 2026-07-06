@@ -37,6 +37,8 @@ type TripClient interface {
 	StartTrip(ctx context.Context, tripID string) error
 	CompleteTrip(ctx context.Context, tripID string, finalFareTotal int64, fareCurrency string) (*TripInfo, error)
 	GetTrip(ctx context.Context, tripID string) (*TripInfo, error)
+	// CancelTrip cancels a trip, used for saga compensation when downstream steps fail.
+	CancelTrip(ctx context.Context, tripID, reason string) error
 }
 
 // DispatchClient abstracts calls to the Dispatch service.
