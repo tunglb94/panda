@@ -2,8 +2,8 @@
 Last updated: 2026-07-06 by Principal Engineer AI
 
 ## Current Phase
-Phase H3-H4 — Hardening: Saga Reliability & Dispatch Lifecycle (COMPLETE)
-Previous: Phase 17 — Pickup & Destination Selection (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
+Phase 18 — Driver App Skeleton (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
+Previous: Phase H3-H4 — Hardening: Saga Reliability & Dispatch Lifecycle (COMPLETE)
 
 ## Documentation Strategy Change
 ORIGINAL: 72-document comprehensive roadmap
@@ -1117,6 +1117,60 @@ via Go structural typing — no circular imports. `booking/go.mod` does not need
 
 **All modules build and test clean:**
 `go test ./services/dispatch/... ./services/booking/... ./shared/...` → 0 failures
+
+---
+
+## Phase 18 — Driver App Skeleton (COMPLETE — pub get + analyze pending)
+
+Flutter Driver application skeleton at `apps/driver/`. Created manually (flutter not installed on work machine).
+
+### Structure mirrors Rider app
+- Package name: `driver` (independent from `rider`)
+- 4 tabs: Home / Trip / Earnings / Profile (Rider has 3)
+- Routes: `/`, `/trip`, `/earnings`, `/profile`
+- No google_maps_flutter, no geolocator (driver skeleton only)
+
+### Files created
+```
+apps/driver/
+  pubspec.yaml                                        go_router ^14.0.0 only; no maps/GPS deps
+  analysis_options.yaml                               include: flutter_lints/flutter.yaml
+  lib/
+    main.dart                                         runApp(DriverApp)
+    app.dart                                          DriverApp — MaterialApp.router wired to AppRouter
+    core/
+      theme/app_theme.dart                            Same FAIRRIDE green #1A8C4E, Material 3
+      router/app_router.dart                          GoRouter with StatefulShellRoute (4 branches)
+    shared/
+      widgets/scaffold_with_nav.dart                  NavigationBar shell — 4 tabs
+    features/
+      home/presentation/pages/home_page.dart          Online/offline toggle (StatefulWidget), today's summary
+      trip/presentation/pages/trip_page.dart          Active trip + recent trips placeholders
+      earnings/presentation/pages/earnings_page.dart  Today's earnings total, weekly bar chart (placeholder)
+      profile/presentation/pages/profile_page.dart    Driver avatar, rating, vehicle, stats, settings
+```
+
+### Design tokens (same as Rider)
+- Primary: `#1A8C4E` (FAIRRIDE green)
+- Scaffold: `#F8F9FA`
+- Nav indicator: `#E8F5ED`
+- Material 3 `useMaterial3: true`
+
+### Key differences from Rider app
+- 4 bottom nav tabs (Rider: 3)
+- Home page: online/offline toggle (`Switch` widget, local `StatefulWidget` state only)
+- Earnings page: `displaySmall` total + `LinearProgressIndicator` weekly bars
+- Profile page: vehicle card + acceptance rate stat
+
+### Action required on home machine
+```bash
+cd apps/driver
+flutter pub get
+flutter analyze
+```
+
+### Human Checkpoint
+HC-P18 pending CTO approval to proceed to next phase.
 
 ---
 
