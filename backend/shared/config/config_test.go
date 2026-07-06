@@ -9,6 +9,7 @@ import (
 
 func TestLoad_DefaultValues(t *testing.T) {
 	t.Setenv("SERVICE_NAME", "")
+	t.Setenv("ENVIRONMENT", "")
 	t.Setenv("LOG_LEVEL", "")
 	t.Setenv("GRPC_ADDR", "")
 	t.Setenv("HTTP_ADDR", "")
