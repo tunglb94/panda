@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
+	domainerrors "github.com/fairride/shared/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -54,4 +56,32 @@ func grpcMessage(err error) string {
 		return st.Message()
 	}
 	return "internal server error"
+}
+
+func writeDomainError(w http.ResponseWriter, err error) {
+	var de *domainerrors.DomainError
+	if errors.As(err, &de) {
+		writeJSON(w, domainCodeToHTTP(de.Code), errorResponse{Error: de.Message})
+		return
+	}
+	writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "internal server error"})
+}
+
+func domainCodeToHTTP(code domainerrors.Code) int {
+	switch code {
+	case domainerrors.CodeNotFound:
+		return http.StatusNotFound
+	case domainerrors.CodeAlreadyExists:
+		return http.StatusConflict
+	case domainerrors.CodeInvalidArgument:
+		return http.StatusBadRequest
+	case domainerrors.CodeUnauthenticated:
+		return http.StatusUnauthorized
+	case domainerrors.CodePermissionDenied:
+		return http.StatusForbidden
+	case domainerrors.CodePreconditionFailed:
+		return http.StatusUnprocessableEntity
+	default:
+		return http.StatusInternalServerError
+	}
 }

@@ -9,10 +9,12 @@ import (
 )
 
 // NewRouter constructs the gateway HTTP mux with all routes and middleware wired up.
-// /health is unauthenticated. All /api/v1/* routes require a valid Bearer JWT.
-// Every request is wrapped in the logging middleware.
+// /health and /api/v1/auth/* are unauthenticated. All other /api/v1/* routes require
+// a valid Bearer JWT. Every request is wrapped in the logging middleware.
 func NewRouter(
 	bh *handlers.BookingHandler,
+	ah *handlers.AuthHandler,
+	avh *handlers.AvailabilityHandler,
 	authMiddleware func(http.Handler) http.Handler,
 	log zerolog.Logger,
 ) http.Handler {
@@ -21,8 +23,16 @@ func NewRouter(
 	// Health — no auth required.
 	mux.HandleFunc("GET /health", handleHealth)
 
-	// Booking API — all routes require authentication.
+	// Auth — no JWT required (issues the token).
+	mux.HandleFunc("POST /api/v1/auth/login", ah.Login)
+
+	// Driver availability — auth required.
 	auth := authMiddleware
+	mux.Handle("POST /api/v1/driver/go-online", auth(http.HandlerFunc(avh.GoOnline)))
+	mux.Handle("POST /api/v1/driver/go-offline", auth(http.HandlerFunc(avh.GoOffline)))
+	mux.Handle("GET /api/v1/driver/availability", auth(http.HandlerFunc(avh.GetAvailability)))
+
+	// Booking API — all routes require authentication.
 	mux.Handle("POST /api/v1/rides", auth(http.HandlerFunc(bh.BookRide)))
 	mux.Handle("GET /api/v1/rides/{tripID}", auth(http.HandlerFunc(bh.GetBooking)))
 	mux.Handle("POST /api/v1/rides/{tripID}/accept", auth(http.HandlerFunc(bh.AcceptDispatchOffer)))

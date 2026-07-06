@@ -1,17 +1,22 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/fairride/booking/grpc/bookingpb"
+	driverpostgres "github.com/fairride/driver/infrastructure/postgres"
+	"github.com/fairride/driver/grpc/driverpb"
 	httpgateway "github.com/fairride/gateway/http"
 	"github.com/fairride/gateway/http/handlers"
 	"github.com/fairride/gateway/http/middleware"
+	identitypostgres "github.com/fairride/identity/infrastructure/postgres"
 	"github.com/fairride/identity/infrastructure/jwt"
 	sharedconfig "github.com/fairride/shared/config"
+	"github.com/fairride/shared/database"
 	"github.com/fairride/shared/logger"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -32,16 +37,56 @@ func main() {
 		log.Fatal().Err(err).Msg("invalid JWT config")
 	}
 
+	// Booking service.
 	bookingAddr := envOrDefault("BOOKING_ADDR", cfg.GRPC.Addr)
-	conn, err := grpc.NewClient(bookingAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	bookingConn, err := grpc.NewClient(bookingAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal().Err(err).Str("addr", bookingAddr).Msg("failed to connect to booking service")
 	}
-	defer conn.Close()
+	defer bookingConn.Close()
+	bh := handlers.NewBookingHandler(bookingpb.NewBookingServiceClient(bookingConn))
 
-	bh := handlers.NewBookingHandler(bookingpb.NewBookingServiceClient(conn))
+	// Auth handler: requires a shared DB for user + driver lookups.
+	// If DB_URL is unset or the connection fails, auth returns 503 gracefully.
+	var ah *handlers.AuthHandler
+	if dbURL := os.Getenv("DB_URL"); dbURL != "" {
+		pool, dbErr := database.Connect(context.Background(), database.Config{
+			URL:      dbURL,
+			MaxConns: 5,
+			MinConns: 1,
+		})
+		if dbErr != nil {
+			log.Warn().Err(dbErr).Msg("gateway: DB connection failed — auth will return 503")
+		} else {
+			ah = handlers.NewAuthHandler(
+				identitypostgres.NewUserRepository(pool),
+				driverpostgres.NewDriverRepository(pool),
+				tokenSvc,
+			)
+		}
+	}
+	if ah == nil {
+		ah = handlers.NewAuthHandler(nil, nil, tokenSvc)
+	}
+
+	// Driver availability: proxies to the driver gRPC service.
+	// If DRIVER_ADDR is unset or the connection fails, availability returns 503 gracefully.
+	var avh *handlers.AvailabilityHandler
+	if driverAddr := os.Getenv("DRIVER_ADDR"); driverAddr != "" {
+		driverConn, connErr := grpc.NewClient(driverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if connErr != nil {
+			log.Warn().Err(connErr).Str("addr", driverAddr).Msg("gateway: driver service connection failed — availability will return 503")
+		} else {
+			defer driverConn.Close()
+			avh = handlers.NewAvailabilityHandler(driverpb.NewDriverAvailabilityServiceClient(driverConn))
+		}
+	}
+	if avh == nil {
+		avh = handlers.NewAvailabilityHandler(nil)
+	}
+
 	authMW := middleware.Auth(tokenSvc)
-	router := httpgateway.NewRouter(bh, authMW, log)
+	router := httpgateway.NewRouter(bh, ah, avh, authMW, log)
 
 	addr := cfg.HTTP.Addr
 	srv := &http.Server{

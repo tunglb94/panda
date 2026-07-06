@@ -1,24 +1,36 @@
 import 'package:flutter/material.dart';
+import '../../../../core/auth/auth_state.dart';
+import '../../../../core/storage/token_storage.dart';
 
 class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({
+    super.key,
+    required this.authState,
+    required this.tokenStorage,
+  });
+
+  final AuthState authState;
+  final TokenStorage tokenStorage;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
-      body: const SafeArea(
+      body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              _ProfileHeader(),
-              SizedBox(height: 16),
-              _VehicleCard(),
-              SizedBox(height: 16),
-              _StatsCard(),
-              SizedBox(height: 16),
-              _SettingsSection(),
+              const _ProfileHeader(),
+              const SizedBox(height: 16),
+              const _VehicleCard(),
+              const SizedBox(height: 16),
+              const _StatsCard(),
+              const SizedBox(height: 16),
+              _SettingsSection(
+                authState: authState,
+                tokenStorage: tokenStorage,
+              ),
             ],
           ),
         ),
@@ -63,8 +75,7 @@ class _ProfileHeader extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Icons.star,
-                          size: 16, color: Color(0xFFFFC107)),
+                      const Icon(Icons.star, size: 16, color: Color(0xFFFFC107)),
                       const SizedBox(width: 4),
                       Text(
                         '—',
@@ -184,7 +195,13 @@ class _StatItem extends StatelessWidget {
 }
 
 class _SettingsSection extends StatelessWidget {
-  const _SettingsSection();
+  const _SettingsSection({
+    required this.authState,
+    required this.tokenStorage,
+  });
+
+  final AuthState authState;
+  final TokenStorage tokenStorage;
 
   @override
   Widget build(BuildContext context) {
@@ -209,7 +226,7 @@ class _SettingsSection extends StatelessWidget {
           ListTile(
             leading: Icon(Icons.logout, color: cs.error),
             title: Text('Sign Out', style: TextStyle(color: cs.error)),
-            onTap: () {},
+            onTap: () => authState.logout(tokenStorage),
           ),
         ],
       ),

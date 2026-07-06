@@ -2,7 +2,8 @@
 Last updated: 2026-07-06 by Principal Engineer AI
 
 ## Current Phase
-Phase 18 — Driver App Skeleton (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
+Phase 19 — Driver Authentication & Availability (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
+Previous: Phase 18 — Driver App Skeleton (COMPLETE)
 Previous: Phase H3-H4 — Hardening: Saga Reliability & Dispatch Lifecycle (COMPLETE)
 
 ## Documentation Strategy Change
@@ -1171,6 +1172,79 @@ flutter analyze
 
 ### Human Checkpoint
 HC-P18 pending CTO approval to proceed to next phase.
+
+---
+
+## Phase 19 — Driver Authentication & Availability (COMPLETE — pub get + analyze pending)
+
+### Backend (COMPLETE — builds + tests clean)
+
+**New gateway dependencies:**
+- `github.com/fairride/driver v0.0.0` added to `services/gateway/go.mod` (replace → `../../services/driver`)
+- `go mod tidy` added transitive: pgx/v5, pgpassfile, pgservicefile, puddle, mattn, golang.org/x/*
+
+**New gateway files:**
+| File | Purpose |
+|------|---------|
+| `services/gateway/http/handlers/errors.go` | Added `writeDomainError` + `domainCodeToHTTP` (maps `*domainerrors.DomainError` → HTTP status) |
+| `services/gateway/http/handlers/auth_handler.go` | `AuthHandler.Login` — POST /api/v1/auth/login; `userFinder` + `driverFinder` interfaces; JWT sub = driver.DriverID |
+| `services/gateway/http/handlers/auth_handler_test.go` | 6 tests: Login_Success, MissingPhone, BlankPhone, UserNotFound, DriverNotFound, DBNotConfigured |
+| `services/gateway/http/handlers/availability_handler.go` | `AvailabilityHandler` (GoOnline/GoOffline/GetAvailability); `AvailabilityClient` interface over driverpb |
+| `services/gateway/http/handlers/availability_handler_test.go` | 5 tests: GoOnline_Success, ServiceUnavailable, GRPCError, GoOffline_Success, GetAvailability_Success |
+| `services/gateway/http/router.go` | Added `AuthHandler` + `AvailabilityHandler` params; new routes wired |
+| `services/gateway/cmd/server/main.go` | Rewritten: wires DB_URL→pool→repos→AuthHandler; DRIVER_ADDR→gRPC→AvailabilityHandler; both graceful-nil if unconfigured |
+
+**REST endpoints added:**
+| Method | Path | Handler | Auth |
+|--------|------|---------|------|
+| `POST` | `/api/v1/auth/login` | AuthHandler.Login | none |
+| `POST` | `/api/v1/driver/go-online` | AvailabilityHandler.GoOnline | JWT required |
+| `POST` | `/api/v1/driver/go-offline` | AvailabilityHandler.GoOffline | JWT required |
+| `GET` | `/api/v1/driver/availability` | AvailabilityHandler.GetAvailability | JWT required |
+
+**JWT design:** `sub` = `driver.DriverID` (not user.ID). All downstream handlers use `claims.UserID` as driver_id directly — no extra lookup needed.
+
+**Backend verification:**
+- `go build github.com/fairride/gateway/...` — ✅ clean
+- `go test github.com/fairride/gateway/...` — ✅ ALL PASS (handlers: 0.656s, middleware: 1.031s)
+
+---
+
+### Flutter Driver App (COMPLETE — pub get + analyze pending)
+
+**New pubspec.yaml dependencies:**
+- `http: ^1.2.0`
+- `shared_preferences: ^2.3.0`
+
+**New / modified files:**
+| File | Purpose |
+|------|---------|
+| `apps/driver/lib/core/config/app_config.dart` | `AppConfig.apiBaseUrl` — reads `API_BASE_URL` env var, default `http://localhost:8080` |
+| `apps/driver/lib/core/storage/token_storage.dart` | `TokenStorage` — shared_preferences-backed persistence for `access_token` + `driver_id` |
+| `apps/driver/lib/core/auth/auth_state.dart` | `AuthState extends ChangeNotifier` — `initialize(storage)`, `login(...)`, `logout(storage)`; used as GoRouter `refreshListenable` |
+| `apps/driver/lib/core/network/api_client.dart` | `ApiClient` — http package; auto-includes `Authorization: Bearer` when token present; `ApiException` on non-2xx |
+| `apps/driver/lib/features/auth/data/auth_repository.dart` | `AuthRepository.loginDriver(phone)` — POST /api/v1/auth/login; returns `LoginResult{accessToken, driverId}` |
+| `apps/driver/lib/features/home/data/availability_repository.dart` | `AvailabilityRepository` — goOnline / goOffline / getAvailability; returns `AvailabilityResult{isOnline, driverId}` |
+| `apps/driver/lib/features/auth/presentation/pages/login_page.dart` | Login form — phone field, loading state, error display; `GoRouter.refreshListenable` handles redirect after login |
+| `apps/driver/lib/features/home/presentation/pages/home_page.dart` | Online/offline toggle wired to AvailabilityRepository; `getAvailability()` on init; `_isToggling` prevents concurrent calls; error display |
+| `apps/driver/lib/features/profile/presentation/pages/profile_page.dart` | Sign Out taps `authState.logout(tokenStorage)`; `authState` + `tokenStorage` passed via constructor |
+| `apps/driver/lib/main.dart` | `WidgetsFlutterBinding.ensureInitialized()`; creates TokenStorage + AuthState + ApiClient; passes all to DriverApp |
+| `apps/driver/lib/app.dart` | `DriverApp` → `StatefulWidget`; creates GoRouter in `initState` (stable across rebuilds) |
+| `apps/driver/lib/core/router/app_router.dart` | `AppRouter.create(authState, tokenStorage, apiClient)` factory; `/login` route; `redirect` guard; passes deps to pages |
+
+**Dependency injection pattern:** no DI library. Dependencies flow: `main.dart` → `DriverApp` → `AppRouter.create` → individual pages via constructor parameters.
+
+**`ChangeNotifier` note:** `AuthState extends ChangeNotifier` is Flutter framework (`flutter/foundation`) — NOT a third-party state management library. Satisfies the Phase 19 "no state management library" requirement.
+
+**Action required on home machine:**
+```bash
+cd apps/driver
+flutter pub get
+flutter analyze
+```
+
+### Human Checkpoint
+HC-P19 pending CTO approval to proceed to Phase 20.
 
 ---
 
