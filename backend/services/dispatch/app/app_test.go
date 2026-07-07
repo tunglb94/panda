@@ -94,6 +94,18 @@ func (r *stubLocationRepo) IsActive(_ context.Context, driverID string) (bool, e
 	return r.active[driverID], nil
 }
 
+func (r *stubLocationRepo) GetLocation(_ context.Context, driverID string) (float64, float64, error) {
+	if coords, ok := r.updated[driverID]; ok {
+		return coords[0], coords[1], nil
+	}
+	for _, id := range r.nearby {
+		if id == driverID {
+			return 10.0, 106.0, nil
+		}
+	}
+	return 0, 0, domainerrors.NotFound("no location for: " + driverID)
+}
+
 func (r *stubLocationRepo) RemoveLocation(_ context.Context, _ string) error { return nil }
 
 // stubTripUpdater records calls for assertion.

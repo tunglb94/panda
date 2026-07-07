@@ -55,6 +55,7 @@ func register(srv *sharedgrpc.Server, ready *server.ReadinessTracker) {
 	updateLocation := app.NewUpdateDriverLocationUseCase(locationRepo)
 	getStatus := app.NewGetDispatchStatusUseCase(jobRepo)
 	getDriverOffer := app.NewGetDriverOfferUseCase(jobRepo)
+	getDriverLocation := app.NewGetDriverLocationUseCase(locationRepo)
 
 	handler := dispatchgrpc.NewHandler(
 		requestDispatch,
@@ -63,6 +64,7 @@ func register(srv *sharedgrpc.Server, ready *server.ReadinessTracker) {
 		updateLocation,
 		getStatus,
 		getDriverOffer,
+		getDriverLocation,
 	)
 	dispatchpb.RegisterDispatchServiceServer(srv.Inner(), handler)
 

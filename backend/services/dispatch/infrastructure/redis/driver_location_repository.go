@@ -86,6 +86,19 @@ func (r *DriverLocationRepository) IsActive(ctx context.Context, driverID string
 	return n > 0, nil
 }
 
+// GetLocation returns the driver's last known coordinates from the Redis GEO set.
+// Returns CodeNotFound if the driver has never reported a location.
+func (r *DriverLocationRepository) GetLocation(ctx context.Context, driverID string) (lat, lon float64, err error) {
+	positions, geoErr := r.client.GeoPos(ctx, geoKey, driverID).Result()
+	if geoErr != nil {
+		return 0, 0, domainerrors.Internal("dispatch: get driver location").WithMeta("error", geoErr.Error())
+	}
+	if len(positions) == 0 || positions[0] == nil {
+		return 0, 0, domainerrors.NotFound("driver location not found: " + driverID)
+	}
+	return positions[0].Latitude, positions[0].Longitude, nil
+}
+
 // RemoveLocation removes the driver from the geo set and deletes the active key.
 func (r *DriverLocationRepository) RemoveLocation(ctx context.Context, driverID string) error {
 	pipe := r.client.Pipeline()

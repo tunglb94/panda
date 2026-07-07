@@ -1,9 +1,14 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:rider/features/map/domain/models/trip_selection.dart';
+import 'package:rider/features/map/data/driver_tracking_repository.dart';
+import 'package:rider/core/network/api_client.dart';
 
-// ─── Location resolution state machine (Phase 14) ────────────────────────────
+// ─── Location resolution state machine ───────────────────────────────────────
 
 enum _LocationStatus {
   loading,
@@ -13,52 +18,124 @@ enum _LocationStatus {
   ready,
 }
 
-// ─── Pickup / destination selection state machine (Phase 17) ─────────────────
+// ─── Pickup / destination selection state machine ─────────────────────────────
 
 enum _SelectionMode {
-  pickupPending,       // user drags map to set pickup
-  destinationPending,  // pickup confirmed; user drags to set destination
-  confirmed,           // both points confirmed; ready for booking phase
+  pickupPending,
+  destinationPending,
+  confirmed,
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 class MapPage extends StatefulWidget {
-  const MapPage({super.key});
+  const MapPage({
+    super.key,
+    required this.apiClient,
+  });
+
+  final ApiClient apiClient;
 
   @override
-  State<MapPage> createState() => _MapPageState();
+  State<MapPage> createState() => MapPageState();
 }
 
-class _MapPageState extends State<MapPage> {
-  // — Location resolution (Phase 14) ——————————————————————————————————————————
+class MapPageState extends State<MapPage> {
+  // — Location ——————————————————————————————————————————————————————————————————
   _LocationStatus _status = _LocationStatus.loading;
   GoogleMapController? _controller;
   LatLng? _position;
   static const double _defaultZoom = 15.0;
 
-  // — Trip selection (Phase 17) ————————————————————————————————————————————————
+  // — Trip selection ————————————————————————————————————————————————————————————
   _SelectionMode _selectionMode = _SelectionMode.pickupPending;
   LatLng _cameraCenter = const LatLng(0, 0);
   LatLng? _pickupPoint;
   LatLng? _destinationPoint;
   Set<Marker> _markers = {};
 
+  // — Driver tracking (Phase 25) ————————————————————————————————————————————————
+  late final DriverTrackingRepository _trackingRepo;
+  String? _trackingDriverId;
+  Timer? _trackingTimer;
+  LatLng? _driverPosition;
+  double _driverHeading = 0;
+
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
+    _trackingRepo = DriverTrackingRepository(apiClient: widget.apiClient);
     _resolveLocation();
   }
 
   @override
   void dispose() {
+    _stopTracking();
     _controller?.dispose();
     super.dispose();
   }
 
-  // ─── Location resolution (Phase 14) ──────────────────────────────────────────
+  // ─── Driver tracking ──────────────────────────────────────────────────────────
+
+  void startTracking(String driverID) {
+    if (_trackingDriverId == driverID && _trackingTimer != null) return;
+    _trackingDriverId = driverID;
+    _trackingTimer?.cancel();
+    _trackingTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _fetchDriverLocation(),
+    );
+    _fetchDriverLocation();
+  }
+
+  void _stopTracking() {
+    _trackingTimer?.cancel();
+    _trackingTimer = null;
+    _trackingDriverId = null;
+    if (mounted) {
+      setState(() {
+        _driverPosition = null;
+        _rebuildMarkers();
+      });
+    }
+  }
+
+  Future<void> _fetchDriverLocation() async {
+    final driverID = _trackingDriverId;
+    if (driverID == null) return;
+    try {
+      final loc = await _trackingRepo.getDriverLocation(driverID);
+      if (!mounted || _trackingDriverId != driverID) return;
+      if (!loc.isActive) {
+        _stopTracking();
+        return;
+      }
+      final newPos = LatLng(loc.lat, loc.lon);
+      setState(() {
+        if (_driverPosition != null) {
+          _driverHeading = _computeHeading(_driverPosition!, newPos);
+        }
+        _driverPosition = newPos;
+        _rebuildMarkers();
+      });
+    } catch (_) {
+      // Network failure — skip this tick, retry next
+    }
+  }
+
+  static double _computeHeading(LatLng from, LatLng to) {
+    final lat1 = from.latitude * pi / 180;
+    final lat2 = to.latitude * pi / 180;
+    final dLon = (to.longitude - from.longitude) * pi / 180;
+    final y = sin(dLon) * cos(lat2);
+    final x =
+        cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon);
+    return (atan2(y, x) * 180 / pi + 360) % 360;
+  }
+
+  // ─── Location resolution ──────────────────────────────────────────────────────
 
   Future<void> _resolveLocation() async {
     if (!mounted) return;
@@ -88,7 +165,8 @@ class _MapPageState extends State<MapPage> {
 
     try {
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.high),
       ).timeout(const Duration(seconds: 10));
       if (!mounted) return;
       final latLng = LatLng(pos.latitude, pos.longitude);
@@ -119,7 +197,6 @@ class _MapPageState extends State<MapPage> {
   void _confirmPickup() {
     setState(() {
       _pickupPoint = _cameraCenter;
-      // Skip destinationPending if destination was already set (edit-pickup flow).
       _selectionMode = _destinationPoint != null
           ? _SelectionMode.confirmed
           : _SelectionMode.destinationPending;
@@ -165,7 +242,8 @@ class _MapPageState extends State<MapPage> {
         Marker(
           markerId: const MarkerId('pickup'),
           position: _pickupPoint!,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          icon:
+              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
           infoWindow: const InfoWindow(title: 'Pickup'),
         ),
       if (_destinationPoint != null)
@@ -175,10 +253,20 @@ class _MapPageState extends State<MapPage> {
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
           infoWindow: const InfoWindow(title: 'Destination'),
         ),
+      if (_driverPosition != null)
+        Marker(
+          markerId: const MarkerId('driver'),
+          position: _driverPosition!,
+          icon:
+              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          flat: true,
+          rotation: _driverHeading,
+          infoWindow: const InfoWindow(title: 'Driver'),
+          anchor: const Offset(0.5, 0.5),
+        ),
     };
   }
 
-  /// Prepared for use by the booking phase.
   TripSelection? get _tripSelection {
     if (_pickupPoint == null || _destinationPoint == null) return null;
     return TripSelection(
@@ -197,8 +285,7 @@ class _MapPageState extends State<MapPage> {
         _LocationStatus.permissionDenied => _LocationErrorView(
             icon: Icons.location_off,
             title: 'Location permission denied',
-            message:
-                'FAIRRIDE needs your location to show nearby drivers and '
+            message: 'FAIRRIDE needs your location to show nearby drivers and '
                 'estimate fares.',
             actionLabel: 'Grant permission',
             onAction: _resolveLocation,
@@ -206,8 +293,7 @@ class _MapPageState extends State<MapPage> {
         _LocationStatus.permissionPermanentlyDenied => _LocationErrorView(
             icon: Icons.location_disabled,
             title: 'Location access blocked',
-            message:
-                'Please enable location permission for FAIRRIDE in your '
+            message: 'Please enable location permission for FAIRRIDE in your '
                 'device Settings.',
             actionLabel: 'Open Settings',
             onAction: () async => Geolocator.openAppSettings(),
@@ -216,8 +302,7 @@ class _MapPageState extends State<MapPage> {
             icon: Icons.gps_off,
             title: 'GPS is turned off',
             message:
-                'Turn on Location Services so FAIRRIDE can show you on '
-                'the map.',
+                'Turn on Location Services so FAIRRIDE can show you on the map.',
             actionLabel: 'Open Location Settings',
             onAction: () async => Geolocator.openLocationSettings(),
           ),
@@ -242,7 +327,6 @@ class _MapPageState extends State<MapPage> {
           compassEnabled: true,
           mapToolbarEnabled: false,
           mapType: MapType.normal,
-          // Reserve space so Google Maps controls sit above the bottom panel.
           padding: const EdgeInsets.only(bottom: 240),
         ),
         if (showPin) const _CenterPin(),
@@ -268,8 +352,6 @@ class _MapPageState extends State<MapPage> {
 
 // ─── Center pin overlay ───────────────────────────────────────────────────────
 
-/// Floating pin whose tip marks the exact map centre.
-/// Shown only when the user is setting pickup or destination.
 class _CenterPin extends StatelessWidget {
   const _CenterPin();
 
@@ -277,8 +359,6 @@ class _CenterPin extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        // Bottom padding == icon size shifts the pin upward by half its
-        // height so the tip aligns with the geometric centre of the Stack.
         padding: const EdgeInsets.only(bottom: 48),
         child: Icon(
           Icons.location_pin,

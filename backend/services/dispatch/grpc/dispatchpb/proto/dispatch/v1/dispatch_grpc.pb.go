@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             v7.35.1
-// source: dispatch.proto
+// source: proto/dispatch/v1/dispatch.proto
 
 package dispatchpb
 
@@ -25,7 +25,6 @@ const (
 	DispatchService_UpdateDriverLocation_FullMethodName = "/dispatch.v1.DispatchService/UpdateDriverLocation"
 	DispatchService_GetDispatchStatus_FullMethodName    = "/dispatch.v1.DispatchService/GetDispatchStatus"
 	DispatchService_GetDriverOffer_FullMethodName       = "/dispatch.v1.DispatchService/GetDriverOffer"
-	DispatchService_GetDriverLocation_FullMethodName    = "/dispatch.v1.DispatchService/GetDriverLocation"
 )
 
 // DispatchServiceClient is the client API for DispatchService service.
@@ -48,9 +47,6 @@ type DispatchServiceClient interface {
 	// GetDriverOffer returns the current pending offer for a given driver, if any.
 	// Returns has_offer=false when the driver has no active offer.
 	GetDriverOffer(ctx context.Context, in *GetDriverOfferRequest, opts ...grpc.CallOption) (*GetDriverOfferResponse, error)
-	// GetDriverLocation returns the driver's last known GPS coordinates.
-	// is_active=false means the driver's location TTL has expired.
-	GetDriverLocation(ctx context.Context, in *GetDriverLocationRequest, opts ...grpc.CallOption) (*GetDriverLocationResponse, error)
 }
 
 type dispatchServiceClient struct {
@@ -115,15 +111,6 @@ func (c *dispatchServiceClient) GetDriverOffer(ctx context.Context, in *GetDrive
 	return out, nil
 }
 
-func (c *dispatchServiceClient) GetDriverLocation(ctx context.Context, in *GetDriverLocationRequest, opts ...grpc.CallOption) (*GetDriverLocationResponse, error) {
-	out := new(GetDriverLocationResponse)
-	err := c.cc.Invoke(ctx, DispatchService_GetDriverLocation_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // DispatchServiceServer is the server API for DispatchService service.
 // All implementations must embed UnimplementedDispatchServiceServer
 // for forward compatibility
@@ -144,9 +131,6 @@ type DispatchServiceServer interface {
 	// GetDriverOffer returns the current pending offer for a given driver, if any.
 	// Returns has_offer=false when the driver has no active offer.
 	GetDriverOffer(context.Context, *GetDriverOfferRequest) (*GetDriverOfferResponse, error)
-	// GetDriverLocation returns the driver's last known GPS coordinates.
-	// is_active=false means the driver's location TTL has expired.
-	GetDriverLocation(context.Context, *GetDriverLocationRequest) (*GetDriverLocationResponse, error)
 	mustEmbedUnimplementedDispatchServiceServer()
 }
 
@@ -171,9 +155,6 @@ func (UnimplementedDispatchServiceServer) GetDispatchStatus(context.Context, *Ge
 }
 func (UnimplementedDispatchServiceServer) GetDriverOffer(context.Context, *GetDriverOfferRequest) (*GetDriverOfferResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetDriverOffer not implemented")
-}
-func (UnimplementedDispatchServiceServer) GetDriverLocation(context.Context, *GetDriverLocationRequest) (*GetDriverLocationResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetDriverLocation not implemented")
 }
 func (UnimplementedDispatchServiceServer) mustEmbedUnimplementedDispatchServiceServer() {}
 
@@ -296,24 +277,6 @@ func _DispatchService_GetDriverOffer_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DispatchService_GetDriverLocation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetDriverLocationRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DispatchServiceServer).GetDriverLocation(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: DispatchService_GetDriverLocation_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DispatchServiceServer).GetDriverLocation(ctx, req.(*GetDriverLocationRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // DispatchService_ServiceDesc is the grpc.ServiceDesc for DispatchService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -345,11 +308,7 @@ var DispatchService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetDriverOffer",
 			Handler:    _DispatchService_GetDriverOffer_Handler,
 		},
-		{
-			MethodName: "GetDriverLocation",
-			Handler:    _DispatchService_GetDriverLocation_Handler,
-		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "dispatch.proto",
+	Metadata: "proto/dispatch/v1/dispatch.proto",
 }

@@ -3,13 +3,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../data/active_trip_repository.dart';
 import '../../data/trip_offer_repository.dart';
 
 enum _PageState {
+  initializing,
   polling,
   offerAvailable,
   acting,
-  accepted,
+  activeTrip,
+  completed,
   error,
 }
 
@@ -23,12 +26,15 @@ class TripPage extends StatefulWidget {
 }
 
 class _TripPageState extends State<TripPage> {
-  late final TripOfferRepository _repo;
+  late final TripOfferRepository _offerRepo;
+  late final ActiveTripRepository _activeTripRepo;
 
-  _PageState _state = _PageState.polling;
+  _PageState _state = _PageState.initializing;
   TripOffer? _offer;
+  ActiveTrip? _activeTrip;
   String? _errorMessage;
   int _countdownSeconds = 0;
+  bool _hasArrived = false;
 
   Timer? _pollTimer;
   Timer? _countdownTimer;
@@ -37,9 +43,9 @@ class _TripPageState extends State<TripPage> {
   @override
   void initState() {
     super.initState();
-    _repo = TripOfferRepository(apiClient: widget.apiClient);
-    _poll();
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _poll());
+    _offerRepo = TripOfferRepository(apiClient: widget.apiClient);
+    _activeTripRepo = ActiveTripRepository(apiClient: widget.apiClient);
+    _initialize();
   }
 
   @override
@@ -49,22 +55,75 @@ class _TripPageState extends State<TripPage> {
     super.dispose();
   }
 
+  // ─── Initialization ──────────────────────────────────────────────────────────
+
+  Future<void> _initialize() async {
+    final storedId = await _activeTripRepo.getStoredTripId();
+    if (!mounted) return;
+
+    if (storedId != null) {
+      try {
+        final trip = await _activeTripRepo.fetchTrip(storedId);
+        if (!mounted) return;
+        if (trip.isActive) {
+          setState(() {
+            _state = _PageState.activeTrip;
+            _activeTrip = trip;
+            _hasArrived = false;
+          });
+          return;
+        }
+        // Trip completed or cancelled on backend — clear and fall through.
+        await _activeTripRepo.clearActiveTripId();
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        if (e.statusCode == 404) {
+          await _activeTripRepo.clearActiveTripId();
+          // Fall through to polling.
+        } else {
+          setState(() {
+            _state = _PageState.error;
+            _errorMessage = e.message;
+          });
+          return;
+        }
+      }
+    }
+
+    if (!mounted) return;
+    _startPolling();
+  }
+
+  // ─── Offer polling ───────────────────────────────────────────────────────────
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    setState(() {
+      _state = _PageState.polling;
+      _offer = null;
+    });
+    _poll();
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _poll());
+  }
+
   Future<void> _poll() async {
     if (_isPollingActive) return;
-    if (_state == _PageState.acting || _state == _PageState.accepted) return;
+    if (_state == _PageState.acting ||
+        _state == _PageState.activeTrip ||
+        _state == _PageState.completed ||
+        _state == _PageState.initializing) return;
+
     _isPollingActive = true;
     try {
-      final offer = await _repo.getCurrentOffer();
+      final offer = await _offerRepo.getCurrentOffer();
       if (!mounted) return;
       if (offer == null) {
-        if (_state == _PageState.offerAvailable) {
-          _countdownTimer?.cancel();
+        _countdownTimer?.cancel();
+        if (_state != _PageState.polling) {
           setState(() {
             _state = _PageState.polling;
             _offer = null;
           });
-        } else if (_state == _PageState.error) {
-          setState(() => _state = _PageState.polling);
         }
       } else {
         if (_state != _PageState.offerAvailable ||
@@ -78,7 +137,7 @@ class _TripPageState extends State<TripPage> {
       }
     } on ApiException catch (e) {
       if (!mounted) return;
-      if (_state == _PageState.polling) {
+      if (_state != _PageState.error) {
         setState(() {
           _state = _PageState.error;
           _errorMessage = e.message;
@@ -98,7 +157,8 @@ class _TripPageState extends State<TripPage> {
       if (!mounted) return;
       setState(() {
         _countdownSeconds =
-            (_offer?.offerExpiresAt.difference(DateTime.now().toUtc()).inSeconds ?? 0)
+            (_offer?.offerExpiresAt.difference(DateTime.now().toUtc()).inSeconds ??
+                    0)
                 .clamp(0, 999);
       });
       if (_countdownSeconds == 0) {
@@ -113,22 +173,27 @@ class _TripPageState extends State<TripPage> {
     });
   }
 
+  // ─── Offer actions ───────────────────────────────────────────────────────────
+
   Future<void> _onAccept() async {
     final offer = _offer;
     if (offer == null) return;
-    setState(() => _state = _PageState.acting);
+    _pollTimer?.cancel();
     _countdownTimer?.cancel();
+    setState(() => _state = _PageState.acting);
     try {
-      await _repo.acceptOffer(offer.tripId);
+      await _offerRepo.acceptOffer(offer.tripId);
+      await _activeTripRepo.saveActiveTripId(offer.tripId);
       if (!mounted) return;
       setState(() {
-        _state = _PageState.accepted;
-        _offer = null;
-      });
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted && _state == _PageState.accepted) {
-          setState(() => _state = _PageState.polling);
-        }
+        _state = _PageState.activeTrip;
+        _activeTrip = ActiveTrip(
+          tripId: offer.tripId,
+          pickupAddress: offer.pickupAddress,
+          dropoffAddress: offer.dropoffAddress,
+          status: 'driver_assigned',
+        );
+        _hasArrived = false;
       });
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -142,14 +207,38 @@ class _TripPageState extends State<TripPage> {
   Future<void> _onReject() async {
     final offer = _offer;
     if (offer == null) return;
-    setState(() => _state = _PageState.acting);
+    _pollTimer?.cancel();
     _countdownTimer?.cancel();
+    setState(() => _state = _PageState.acting);
     try {
-      await _repo.rejectOffer(offer.tripId);
+      await _offerRepo.rejectOffer(offer.tripId);
+      if (!mounted) return;
+      _startPolling();
+    } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
-        _state = _PageState.polling;
-        _offer = null;
+        _state = _PageState.error;
+        _errorMessage = e.message;
+      });
+    }
+  }
+
+  // ─── Trip execution actions ──────────────────────────────────────────────────
+
+  void _onArrived() {
+    setState(() => _hasArrived = true);
+  }
+
+  Future<void> _onStartTrip() async {
+    final trip = _activeTrip;
+    if (trip == null) return;
+    setState(() => _state = _PageState.acting);
+    try {
+      await _activeTripRepo.startTrip(trip.tripId);
+      if (!mounted) return;
+      setState(() {
+        _state = _PageState.activeTrip;
+        _activeTrip = trip.copyWith(status: 'in_progress');
       });
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -160,16 +249,56 @@ class _TripPageState extends State<TripPage> {
     }
   }
 
+  Future<void> _onFinishTrip() async {
+    final trip = _activeTrip;
+    if (trip == null) return;
+    setState(() => _state = _PageState.acting);
+    try {
+      final completed = await _activeTripRepo.finishTrip(
+        tripId: trip.tripId,
+        pickupAddress: trip.pickupAddress,
+        dropoffAddress: trip.dropoffAddress,
+      );
+      await _activeTripRepo.clearActiveTripId();
+      if (!mounted) return;
+      setState(() {
+        _state = _PageState.completed;
+        _activeTrip = completed;
+      });
+      Future.delayed(const Duration(seconds: 4), () {
+        if (mounted && _state == _PageState.completed) {
+          _startPolling();
+        }
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _state = _PageState.error;
+        _errorMessage = e.message;
+      });
+    }
+  }
+
+  // ─── Build ───────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Trip Offers')),
+      appBar: AppBar(title: Text(_appBarTitle())),
       body: SafeArea(child: _buildBody()),
     );
   }
 
+  String _appBarTitle() {
+    if (_state == _PageState.activeTrip) return 'Active Trip';
+    if (_state == _PageState.completed) return 'Trip Completed';
+    return 'Trip Offers';
+  }
+
   Widget _buildBody() {
     return switch (_state) {
+      _PageState.initializing =>
+        const Center(child: CircularProgressIndicator()),
       _PageState.polling => _PollingView(onRetry: _poll),
       _PageState.offerAvailable => _OfferCard(
           offer: _offer!,
@@ -178,16 +307,23 @@ class _TripPageState extends State<TripPage> {
           onReject: _onReject,
         ),
       _PageState.acting => const Center(child: CircularProgressIndicator()),
-      _PageState.accepted => const _AcceptedView(),
+      _PageState.activeTrip => _TripExecutionCard(
+          trip: _activeTrip!,
+          hasArrived: _hasArrived,
+          onArrived: _onArrived,
+          onStartTrip: _onStartTrip,
+          onFinishTrip: _onFinishTrip,
+        ),
+      _PageState.completed => _TripCompletedCard(trip: _activeTrip!),
       _PageState.error => _ErrorView(
           message: _errorMessage ?? 'An error occurred',
-          onRetry: _poll,
+          onRetry: _initialize,
         ),
     };
   }
 }
 
-// ─── Sub-widgets ─────────────────────────────────────────────────────────────
+// ─── Offer widgets ────────────────────────────────────────────────────────────
 
 class _PollingView extends StatelessWidget {
   const _PollingView({required this.onRetry});
@@ -349,6 +485,279 @@ class _CountdownBadge extends StatelessWidget {
   }
 }
 
+// ─── Trip execution widgets ───────────────────────────────────────────────────
+
+class _TripExecutionCard extends StatelessWidget {
+  const _TripExecutionCard({
+    required this.trip,
+    required this.hasArrived,
+    required this.onArrived,
+    required this.onStartTrip,
+    required this.onFinishTrip,
+  });
+
+  final ActiveTrip trip;
+  final bool hasArrived;
+  final VoidCallback onArrived;
+  final VoidCallback onStartTrip;
+  final VoidCallback onFinishTrip;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _StatusBanner(status: trip.status, hasArrived: hasArrived),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _AddressRow(
+                    icon: Icons.location_on,
+                    color: cs.primary,
+                    label: 'Pickup',
+                    address: trip.pickupAddress,
+                  ),
+                  const SizedBox(height: 12),
+                  _AddressRow(
+                    icon: Icons.flag,
+                    color: cs.error,
+                    label: 'Destination',
+                    address: trip.dropoffAddress,
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Divider(),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Estimated fare',
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                      Text(
+                        _fareLabel(trip),
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  _ActionButton(
+                    status: trip.status,
+                    hasArrived: hasArrived,
+                    onArrived: onArrived,
+                    onStartTrip: onStartTrip,
+                    onFinishTrip: onFinishTrip,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _fareLabel(ActiveTrip trip) {
+    if (trip.finalFare > 0 && trip.fareCurrency.isNotEmpty) {
+      final amount = trip.finalFare / 100;
+      return '${trip.fareCurrency} ${amount.toStringAsFixed(2)}';
+    }
+    return '—';
+  }
+}
+
+class _StatusBanner extends StatelessWidget {
+  const _StatusBanner({required this.status, required this.hasArrived});
+
+  final String status;
+  final bool hasArrived;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final (label, color, icon) = _statusInfo(cs);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: Theme.of(context)
+                .textTheme
+                .labelLarge
+                ?.copyWith(color: color, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  (String, Color, IconData) _statusInfo(ColorScheme cs) {
+    if (status == 'in_progress') {
+      return ('In Progress', cs.tertiary, Icons.directions_car);
+    }
+    if (status == 'driver_assigned' && hasArrived) {
+      return ('Arrived at Pickup', cs.primary, Icons.where_to_vote);
+    }
+    return ('Heading to Pickup', cs.secondary, Icons.navigation);
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.status,
+    required this.hasArrived,
+    required this.onArrived,
+    required this.onStartTrip,
+    required this.onFinishTrip,
+  });
+
+  final String status;
+  final bool hasArrived;
+  final VoidCallback onArrived;
+  final VoidCallback onStartTrip;
+  final VoidCallback onFinishTrip;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    if (status == 'in_progress') {
+      return FilledButton(
+        onPressed: onFinishTrip,
+        style: FilledButton.styleFrom(
+          backgroundColor: cs.errorContainer,
+          foregroundColor: cs.onErrorContainer,
+          minimumSize: const Size.fromHeight(52),
+        ),
+        child: const Text('Complete Trip'),
+      );
+    }
+    if (status == 'driver_assigned' && hasArrived) {
+      return FilledButton(
+        onPressed: onStartTrip,
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(52),
+        ),
+        child: const Text('Start Trip'),
+      );
+    }
+    // driver_assigned, not yet arrived
+    return OutlinedButton(
+      onPressed: onArrived,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(52),
+      ),
+      child: const Text('I\'ve Arrived at Pickup'),
+    );
+  }
+}
+
+class _TripCompletedCard extends StatelessWidget {
+  const _TripCompletedCard({required this.trip});
+
+  final ActiveTrip trip;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          const SizedBox(height: 24),
+          Icon(Icons.check_circle_outline, size: 72, color: cs.primary),
+          const SizedBox(height: 12),
+          Text(
+            'Trip Completed!',
+            style: theme.textTheme.headlineSmall
+                ?.copyWith(color: cs.primary, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 24),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _AddressRow(
+                    icon: Icons.location_on,
+                    color: cs.primary,
+                    label: 'Pickup',
+                    address: trip.pickupAddress,
+                  ),
+                  const SizedBox(height: 12),
+                  _AddressRow(
+                    icon: Icons.flag,
+                    color: cs.error,
+                    label: 'Destination',
+                    address: trip.dropoffAddress,
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Divider(),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Final fare',
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                      Text(
+                        _fareLabel(trip),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: cs.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Returning to offer queue…',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _fareLabel(ActiveTrip trip) {
+    if (trip.finalFare > 0 && trip.fareCurrency.isNotEmpty) {
+      final amount = trip.finalFare / 100;
+      return '${trip.fareCurrency} ${amount.toStringAsFixed(2)}';
+    }
+    return '—';
+  }
+}
+
+// ─── Shared widgets ───────────────────────────────────────────────────────────
+
 class _AddressRow extends StatelessWidget {
   const _AddressRow({
     required this.icon,
@@ -373,11 +782,12 @@ class _AddressRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label,
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelSmall
-                      ?.copyWith(color: Theme.of(context).colorScheme.outline)),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+              ),
               Text(address, style: Theme.of(context).textTheme.bodyMedium),
             ],
           ),
@@ -415,51 +825,24 @@ class _InfoChip extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleSmall
-                        ?.copyWith(fontWeight: FontWeight.bold)),
-                Text(sublabel,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: cs.onSurfaceVariant)),
+                Text(
+                  label,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall
+                      ?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  sublabel,
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelSmall
+                      ?.copyWith(color: cs.onSurfaceVariant),
+                ),
               ],
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _AcceptedView extends StatelessWidget {
-  const _AcceptedView();
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.check_circle_outline, size: 64, color: cs.primary),
-          const SizedBox(height: 16),
-          Text(
-            'Trip Accepted!',
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(color: cs.primary),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Head to the pickup location.',
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: cs.onSurfaceVariant),
-          ),
-        ],
       ),
     );
   }

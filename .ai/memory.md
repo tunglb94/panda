@@ -1,8 +1,11 @@
 # FAIRRIDE EOS — Project Memory
-Last updated: 2026-07-06 by Principal Engineer AI
+Last updated: 2026-07-07 by Principal Engineer AI
 
 ## Current Phase
-Phase 21 — Driver Trip Offer (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
+Phase 25 — Rider Driver Tracking (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
+Previous: Phase 24 — Driver Live Location (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
+Previous: Phase 22 — Driver Trip Execution (COMPLETE)
+Previous: Phase 21 — Driver Trip Offer (COMPLETE)
 Previous: Phase 20 — Driver Maps & Current Location (COMPLETE)
 Previous: Phase 19 — Driver Authentication & Availability (COMPLETE)
 Previous: Phase H3-H4 — Hardening: Saga Reliability & Dispatch Lifecycle (COMPLETE)
@@ -1411,6 +1414,163 @@ flutter analyze
 
 ### Human Checkpoint
 HC-P21 pending CTO approval to proceed to next phase.
+
+---
+
+## Phase 22 — Driver Trip Execution (COMPLETE — pub get + analyze pending)
+
+### New files
+| File | Purpose |
+|------|---------|
+| `apps/driver/lib/features/trip/data/active_trip_repository.dart` | `ActiveTrip` model + `ActiveTripRepository` — SharedPreferences persistence for `active_trip_id`; `fetchTrip`, `startTrip`, `finishTrip` API calls |
+
+### Modified files
+| File | Change |
+|------|--------|
+| `apps/driver/lib/features/trip/presentation/pages/trip_page.dart` | Fully rewritten — integrates offer polling AND trip execution |
+
+### TripPage state machine (`_PageState`)
+| State | Trigger | UI |
+|---|---|---|
+| `initializing` | app start | `CircularProgressIndicator` — checks SharedPreferences for stored active trip |
+| `polling` | no active trip / after completion | Spinner + "Waiting for trip offers…" |
+| `offerAvailable` | offer returned from poll | `_OfferCard` with countdown + Accept/Reject buttons |
+| `acting` | any async action in progress | Full-screen `CircularProgressIndicator` |
+| `activeTrip` | trip accepted or restored on startup | `_TripExecutionCard` with status banner + action button |
+| `completed` | `finishTrip` success | `_TripCompletedCard` — auto-returns to polling after 4s |
+| `error` | network or backend error | `_ErrorView` with Retry → `_initialize()` |
+
+### Trip execution flow
+1. `_initialize()` — reads `active_trip_id` from SharedPreferences; fetches trip; if active → `activeTrip` state; if 404/completed → clear + fall through to polling
+2. Accept offer → `POST /accept` → save tripId to SharedPreferences → transition to `activeTrip` with `status: 'driver_assigned'`
+3. **Arrived at Pickup** — LOCAL UI only (`_hasArrived = true`); no backend call; `startTrip` works from both `driver_assigned` and `driver_arrived` in backend
+4. **Start Trip** → `POST /api/v1/rides/{tripId}/start` → update status to `in_progress`
+5. **Complete Trip** → `POST /api/v1/rides/{tripId}/finish` (body: `vehicle_type: "car", distance_km: 0.0, duration_min: 0.0`) → clear SharedPreferences → `completed` state
+
+### Action button logic
+| Condition | Button |
+|-----------|--------|
+| `driver_assigned` + !`_hasArrived` | "I've Arrived at Pickup" (outlined) |
+| `driver_assigned` + `_hasArrived` | "Start Trip" (filled) |
+| `in_progress` | "Complete Trip" (filled, error color) |
+
+### Key design decisions
+- `finishTrip` uses `distance_km: 0.0, duration_min: 0.0` → backend yields minimum fare; acceptable since GPS/earnings calculation is out of Phase 22 scope
+- `GET /api/v1/rides/{tripId}` returns `trip_status`; `POST .../finish` returns `status` — handled per-call in `ActiveTripRepository`
+- `isActive` property on `ActiveTrip`: `status == 'driver_assigned' || status == 'in_progress'`
+- Poll timer is cancelled when entering `activeTrip`; restarted when returning to `polling`
+- Duplicate button presses prevented by transitioning to `acting` state (which disables all buttons)
+
+### Fare display
+- During trip: "—" (final fare is 0 until backend calculates it)
+- After completion: actual `final_fare` / 100 formatted as `{currency} {amount}`, or "—" if not available
+
+### Action required on home machine
+```bash
+cd apps/driver
+flutter pub get
+flutter analyze
+```
+
+### Human Checkpoint
+HC-P22 pending CTO approval to proceed to next phase.
+
+---
+
+## Phase 24 — Driver Live Location (COMPLETE — pub get + analyze pending)
+
+### Backend (COMPLETE — builds + tests clean)
+
+**New dispatch RPC:** `GetDriverLocation(driverID)` → Redis GEOPOS → `{lat, lon, is_active}`.
+
+| File | Change |
+|------|--------|
+| `backend/proto/dispatch/v1/dispatch.proto` | Added `GetDriverLocation` RPC + request/response messages |
+| `services/dispatch/grpc/dispatchpb/` | Regenerated (protoc) |
+| `services/dispatch/domain/repository/repository.go` | Added `GetLocation` to `DriverLocationRepository` interface |
+| `services/dispatch/infrastructure/redis/driver_location_repository.go` | Implemented `GetLocation` via Redis GEOPOS; nil position → CodeNotFound |
+| `services/dispatch/app/get_driver_location.go` | NEW — `GetDriverLocationUseCase`; CodeNotFound → `{IsActive: false}` (not an error) |
+| `services/dispatch/grpc/handler.go` | Added 7th field + `GetDriverLocation` RPC |
+| `services/dispatch/grpc/handler_test.go` | Updated to 7-arg; 3 new tests |
+| `services/dispatch/app/app_test.go` | Added `GetLocation` to stub |
+| `services/dispatch/cmd/server/main.go` | Wired `GetDriverLocationUseCase` as 7th arg |
+| `services/gateway/go.mod` | Added `github.com/fairride/dispatch v0.0.0` |
+| `services/gateway/http/handlers/location_handler.go` | NEW — `LocationHandler`: `POST /api/v1/driver/location` (update) + `GET /api/v1/driver/{driverID}/location` (get); `DispatchLocationClient` interface |
+| `services/gateway/http/handlers/location_handler_test.go` | NEW — 7 tests |
+| `services/gateway/http/router.go` | Added `LocationHandler` param; wired both routes |
+| `services/gateway/cmd/server/main.go` | Wires `DISPATCH_ADDR` → gRPC → `LocationHandler`; graceful nil → 503 |
+
+**REST endpoints added:**
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| `POST` | `/api/v1/driver/location` | JWT required | driverID from claims; body: `{lat, lon}` |
+| `GET` | `/api/v1/driver/{driverID}/location` | JWT required | returns `{driver_id, lat, lon, is_active}` |
+
+### Flutter Driver App (COMPLETE — pub get + analyze pending)
+
+| File | Purpose |
+|------|---------|
+| `apps/driver/lib/features/location/data/location_upload_repository.dart` | NEW — `LocationUploadRepository.uploadLocation(lat, lon)` → `POST /api/v1/driver/location` |
+| `apps/driver/lib/features/location/services/location_upload_service.dart` | NEW — `LocationUploadService` owns `LocationEngine`; `Timer.periodic(15s)`; 3 retries with 2s/4s backoff; `statusStream: Stream<UploadStatus>` |
+| `apps/driver/lib/features/map/presentation/pages/map_page.dart` | Updated — creates `LocationUploadService` in `initState`; starts on go-online, stops on go-offline; shows `_UploadIndicator` in `_StatusCard` when online |
+
+**`UploadStatus` enum:** `idle / uploading / success / failed`
+**`_UploadIndicator`:** cloud icon (orange=uploading, green=success, red=failed); only shown when `_isOnline && status != idle`
+
+### Action required on home machine
+```bash
+cd apps/driver
+flutter pub get
+flutter analyze
+```
+
+---
+
+## Phase 25 — Rider Driver Tracking (COMPLETE — pub get + analyze pending)
+
+### Backend (COMPLETE as part of Phase 24 prep — no new backend changes)
+
+The `GET /api/v1/driver/{driverID}/location` endpoint was added in Phase 24.
+
+### Flutter Rider App (COMPLETE — pub get + analyze pending)
+
+**New pubspec.yaml dependencies:**
+- `http: ^1.2.0`
+- `shared_preferences: ^2.3.0`
+
+**New files:**
+| File | Purpose |
+|------|---------|
+| `apps/rider/lib/core/config/app_config.dart` | `AppConfig.apiBaseUrl` — reads `API_BASE_URL` env var, default `http://localhost:8080` |
+| `apps/rider/lib/core/storage/token_storage.dart` | `TokenStorage` — `access_token` + `rider_id` in SharedPreferences |
+| `apps/rider/lib/core/auth/auth_state.dart` | `AuthState extends ChangeNotifier` — `initialize`, `login`, `logout` |
+| `apps/rider/lib/core/network/api_client.dart` | `ApiClient` — same pattern as driver app; `ApiException` on non-2xx |
+| `apps/rider/lib/features/map/data/driver_tracking_repository.dart` | `DriverLocation` model + `DriverTrackingRepository.getDriverLocation(driverID)` → `GET /api/v1/driver/{driverID}/location` |
+
+**Modified files:**
+| File | Change |
+|------|--------|
+| `apps/rider/lib/features/map/presentation/pages/map_page.dart` | Updated — accepts `ApiClient apiClient`; adds `startTracking(driverID)` / `_stopTracking()` methods; driver marker (azure blue, `flat: true`, heading-based rotation); polls every 5s; auto-stops when `is_active: false`; network failures skip tick and retry |
+| `apps/rider/lib/main.dart` | Creates `TokenStorage` + `AuthState` + `ApiClient`; passes to `RiderApp` |
+| `apps/rider/lib/app.dart` | Accepts `AuthState`, `TokenStorage`, `ApiClient`; passes `apiClient` to `AppRouter.create()` |
+| `apps/rider/lib/core/router/app_router.dart` | `AppRouter.create({ApiClient})` factory; passes `apiClient` to `MapPage` |
+
+**Driver tracking design:**
+- `MapPageState.startTracking(String driverID)` — public method; creates `Timer.periodic(5s)` → `_fetchDriverLocation()`
+- `_fetchDriverLocation()` — calls `DriverTrackingRepository.getDriverLocation`; if `!isActive` → auto-stop; else → update marker with heading
+- Heading computed from previous → current position using Haversine bearing formula
+- Driver marker: `MarkerId('driver')`, `BitmapDescriptor.defaultMarkerWithHue(hueAzure)`, `flat: true`, `rotation: _driverHeading`, `anchor: Offset(0.5, 0.5)`
+- Network failures: caught silently, skip current tick
+
+### Action required on home machine
+```bash
+cd apps/rider
+flutter pub get
+flutter analyze
+```
+
+### Human Checkpoint
+HC-P24 + HC-P25 pending CTO approval to proceed to next phase.
 
 ---
 

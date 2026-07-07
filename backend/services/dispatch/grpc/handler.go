@@ -23,9 +23,10 @@ type Handler struct {
 	updateDriverLocation *app.UpdateDriverLocationUseCase
 	getDispatchStatus    *app.GetDispatchStatusUseCase
 	getDriverOffer       *app.GetDriverOfferUseCase
+	getDriverLocation    *app.GetDriverLocationUseCase
 }
 
-// NewHandler wires all six dispatch use cases into a gRPC handler.
+// NewHandler wires all seven dispatch use cases into a gRPC handler.
 func NewHandler(
 	requestDispatch *app.RequestDispatchUseCase,
 	acceptTrip *app.AcceptTripUseCase,
@@ -33,6 +34,7 @@ func NewHandler(
 	updateDriverLocation *app.UpdateDriverLocationUseCase,
 	getDispatchStatus *app.GetDispatchStatusUseCase,
 	getDriverOffer *app.GetDriverOfferUseCase,
+	getDriverLocation *app.GetDriverLocationUseCase,
 ) *Handler {
 	if requestDispatch == nil {
 		panic("dispatch grpc: RequestDispatchUseCase must not be nil")
@@ -52,6 +54,9 @@ func NewHandler(
 	if getDriverOffer == nil {
 		panic("dispatch grpc: GetDriverOfferUseCase must not be nil")
 	}
+	if getDriverLocation == nil {
+		panic("dispatch grpc: GetDriverLocationUseCase must not be nil")
+	}
 	return &Handler{
 		requestDispatch:      requestDispatch,
 		acceptTrip:           acceptTrip,
@@ -59,6 +64,7 @@ func NewHandler(
 		updateDriverLocation: updateDriverLocation,
 		getDispatchStatus:    getDispatchStatus,
 		getDriverOffer:       getDriverOffer,
+		getDriverLocation:    getDriverLocation,
 	}
 }
 
@@ -159,6 +165,22 @@ func (h *Handler) GetDriverOffer(ctx context.Context, req *dispatchpb.GetDriverO
 		resp.OfferExpiresAt = timestamppb.New(job.OfferExpiresAt)
 	}
 	return resp, nil
+}
+
+// GetDriverLocation implements DispatchServiceServer.GetDriverLocation.
+func (h *Handler) GetDriverLocation(ctx context.Context, req *dispatchpb.GetDriverLocationRequest) (*dispatchpb.GetDriverLocationResponse, error) {
+	if req.GetDriverId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "driver_id is required")
+	}
+	result, err := h.getDriverLocation.Execute(ctx, req.GetDriverId())
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	return &dispatchpb.GetDriverLocationResponse{
+		Lat:      result.Lat,
+		Lon:      result.Lon,
+		IsActive: result.IsActive,
+	}, nil
 }
 
 // ─── private helpers ──────────────────────────────────────────────────────────

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -5,6 +7,8 @@ import '../../../../core/auth/auth_state.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/token_storage.dart';
 import '../../../home/data/availability_repository.dart';
+import '../../../location/data/location_upload_repository.dart';
+import '../../../location/services/location_upload_service.dart';
 
 // ─── Location state machine ───────────────────────────────────────────────────
 
@@ -48,18 +52,31 @@ class _MapPageState extends State<MapPage> {
   bool _isToggling = false;
   String? _availError;
 
+  // — Location upload ——————————————————————————————————————————————————————————
+  late final LocationUploadService _uploadService;
+  UploadStatus _uploadStatus = UploadStatus.idle;
+  StreamSubscription<UploadStatus>? _uploadStatusSub;
+
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
     _availRepo = AvailabilityRepository(widget.apiClient);
+    _uploadService = LocationUploadService(
+      repository: LocationUploadRepository(apiClient: widget.apiClient),
+    );
+    _uploadStatusSub = _uploadService.statusStream.listen((s) {
+      if (mounted) setState(() => _uploadStatus = s);
+    });
     _resolveLocation();
     _fetchAvailability();
   }
 
   @override
   void dispose() {
+    _uploadStatusSub?.cancel();
+    _uploadService.dispose();
     _mapController?.dispose();
     super.dispose();
   }
@@ -115,6 +132,7 @@ class _MapPageState extends State<MapPage> {
     try {
       final result = await _availRepo.getAvailability();
       if (mounted) setState(() => _isOnline = result.isOnline);
+      if (result.isOnline) unawaited(_uploadService.start());
     } catch (_) {
       // Non-fatal — default to offline
     } finally {
@@ -132,7 +150,13 @@ class _MapPageState extends State<MapPage> {
       final result = _isOnline
           ? await _availRepo.goOffline()
           : await _availRepo.goOnline();
-      if (mounted) setState(() => _isOnline = result.isOnline);
+      if (!mounted) return;
+      setState(() => _isOnline = result.isOnline);
+      if (result.isOnline) {
+        unawaited(_uploadService.start());
+      } else {
+        _uploadService.stop();
+      }
     } on ApiException catch (e) {
       if (mounted) setState(() => _availError = e.message);
     } catch (_) {
@@ -210,6 +234,7 @@ class _MapPageState extends State<MapPage> {
             isOnline: _isOnline,
             isLoading: _isLoadingStatus || _isToggling,
             error: _availError,
+            uploadStatus: _isOnline ? _uploadStatus : UploadStatus.idle,
             onToggle: _toggle,
           ),
         ),
@@ -225,12 +250,14 @@ class _StatusCard extends StatelessWidget {
     required this.isOnline,
     required this.isLoading,
     this.error,
+    required this.uploadStatus,
     required this.onToggle,
   });
 
   final bool isOnline;
   final bool isLoading;
   final String? error;
+  final UploadStatus uploadStatus;
   final VoidCallback onToggle;
 
   @override
@@ -272,6 +299,10 @@ class _StatusCard extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
+                  if (isOnline && uploadStatus != UploadStatus.idle) ...[
+                    _UploadIndicator(status: uploadStatus),
+                    const SizedBox(width: 8),
+                  ],
                   Switch(
                     value: isOnline,
                     onChanged: isLoading ? null : (_) => onToggle(),
@@ -290,6 +321,25 @@ class _StatusCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ─── Upload status indicator ─────────────────────────────────────────────────
+
+class _UploadIndicator extends StatelessWidget {
+  const _UploadIndicator({required this.status});
+
+  final UploadStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final (color, icon) = switch (status) {
+      UploadStatus.uploading => (Colors.orange, Icons.cloud_upload_outlined),
+      UploadStatus.success => (Colors.green, Icons.cloud_done_outlined),
+      UploadStatus.failed => (Colors.red, Icons.cloud_off_outlined),
+      UploadStatus.idle => (Colors.grey, Icons.cloud_outlined),
+    };
+    return Icon(icon, size: 16, color: color);
   }
 }
 

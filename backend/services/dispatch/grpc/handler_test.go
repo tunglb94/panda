@@ -77,6 +77,14 @@ func (r *stubLocRepo) IsActive(_ context.Context, id string) (bool, error) {
 	}
 	return false, nil
 }
+func (r *stubLocRepo) GetLocation(_ context.Context, id string) (float64, float64, error) {
+	for _, n := range r.nearby {
+		if n == id {
+			return 10.0, 106.0, nil
+		}
+	}
+	return 0, 0, domainerrors.NotFound("no location for: " + id)
+}
 func (r *stubLocRepo) RemoveLocation(_ context.Context, _ string) error { return nil }
 
 type stubTripUpdater struct{ assigned map[string]string }
@@ -114,6 +122,7 @@ func newHandler(jobs *stubJobRepo, locs *stubLocRepo, trips *stubTripUpdater) *d
 		app.NewUpdateDriverLocationUseCase(locs),
 		app.NewGetDispatchStatusUseCase(jobs),
 		app.NewGetDriverOfferUseCase(jobs),
+		app.NewGetDriverLocationUseCase(locs),
 	)
 }
 
@@ -380,6 +389,49 @@ func TestGetDriverOffer_NoOffer(t *testing.T) {
 func TestGetDriverOffer_MissingDriverID(t *testing.T) {
 	h := newHandler(newStubJobRepo(), &stubLocRepo{}, newStubTripUpdater())
 	_, err := h.GetDriverOffer(context.Background(), &dispatchpb.GetDriverOfferRequest{})
+	s, _ := status.FromError(err)
+	if s.Code() != codes.InvalidArgument {
+		t.Errorf("code = %v, want InvalidArgument", s.Code())
+	}
+}
+
+// ─── GetDriverLocation ───────────────────────────────────────────────────────
+
+func TestGetDriverLocation_Active(t *testing.T) {
+	locs := &stubLocRepo{nearby: []string{"d1"}}
+	h := newHandler(newStubJobRepo(), locs, newStubTripUpdater())
+
+	resp, err := h.GetDriverLocation(context.Background(), &dispatchpb.GetDriverLocationRequest{
+		DriverId: "d1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.IsActive {
+		t.Error("is_active = false, want true for active driver")
+	}
+	if resp.Lat == 0 && resp.Lon == 0 {
+		t.Error("lat/lon both zero for a driver that has a location")
+	}
+}
+
+func TestGetDriverLocation_NotActive(t *testing.T) {
+	h := newHandler(newStubJobRepo(), &stubLocRepo{}, newStubTripUpdater())
+
+	resp, err := h.GetDriverLocation(context.Background(), &dispatchpb.GetDriverLocationRequest{
+		DriverId: "d99",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.IsActive {
+		t.Error("is_active = true, want false for driver with no location")
+	}
+}
+
+func TestGetDriverLocation_MissingDriverID(t *testing.T) {
+	h := newHandler(newStubJobRepo(), &stubLocRepo{}, newStubTripUpdater())
+	_, err := h.GetDriverLocation(context.Background(), &dispatchpb.GetDriverLocationRequest{})
 	s, _ := status.FromError(err)
 	if s.Code() != codes.InvalidArgument {
 		t.Errorf("code = %v, want InvalidArgument", s.Code())

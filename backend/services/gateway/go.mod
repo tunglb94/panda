@@ -4,6 +4,7 @@ go 1.22
 
 require (
 	github.com/fairride/booking v0.0.0
+	github.com/fairride/dispatch v0.0.0
 	github.com/fairride/driver v0.0.0
 	github.com/fairride/identity v0.0.0
 	github.com/fairride/shared v0.0.0

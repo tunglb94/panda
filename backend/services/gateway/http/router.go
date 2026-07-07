@@ -15,6 +15,7 @@ func NewRouter(
 	bh *handlers.BookingHandler,
 	ah *handlers.AuthHandler,
 	avh *handlers.AvailabilityHandler,
+	lh *handlers.LocationHandler,
 	authMiddleware func(http.Handler) http.Handler,
 	log zerolog.Logger,
 ) http.Handler {
@@ -31,6 +32,12 @@ func NewRouter(
 	mux.Handle("POST /api/v1/driver/go-online", auth(http.HandlerFunc(avh.GoOnline)))
 	mux.Handle("POST /api/v1/driver/go-offline", auth(http.HandlerFunc(avh.GoOffline)))
 	mux.Handle("GET /api/v1/driver/availability", auth(http.HandlerFunc(avh.GetAvailability)))
+
+	// Driver location — auth required.
+	// POST: driver uploads their current coordinates (Phase 24).
+	// GET:  rider polls the assigned driver's coordinates (Phase 25).
+	mux.Handle("POST /api/v1/driver/location", auth(http.HandlerFunc(lh.UpdateLocation)))
+	mux.Handle("GET /api/v1/driver/{driverID}/location", auth(http.HandlerFunc(lh.GetLocation)))
 
 	// Booking API — all routes require authentication.
 	mux.Handle("POST /api/v1/rides", auth(http.HandlerFunc(bh.BookRide)))

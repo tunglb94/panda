@@ -31,6 +31,10 @@ service DispatchService {
   // GetDriverOffer returns the current pending offer for a given driver, if any.
   // Returns has_offer=false when the driver has no active offer.
   rpc GetDriverOffer(GetDriverOfferRequest) returns (GetDriverOfferResponse);
+
+  // GetDriverLocation returns the driver's last known GPS coordinates.
+  // is_active=false means the driver's location TTL has expired.
+  rpc GetDriverLocation(GetDriverLocationRequest) returns (GetDriverLocationResponse);
 }
 
 // ─── Requests ────────────────────────────────────────────────────────────────
@@ -75,6 +79,16 @@ message GetDriverOfferResponse {
   string trip_id         = 2;
   string job_id          = 3;
   google.protobuf.Timestamp offer_expires_at = 4;
+}
+
+message GetDriverLocationRequest {
+  string driver_id = 1;
+}
+
+message GetDriverLocationResponse {
+  double lat       = 1;
+  double lon       = 2;
+  bool   is_active = 3;
 }
 
 // ─── Responses ───────────────────────────────────────────────────────────────

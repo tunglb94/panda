@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fairride/booking/grpc/bookingpb"
+	"github.com/fairride/dispatch/grpc/dispatchpb"
 	driverpostgres "github.com/fairride/driver/infrastructure/postgres"
 	"github.com/fairride/driver/grpc/driverpb"
 	httpgateway "github.com/fairride/gateway/http"
@@ -85,8 +86,24 @@ func main() {
 		avh = handlers.NewAvailabilityHandler(nil)
 	}
 
+	// Dispatch service: driver location upload (Phase 24) + rider location query (Phase 25).
+	// If DISPATCH_ADDR is unset, location endpoints return 503 gracefully.
+	var lh *handlers.LocationHandler
+	if dispatchAddr := os.Getenv("DISPATCH_ADDR"); dispatchAddr != "" {
+		dispatchConn, connErr := grpc.NewClient(dispatchAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if connErr != nil {
+			log.Warn().Err(connErr).Str("addr", dispatchAddr).Msg("gateway: dispatch service connection failed — location will return 503")
+		} else {
+			defer dispatchConn.Close()
+			lh = handlers.NewLocationHandler(dispatchpb.NewDispatchServiceClient(dispatchConn))
+		}
+	}
+	if lh == nil {
+		lh = handlers.NewLocationHandler(nil)
+	}
+
 	authMW := middleware.Auth(tokenSvc)
-	router := httpgateway.NewRouter(bh, ah, avh, authMW, log)
+	router := httpgateway.NewRouter(bh, ah, avh, lh, authMW, log)
 
 	addr := cfg.HTTP.Addr
 	srv := &http.Server{

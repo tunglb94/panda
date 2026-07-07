@@ -40,6 +40,10 @@ type DriverLocationRepository interface {
 	// IsActive returns true if the driver has sent a location update within the TTL window.
 	IsActive(ctx context.Context, driverID string) (bool, error)
 
+	// GetLocation returns the driver's last known coordinates from the geo set.
+	// Returns CodeNotFound if the driver has never reported a location.
+	GetLocation(ctx context.Context, driverID string) (lat, lon float64, err error)
+
 	// RemoveLocation removes a driver from the geo set (e.g., when they go offline).
 	RemoveLocation(ctx context.Context, driverID string) error
 }
