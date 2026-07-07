@@ -2,7 +2,8 @@
 Last updated: 2026-07-07 by Principal Engineer AI
 
 ## Current Phase
-Phase 26 — Route Engine Foundation (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
+Phase 27 — Route Progress Engine (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
+Previous: Phase 26 — Route Engine Foundation (COMPLETE)
 Previous: Phase 25 — Rider Driver Tracking (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
 Previous: Phase 24 — Driver Live Location (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
 Previous: Phase 22 — Driver Trip Execution (COMPLETE)
@@ -1612,6 +1613,55 @@ flutter analyze
 
 ### Human Checkpoint
 HC-P26 pending CTO approval to proceed to next phase.
+
+---
+
+## Phase 27 — Route Progress Engine (COMPLETE — pub get + analyze pending)
+
+### Rider App (Flutter — analyze pending on home machine)
+
+**New files:**
+| File | Purpose |
+|------|---------|
+| `apps/rider/lib/core/routing/route_progress_model.dart` | `RouteProgressModel` value class: `progressPercent: double`, `remainingDistance: int` (metres), `remainingDuration: int` (seconds), `isOnRoute: bool`, `nearestRoutePoint: LatLng` |
+| `apps/rider/lib/core/routing/route_progress_engine.dart` | `RouteProgressEngine` — subscribes to `LocationEngine.locationStream`; precomputes cumulative distances at init; emits `RouteProgressModel` via `progressStream` on each accepted GPS fix |
+
+**Modified files:**
+| File | Change |
+|------|--------|
+| `apps/rider/lib/features/map/presentation/pages/map_page.dart` | Creates `LocationEngine(distanceFilter: 5m)` in `initState`; starts it on route load; builds `RouteProgressEngine`; listens on `progressSub`; stops everything on edit/dispose; `_RouteProgressBar` widget shows `LinearProgressIndicator` + remaining distance + remaining duration + "Off route" badge |
+
+### RouteProgressEngine design
+- **Constructor**: `RouteProgressEngine({required RouteModel route, required LocationEngine locationEngine, double onRouteThresholdMeters = 50.0, double jitterThresholdMeters = 5.0})`
+- **Precompute**: builds `_cumDist: List<double>` (cumulative Haversine metres from route start to each polyline point) once at construction
+- **Per-GPS update algorithm**:
+  1. Jitter filter: ignore update if < 5m from last processed position
+  2. Nearest point: O(n) scan over polyline segments; equirectangular projection for segment closest-point; Haversine for final distance check
+  3. Cumulative distance at nearest point = `_cumDist[i] + t * (cumDist[i+1] - cumDist[i])`
+  4. `progressPercent = covered / totalDistance` (clamped 0–1)
+  5. `remainingDistance = totalDistance - covered`
+  6. `remainingDuration = durationSeconds * (1 - progress)` (proportional)
+  7. `isOnRoute = distToNearestPoint < 50m`
+- **LocationEngine lifecycle**: caller owns start/stop; engine only subscribes/unsubscribes to `locationStream`
+
+### UI progression in confirmed panel
+1. Route loading → spinner
+2. Route loaded, no GPS fix yet → static distance + duration text from API
+3. GPS fix arrives → `_RouteProgressBar` replaces static text:
+   - `LinearProgressIndicator` (green when on route, orange when off)
+   - Remaining distance (formatted: Xm / X.Xkm)
+   - Remaining duration (formatted: < 1 min / X min / Xh Xmin)
+   - "Off route" label when `!isOnRoute`
+
+### Action required on home machine
+```bash
+cd apps/rider
+flutter pub get
+flutter analyze
+```
+
+### Human Checkpoint
+HC-P27 pending CTO approval to proceed to next phase.
 
 ---
 

@@ -4,8 +4,12 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:rider/core/location/location_engine.dart';
+import 'package:rider/core/location/location_engine_config.dart';
 import 'package:rider/core/network/api_client.dart';
 import 'package:rider/core/routing/route_model.dart';
+import 'package:rider/core/routing/route_progress_engine.dart';
+import 'package:rider/core/routing/route_progress_model.dart';
 import 'package:rider/core/routing/route_service.dart';
 import 'package:rider/features/booking/presentation/widgets/booking_bottom_sheet.dart';
 import 'package:rider/features/map/data/driver_tracking_repository.dart';
@@ -62,6 +66,12 @@ class MapPageState extends State<MapPage> {
   RouteModel? _routeInfo;
   bool _routeLoading = false;
 
+  // — Route progress (Phase 27) ————————————————————————————————————————————————
+  late final LocationEngine _locationEngine;
+  RouteProgressEngine? _progressEngine;
+  StreamSubscription<RouteProgressModel>? _progressSub;
+  RouteProgressModel? _routeProgress;
+
   // — Driver tracking (Phase 25) ————————————————————————————————————————————————
   late final DriverTrackingRepository _trackingRepo;
   String? _trackingDriverId;
@@ -74,12 +84,18 @@ class MapPageState extends State<MapPage> {
   @override
   void initState() {
     super.initState();
+    _locationEngine = LocationEngine(
+      config: const LocationEngineConfig(distanceFilter: 5.0),
+    );
     _trackingRepo = DriverTrackingRepository(apiClient: widget.apiClient);
     _resolveLocation();
   }
 
   @override
   void dispose() {
+    _progressSub?.cancel();
+    _progressEngine?.dispose();
+    _locationEngine.dispose();
     _stopTracking();
     _controller?.dispose();
     super.dispose();
@@ -226,11 +242,13 @@ class MapPageState extends State<MapPage> {
 
   void _editPickup() {
     final lastPickup = _pickupPoint;
+    _stopProgressTracking();
     setState(() {
       _pickupPoint = null;
       _selectionMode = _SelectionMode.pickupPending;
       _polylines = {};
       _routeInfo = null;
+      _routeProgress = null;
       _rebuildMarkers();
     });
     if (lastPickup != null) {
@@ -240,11 +258,13 @@ class MapPageState extends State<MapPage> {
 
   void _editDestination() {
     final lastDestination = _destinationPoint;
+    _stopProgressTracking();
     setState(() {
       _destinationPoint = null;
       _selectionMode = _SelectionMode.destinationPending;
       _polylines = {};
       _routeInfo = null;
+      _routeProgress = null;
       _rebuildMarkers();
     });
     if (lastDestination != null) {
@@ -263,6 +283,7 @@ class MapPageState extends State<MapPage> {
       if (_pickupPoint != pickup || _destinationPoint != destination) return;
       setState(() {
         _routeInfo = route;
+        _routeProgress = null;
         _polylines = {
           Polyline(
             polylineId: const PolylineId('route'),
@@ -273,10 +294,36 @@ class MapPageState extends State<MapPage> {
         };
         _routeLoading = false;
       });
+      _startProgressTracking(route);
     } catch (_) {
       if (!mounted) return;
       setState(() => _routeLoading = false);
     }
+  }
+
+  void _startProgressTracking(RouteModel route) {
+    _stopProgressTracking();
+    if (_locationEngine.state == LocationEngineState.stopped) {
+      unawaited(_locationEngine.start());
+    }
+    final engine = RouteProgressEngine(
+      route: route,
+      locationEngine: _locationEngine,
+    );
+    _progressEngine = engine;
+    _progressSub = engine.progressStream.listen((p) {
+      if (!mounted) return;
+      setState(() => _routeProgress = p);
+    });
+    engine.start();
+  }
+
+  void _stopProgressTracking() {
+    _progressSub?.cancel();
+    _progressSub = null;
+    _progressEngine?.dispose();
+    _progressEngine = null;
+    _locationEngine.stop();
   }
 
   void _rebuildMarkers() {
@@ -393,6 +440,7 @@ class MapPageState extends State<MapPage> {
             routeDistanceText: _routeInfo?.distanceText,
             routeDurationText: _routeInfo?.durationText,
             routeLoading: _routeLoading,
+            routeProgress: _routeProgress,
           ),
         ),
       ],
@@ -437,6 +485,7 @@ class _SelectionPanel extends StatelessWidget {
     this.routeDistanceText,
     this.routeDurationText,
     this.routeLoading = false,
+    this.routeProgress,
   });
 
   final _SelectionMode mode;
@@ -451,6 +500,7 @@ class _SelectionPanel extends StatelessWidget {
   final String? routeDistanceText;
   final String? routeDurationText;
   final bool routeLoading;
+  final RouteProgressModel? routeProgress;
 
   @override
   Widget build(BuildContext context) {
@@ -581,6 +631,9 @@ class _SelectionPanel extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
           ),
+        ] else if (routeProgress != null) ...[
+          const Divider(height: 20),
+          _RouteProgressBar(progress: routeProgress!),
         ] else if (routeDistanceText != null && routeDurationText != null) ...[
           const Divider(height: 20),
           Row(
@@ -678,6 +731,69 @@ class _PointRow extends StatelessWidget {
 
   static String _formatCoord(LatLng p) =>
       '${p.latitude.toStringAsFixed(5)}, ${p.longitude.toStringAsFixed(5)}';
+}
+
+// ─── Route progress bar ───────────────────────────────────────────────────────
+
+class _RouteProgressBar extends StatelessWidget {
+  const _RouteProgressBar({required this.progress});
+
+  final RouteProgressModel progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final textStyle = Theme.of(context)
+        .textTheme
+        .bodySmall
+        ?.copyWith(color: Colors.grey.shade700);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: progress.progressPercent,
+            minHeight: 6,
+            backgroundColor: Colors.grey.shade200,
+            color: progress.isOnRoute ? primary : Colors.orange,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Icon(Icons.route, size: 16, color: Colors.grey.shade600),
+            const SizedBox(width: 6),
+            Text(_formatDistance(progress.remainingDistance), style: textStyle),
+            const SizedBox(width: 16),
+            Icon(Icons.access_time, size: 16, color: Colors.grey.shade600),
+            const SizedBox(width: 6),
+            Text(_formatDuration(progress.remainingDuration), style: textStyle),
+            const Spacer(),
+            if (!progress.isOnRoute)
+              Text(
+                'Off route',
+                style: textStyle?.copyWith(color: Colors.orange),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  static String _formatDistance(int meters) {
+    if (meters < 1000) return '${meters}m';
+    return '${(meters / 1000).toStringAsFixed(1)}km';
+  }
+
+  static String _formatDuration(int seconds) {
+    if (seconds < 60) return '< 1 min';
+    final mins = (seconds / 60).round();
+    if (mins < 60) return '$mins min';
+    final hours = mins ~/ 60;
+    final rem = mins % 60;
+    return rem == 0 ? '${hours}h' : '${hours}h ${rem}min';
+  }
 }
 
 // ─── Loading view ─────────────────────────────────────────────────────────────
