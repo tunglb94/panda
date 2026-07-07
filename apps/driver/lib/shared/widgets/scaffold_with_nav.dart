@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+/// Bottom navigation shell for the 5 Driver app tabs: Home, Trips,
+/// Earnings, Notifications, Profile. Mirrors `apps/rider`'s
+/// `ScaffoldWithNav` (3 tabs there; 5 here).
 class ScaffoldWithNav extends StatelessWidget {
   const ScaffoldWithNav({super.key, required this.shell});
 
@@ -12,7 +15,10 @@ class ScaffoldWithNav extends StatelessWidget {
       body: shell,
       bottomNavigationBar: NavigationBar(
         selectedIndex: shell.currentIndex,
-        onDestinationSelected: _onTap,
+        onDestinationSelected: (index) => shell.goBranch(
+          index,
+          initialLocation: index == shell.currentIndex,
+        ),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
@@ -20,14 +26,19 @@ class ScaffoldWithNav extends StatelessWidget {
             label: 'Home',
           ),
           NavigationDestination(
-            icon: Icon(Icons.directions_car_outlined),
-            selectedIcon: Icon(Icons.directions_car),
-            label: 'Trip',
+            icon: Icon(Icons.route_outlined),
+            selectedIcon: Icon(Icons.route),
+            label: 'Trips',
           ),
           NavigationDestination(
-            icon: Icon(Icons.attach_money_outlined),
-            selectedIcon: Icon(Icons.attach_money),
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: Icon(Icons.account_balance_wallet),
             label: 'Earnings',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.notifications_outlined),
+            selectedIcon: Icon(Icons.notifications),
+            label: 'Notifications',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
@@ -36,13 +47,6 @@ class ScaffoldWithNav extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  void _onTap(int index) {
-    shell.goBranch(
-      index,
-      initialLocation: index == shell.currentIndex,
     );
   }
 }

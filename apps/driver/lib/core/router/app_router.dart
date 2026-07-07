@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/earnings/presentation/pages/earnings_page.dart';
 import '../../features/map/presentation/pages/map_page.dart';
+import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/trip/presentation/pages/trip_page.dart';
 import '../../shared/widgets/scaffold_with_nav.dart';
@@ -14,8 +15,9 @@ import '../storage/token_storage.dart';
 abstract final class AppRoutes {
   static const login = '/login';
   static const home = '/';
-  static const trip = '/trip';
+  static const trips = '/trips';
   static const earnings = '/earnings';
+  static const notifications = '/notifications';
   static const profile = '/profile';
 }
 
@@ -62,7 +64,7 @@ abstract final class AppRouter {
             StatefulShellBranch(
               routes: [
                 GoRoute(
-                  path: AppRoutes.trip,
+                  path: AppRoutes.trips,
                   builder: (context, state) => TripPage(apiClient: apiClient),
                 ),
               ],
@@ -78,11 +80,16 @@ abstract final class AppRouter {
             StatefulShellBranch(
               routes: [
                 GoRoute(
+                  path: AppRoutes.notifications,
+                  builder: (context, state) => const NotificationsPage(),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
                   path: AppRoutes.profile,
-                  builder: (context, state) => ProfilePage(
-                    authState: authState,
-                    tokenStorage: tokenStorage,
-                  ),
+                  builder: (context, state) => const ProfilePage(),
                 ),
               ],
             ),

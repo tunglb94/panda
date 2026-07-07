@@ -1,6 +1,7 @@
 import 'package:go_router/go_router.dart';
 import 'package:rider/core/network/api_client.dart';
 import 'package:rider/features/booking/presentation/pages/booking_page.dart';
+import 'package:rider/features/map/domain/models/trip_selection.dart';
 import 'package:rider/features/map/presentation/pages/map_page.dart';
 import 'package:rider/features/profile/presentation/pages/profile_page.dart';
 import 'package:rider/shared/widgets/scaffold_with_nav.dart';
@@ -33,7 +34,11 @@ class AppRouter {
               routes: [
                 GoRoute(
                   path: AppRoutes.booking,
-                  builder: (context, state) => const BookingPage(),
+                  builder: (context, state) => BookingPage(
+                    tripSelection: state.extra is TripSelection
+                        ? state.extra as TripSelection
+                        : null,
+                  ),
                 ),
               ],
             ),

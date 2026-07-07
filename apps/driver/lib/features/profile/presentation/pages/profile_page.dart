@@ -1,234 +1,60 @@
 import 'package:flutter/material.dart';
-import '../../../../core/auth/auth_state.dart';
-import '../../../../core/storage/token_storage.dart';
 
+import 'developer_page.dart';
+
+/// Profile tab placeholder. The only functional entry point in this phase
+/// is "Developer" (Development Utilities requirement) — everything else
+/// about the driver's own profile arrives in a future phase, alongside
+/// `apps/rider`'s equivalent Profile module.
 class ProfilePage extends StatelessWidget {
-  const ProfilePage({
-    super.key,
-    required this.authState,
-    required this.tokenStorage,
-  });
-
-  final AuthState authState;
-  final TokenStorage tokenStorage;
+  const ProfilePage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              const _ProfileHeader(),
-              const SizedBox(height: 16),
-              const _VehicleCard(),
-              const SizedBox(height: 16),
-              const _StatsCard(),
-              const SizedBox(height: 16),
-              _SettingsSection(
-                authState: authState,
-                tokenStorage: tokenStorage,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 36,
-              backgroundColor: cs.primaryContainer,
-              child: Icon(Icons.person, size: 40, color: cs.onPrimaryContainer),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Driver Name',
-                    style: Theme.of(context).textTheme.titleLarge,
+                  CircleAvatar(
+                    radius: 44,
+                    backgroundColor: primary.withValues(alpha: 0.12),
+                    child: Icon(Icons.person, size: 44, color: primary),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Mock Driver',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '+1 (555) 000-0000',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(color: cs.onSurfaceVariant),
+                    'Driver profile details arrive in a future phase.',
+                    style: TextStyle(color: Colors.grey.shade500),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.star, size: 16, color: Color(0xFFFFC107)),
-                      const SizedBox(width: 4),
-                      Text(
-                        '—',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
+                  const SizedBox(height: 24),
+                  ListTile(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    leading: Icon(Icons.developer_mode_outlined, color: primary),
+                    title: const Text('Developer'),
+                    trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const DeveloperPage()),
+                    ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _VehicleCard extends StatelessWidget {
-  const _VehicleCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Vehicle', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.directions_car, color: cs.primary),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Make / Model',
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                      Text(
-                        'Plate: —',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(color: cs.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatsCard extends StatelessWidget {
-  const _StatsCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Stats', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 16),
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _StatItem(label: 'Total Trips', value: '0'),
-                _StatItem(label: 'Member Since', value: '—'),
-                _StatItem(label: 'Acceptance', value: '—%'),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatItem extends StatelessWidget {
-  const _StatItem({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: Theme.of(context)
-              .textTheme
-              .titleLarge
-              ?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall,
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-}
-
-class _SettingsSection extends StatelessWidget {
-  const _SettingsSection({
-    required this.authState,
-    required this.tokenStorage,
-  });
-
-  final AuthState authState;
-  final TokenStorage tokenStorage;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Card(
-      child: Column(
-        children: [
-          ListTile(
-            leading: const Icon(Icons.notifications_outlined),
-            title: const Text('Notifications'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {},
           ),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.help_outline),
-            title: const Text('Help & Support'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {},
-          ),
-          const Divider(height: 1),
-          ListTile(
-            leading: Icon(Icons.logout, color: cs.error),
-            title: Text('Sign Out', style: TextStyle(color: cs.error)),
-            onTap: () => authState.logout(tokenStorage),
-          ),
-        ],
+        ),
       ),
     );
   }
