@@ -1,9 +1,365 @@
 # FAIRRIDE EOS — Project Memory
-Last updated: 2026-07-06 by Principal Engineer AI
+Last updated: 2026-07-07 by Principal Engineer AI
 
 ## Current Phase
-Phase D-02 — Driver App: Home Dashboard Module (COMPLETE)
-Previous: Phase D-01 — Driver App: Initial Project Scaffold (COMPLETE)
+Phase D-06 — Driver App: Arrived at Pickup (COMPLETE)
+Previous: Phase D-05 — Driver App: Driver Assigned & Navigation Ready (COMPLETE)
+
+## Phase D-06 — Driver App: Arrived at Pickup (COMPLETE — 2026-07-07)
+
+Reference: `docs/project/MVP_DEVELOPMENT_PLAN.md` Section 6 (Driver App
+Roadmap, stage D5 — UI portion, completes the pickup leg started in D-05)
+and Section 12 (Phase Registry). UI only — no backend, gRPC, proto, map/GPS.
+No state management library, no new repository (per the task: "Không tạo
+repository mới"). Scope strictly `apps/driver/lib/features/trips/` — Rider
+app, Home dashboard, auth were not touched. Flow covered:
+`NavigatingToPickup → ArrivedAtPickup` only; `passengerBoarding` does **not**
+exist yet (explicitly out of scope).
+
+### State machine — extended, and the *trigger* for the new state is progress, not a timer
+
+`TripOfferState` (D-05, 8 values) extended to **9 values**: added
+`arrivedAtPickup`. Critically, per the task ("Không chuyển bằng timer cứng.
+State phải đổi khi progress hoàn thành"), this transition is **not** driven
+by an independent timer — it's driven by the *same* route-progress ticker
+from D-05 finally reaching its end:
+
+- `RouteProgressModel.stepDown()`'s floor changed from **20 → 0** (D-05
+  explicitly floored at 20 because `arrived` didn't exist yet; now it does).
+  `RouteProgressIndicator`'s trailing label reads "Arrived" instead of
+  "0% remaining" once `progress <= 0`.
+- `_RouteProgressTicker` (private, in `trip_offer_view.dart`) gained an
+  `onArrived` callback. Its `_scheduleTick()` now checks, after each
+  `stepDown()`, whether the new progress is `<= 0`; if so it calls
+  `onArrived()` **exactly once** and returns without scheduling another
+  tick (previously it just returned once `<= 20`, since 20 was the end).
+  `TripsPage._handleArrived()` (guarded like every other transition:
+  `if (_state != navigatingToPickup) return;`) flips the state.
+- A defensive edge case: if a ticker were ever seeded already at 0 (never
+  happens from the live repository, which always starts at 100), calling
+  `onArrived()` synchronously from `initState` would risk a "setState during
+  build" error one level up (in `TripsPage`) — guarded with a
+  `WidgetsBinding.instance.addPostFrameCallback`.
+
+### New widgets under `apps/driver/lib/features/trips/presentation/widgets/`
+
+| File | Purpose |
+|------|---------|
+| `waiting_timer.dart` | `WaitingTimer` — self-ticking mm:ss counter. **No package** — a recursive `Future.delayed(1s)` chain, the exact same self-scheduling shape as `_RouteProgressTicker` (D-05), with its own `_stopped` dispose-guard. `onMinutePassed(int minute)` fires once per whole minute (mock only). `initialSeconds` (default 0) lets a caller seed a starting point — used by the Arrival Preview to show "Waiting 03:00"/"08:00" instantly instead of waiting 3/8 real minutes; the timer keeps ticking live from that seed rather than freezing, same philosophy as every other preview page in this app reusing real, interactive widgets instead of inventing frozen mock renderings |
+| `waiting_fee_card.dart` | `WaitingFeeCard` — pure `StatelessWidget`, computed entirely from `elapsedMinutes`: free for the first 5 minutes, then 2.000đ per additional minute (own tiny thousands-separator formatter — no `intl`/package, since "Không thêm package" applies here too). "Chỉ UI" — no backend billing |
+| `passenger_action_panel.dart` | `PassengerActionPanel` — Passenger On Board / Contact Rider / Cancel Trip. All three are **plain callbacks only** — no phone dialer, no popup/dialog. "Passenger On Board" is a placeholder like the other two since `passengerBoarding` isn't a state yet |
+| `driver_arrival_card.dart` | `DriverArrivalCard` — the Arrived screen. A `StatefulWidget` (holds `_elapsedMinutes`, fed by `WaitingTimer.onMinutePassed`, relayed into `WaitingFeeCard`) composing: the "Arrived at Pickup" status via the **existing, unmodified** `DriverStatusBanner` (task: "Không tạo widget mới" for the banner — reuse as-is with new icon/title/subtitle), pickup address via `TripAddressRow`, passenger name via `RouteStatTile`, estimated fare via `FareEstimateCard` (reused whole, not re-derived), then `WaitingTimer`/`WaitingFeeCard`/`PassengerActionPanel` |
+| `presentation/pages/arrival_preview_page.dart` | `ArrivalPreviewPage` — "Arrival Preview": `ChoiceChip` row steps through Arrived/Waiting 00:00/03:00/08:00 by passing different `initialWaitingSeconds` into `DriverArrivalCard` directly — **no repository call**, cross-fades with `AnimatedSwitcher` |
+
+**Modified:**
+- `route_progress_model.dart` (`stepDown` floor default 20→0; doc comments updated)
+- `route_progress_indicator.dart` (trailing label "Arrived" at progress 0)
+- `trip_offer_view.dart` (+`arrivedAtPickup` case → `DriverArrivalCard`; `_RouteProgressTicker`/`_NavigatingToPickupContent` +`onArrived`; +`onArrived`/`onPassengerOnBoard` params on `TripOfferView`)
+- `trips_page.dart` (+`_handleArrived` — guarded state transition, not a callback the UI invokes directly; +`_handlePassengerOnBoard` — plain SnackBar placeholder; wired both into the `TripOfferView(...)` call)
+- `trip_offer_preview_menu_page.dart` (+"Arrival Preview" entry)
+
+### Reuse discipline (explicit task requirement: "Reuse tối đa... Không duplicate")
+
+`TripAddressRow`, `RouteStatTile`, `DriverStatusBanner`, `FareEstimateCard`
+are all reused **verbatim** inside `DriverArrivalCard` — none were copied or
+forked. `DriverStatusBanner` needed zero source changes (it was already
+generic enough from D-05 to accept "Arrived at Pickup" as just another
+icon/title/subtitle).
+
+### Test-writing lesson learned this phase (new — a second twist on the D-04/D-05 timer lessons)
+
+D-05 already established that `pumpAndSettle()` is unsafe around a bare
+`Future.delayed` chain (it falsely reports "settled" without the next tick
+firing, since nothing schedules a frame while just waiting) and that D-05's
+route ticker could be **fully drained** with one big `pump(9s)` because it
+had a floor (20%) where it permanently stopped rescheduling.
+
+D-06 broke that assumption twice over:
+
+1. Changing the floor to 0 meant the *old* D-05 tests' `pump(seconds: 9)`
+   drain (sized for "4 ticks to the 20% floor") was now **one tick short**
+   of the new 5-tick chain to the 0% floor — those tests started failing
+   with "A Timer is still pending" the moment the floor changed, even
+   though their own assertions never touched Arrived at all.
+2. `WaitingTimer` has **no floor at all** — it ticks for as long as the
+   Arrived screen is mounted. A test that reaches `arrivedAtPickup` can
+   never "pump long enough" to drain it to completion, because there is no
+   completion.
+
+The fix, applied uniformly to both problems: stop trying to pump a
+`Future.delayed` chain to its natural end when the test doesn't care about
+reaching that end. Instead, **unmount the widget tree** (`pumpWidget` a
+throwaway `SizedBox()`) — this runs `dispose()`, which flips each ticker's
+`_stopped` guard — then pump past whatever *single* tick was already
+in-flight before disposal, so it fires and returns immediately (via the
+guard) instead of staying "pending." This works identically regardless of
+how many ticks remain or whether the chain has a floor at all, which is why
+it replaced the old fixed-duration drains for every D-05 navigation test too
+(see `_disposeAndDrainPendingTimer` in `test/widget_test.dart` — formerly
+`_drainWaitingTimer`, generalized once it became clear both tickers needed
+the identical fix). Tests that *do* want to reach Arrived on purpose
+(`_reachArrivedContent`) still use one big `pump(seconds: 11)` to cross all
+5 route-ticker ticks (10s) plus buffer, since that chain **does** have a
+natural end and cascading through it is the whole point of that helper.
+
+**Verified this session:** `flutter analyze` — 0 issues (no warnings).
+`flutter test` — 40/40 pass (32 from D-01–D-05, five of which needed their
+drain updated for the floor change, behavior otherwise unaffected; + 8 new:
+route progress completing transitions Navigating→Arrived, `WaitingTimer`
+counts up in mm:ss and fires `onMinutePassed` once per minute, `WaitingTimer`
+does not tick after being disposed, `WaitingFeeCard` free-then-charged
+thresholds, `PassengerActionPanel`'s three buttons fire independently,
+`DriverArrivalCard` renders its banner/address/passenger correctly, the
+preview menu lists "Arrival Preview", `ArrivalPreviewPage` steps through
+Arrived/Waiting 00:00–08:00 with zero repository/Future involvement).
+`git status` confirms `apps/rider` untouched.
+
+## Phase D-05 — Driver App: Driver Assigned & Navigation Ready (COMPLETE — 2026-07-07)
+
+Reference: `docs/project/MVP_DEVELOPMENT_PLAN.md` Section 6 (Driver App
+Roadmap, stage D5 — UI portion, pickup leg only) and Section 12 (Phase
+Registry). UI only — no backend, gRPC, proto, map/GPS provider. No state
+management library introduced. Scope strictly
+`apps/driver/lib/features/trips/` — Rider app, Home dashboard, auth were not
+touched. Flow covered: `Assigned → NavigatingToPickup` only; `Arrived` does
+**not** exist yet (explicitly out of scope this phase).
+
+### State machine — extended, not renamed this time
+
+`TripOfferState` (D-04, 7 values) extended to **8 values**: added
+`navigatingToPickup` at the end. Reached only from `assigned`, via
+`TripsPage._handleNavigate()` (guarded: `if (_state != assigned) return;`,
+same pattern as every other transition in this file).
+
+### New domain model
+
+`domain/models/route_progress_model.dart`:
+- `TrafficLevel` enum (`normal, slow, heavy`) — **not a `String`**, per this
+  project's recurring state-machine convention.
+- `RouteProgressModel { remainingDistanceKm, remainingDurationMin, progress, trafficLevel }`.
+  `progress` is percent **remaining** (100 → 20 this phase, floored — 0/
+  "Arrived" doesn't exist yet).
+- `RouteProgressModel.mock({progress, trafficLevel})` — pure, static factory:
+  bases the pickup leg on the *same* 1.8km/6min numbers
+  `TripOffer.distanceToPickupKm` and the Assigned screen's ETA already use
+  (18 km/h assumed approach speed), so all three screens agree at 100%.
+  Traffic only slows the ETA (normal ×1.0, slow ×1.3, heavy ×1.6) — the
+  physical distance remaining is traffic-independent.
+- `RouteProgressModel.stepDown({by = 20, floor = 20})` — recomputes the next
+  tick via `.mock()` (not iterative scaling) to avoid floating-point drift.
+
+### New repository method
+
+`DriverTripOfferRepository.fetchRouteProgress({Duration delay = 600ms, TrafficLevel traffic = normal})`
+→ `Future<RouteProgressModel>` — returns `RouteProgressModel.mock(progress: 100, trafficLevel: traffic)`
+after the mock delay. `traffic` is dev-selectable via a new
+`PopupMenuButton<TrafficLevel>` ("Traffic (dev)") in `TripsPage`'s AppBar —
+directly the `TrafficLevel` enum as the parameter, no extra demo-mode enum
+needed.
+
+### New files under `apps/driver/lib/features/trips/`
+
+| File | Purpose |
+|------|---------|
+| `domain/models/route_progress_model.dart` | `TrafficLevel` + `RouteProgressModel` (see above) |
+| `presentation/widgets/route_stat_tile.dart` | Generic icon+value+label tile. Extracted so `TripAssignedCard`'s new Pickup ETA/Distance to Pickup stats and `DriverNavigationCard`'s Distance Remaining/ETA share one widget — also **de-duplicated** `FareEstimateCard`'s old private `_Stat` into this (identical layout, would have been a third copy otherwise) |
+| `presentation/widgets/driver_status_banner.dart` | Icon-in-circle + title + optional subtitle ("Driving to Pickup"). Deliberately generic/reusable — the task explicitly asked for this to be reusable by a later phase (e.g. "Arrived", "Trip in Progress") |
+| `presentation/widgets/route_progress_indicator.dart` | Mock linear progress bar (no map/GPS) + a color-coded traffic badge (green/orange/red for normal/slow/heavy) |
+| `presentation/widgets/driver_navigation_card.dart` | The Navigation screen's main card: `DriverStatusBanner` + pickup address (reuses `TripAddressRow`) + Distance Remaining/ETA (`RouteStatTile` ×2) + `RouteProgressIndicator` + Cancel Trip/Contact Rider buttons. New widget, does **not** duplicate `TripAssignedCard` |
+| `presentation/pages/navigation_preview_page.dart` | "Navigation Preview" — `ChoiceChip` row steps through Assigned/100%/80%/60%/40%/20% via `RouteProgressModel.mock(...)` directly, **no repository call**, cross-fades with `AnimatedSwitcher` |
+
+**Modified:**
+- `trip_offer_state.dart` (+`navigatingToPickup`, +label)
+- `trip_assigned_card.dart` (+Pickup ETA/Distance to Pickup via `RouteStatTile`, +"Current status: Ready to navigate" line; `onNavigate`'s *meaning* changed upstream — the widget itself still just reports the tap)
+- `driver_trip_offer_repository.dart` (+`fetchRouteProgress`)
+- `fare_estimate_card.dart` (its private `_Stat` replaced with the new shared `RouteStatTile` — no behavior change, pure de-duplication)
+- `trip_offer_view.dart` (+`navigatingToPickup` case → `_NavigatingToPickupContent`, a new private widget wrapping a **second, nested** `AsyncStateView<RouteProgressModel>` + `_RouteProgressTicker` — see below; +`routeFuture`/`onContactRider`/`onCancelTrip` params)
+- `trips_page.dart` (`_handleNavigate` no longer just shows a SnackBar — it now transitions `assigned → navigatingToPickup` and calls `fetchRouteProgress()`; new `_handleContactRider`/`_handleCancelTrip`, both **plain placeholder callbacks only** — no phone dialer, no popup/dialog, matching the task's explicit "đều chỉ callback. Không mở điện thoại. Không popup." for both actions, same as `onNavigate` used to be before this phase; new "Traffic (dev)" `PopupMenuButton<TrafficLevel>`)
+- `trip_offer_preview_menu_page.dart` (+"Navigation Preview" entry, linking to the new page)
+
+### Architecture: nested `AsyncStateView`, kept separate from the business state machine
+
+The `navigatingToPickup` case needed its *own* async fetch
+(`fetchRouteProgress()`), independent of the outer offer fetch. Rather than
+threading a raw `Future` through more state, `TripOfferView`'s new
+`_NavigatingToPickupContent` wraps a **second** `AsyncStateView<RouteProgressModel>`
+nested inside the outer `AsyncStateView<TripOffer?>` — a direct, deliberate
+demonstration that this pattern composes at any depth without merging
+Loading/Success/Empty/Error into the `TripOfferState` enum.
+
+Once that inner fetch resolves, `successBuilder` returns a `_RouteProgressTicker`
+(`StatefulWidget`) seeded with the fetched `RouteProgressModel`. It self-schedules
+`stepDown()` every 2 seconds via a recursive `Future.delayed` chain — **not**
+a repeated repository call, purely local computation — and stops scheduling
+once `progress <= 20` (the floor). Because `successBuilder` is only
+re-invoked when the `FutureBuilder`'s snapshot changes, and the ticker is a
+genuine `StatefulWidget` at a stable tree position, its internal ticking
+state survives parent rebuilds correctly.
+
+### Test-writing lesson learned this phase (new — distinct from D-04's countdown lesson)
+
+D-04 already established that `pumpAndSettle()` is unsafe while a
+**continuously-ticking `AnimationController`** is in the tree (it never
+settles). This phase surfaced the *opposite* failure mode: `pumpAndSettle()`
+is *also* unsafe around a bare **`Future.delayed` chain with gaps between
+ticks** — but for the opposite reason. `pumpAndSettle()` repeatedly pumps in
+short bursts (default 100ms) and stops as soon as a burst produces no newly
+scheduled frame. A `Future.delayed(2s)` schedules **no frames at all** while
+it's waiting — nothing animates in the meantime — so `pumpAndSettle()`
+falsely concludes the tree has "settled" almost immediately, without the 2s
+timer ever firing. The fix used throughout the new tests: advance time with
+explicit `pump(Duration(...))` jumps sized to actually cross each tick
+boundary (e.g. `pump(2100ms)` to force exactly one `stepDown()`), and —
+because the ticker leaves a pending `Future.delayed` running until it hits
+the 20% floor — every test that enters `navigatingToPickup` finishes with a
+large enough `pump()` (9s, comfortably past all 4 remaining ticks) to drain
+it fully before the test ends, avoiding a "pending Timer" failure exactly
+like the one already documented in D-04's Accept-delay tests.
+
+Also hit, fixed immediately: `RouteStatTile`'s icon+`Column(value,label)` Row
+had no `Expanded` around the column, so longer labels ("Distance to Pickup",
+"Distance remaining") overflowed once two tiles shared a row at the app's
+~400px test width — same "unconstrained value Text in a Row" class of bug
+documented in earlier phases (`ReceiptRow`, `InfoRow`, `QuickActionCard`).
+Fixed by wrapping the `Column` in `Expanded` with `maxLines: 1` +
+`TextOverflow.ellipsis` on both `Text`s; the same fix was applied to
+`TripAssignedCard`'s new one-line "Current status" row.
+
+**Verified this session:** `flutter analyze` — 0 issues (no warnings).
+`flutter test` — 32/32 pass (24 from D-01–D-04, unaffected, + 8 new: Start
+Navigation transitions Assigned→Navigating, the Navigation screen renders
+initial distance/ETA/traffic, route progress ticks 100%→80% over simulated
+time, the traffic badge reflects the dev "Traffic" menu, Cancel Trip and
+Contact Rider are plain callbacks with no `AlertDialog`/`Dialog`, the preview
+menu lists "Navigation Preview", `NavigationPreviewPage` steps through
+Assigned→100%→20% with zero repository/Future involvement). `git status`
+confirms `apps/rider` untouched.
+
+## Phase D-04 — Driver App: Accept Flow & Dispatch Session (COMPLETE — 2026-07-07)
+
+Reference: `docs/project/MVP_DEVELOPMENT_PLAN.md` Section 6 (Driver App
+Roadmap, stage D4 — UI portion, completing what D-03 started) and Section 12
+(Phase Registry). UI only — no backend, API, or protobuf changes. No state
+management library introduced. Scope strictly `apps/driver/lib/features/trips/`
+— Rider app, Home dashboard, and auth were not touched.
+
+### State machine — renamed and extended
+
+`TripOfferStatus` (D-03, 4 values) → **renamed** to `TripOfferState` (task's
+own naming convention) and extended to 7 values:
+`newOffer, accepting, assigned, rejected, expired, failed, timeout`.
+`accepted` was renamed to `assigned` — it's now the true terminal success
+state after dispatch confirms (Dispatch Accepted + Trip Assigned + Ready to
+Navigate collapsed into one screen, per the task). File renamed
+`trip_offer_status.dart` → `trip_offer_state.dart`; all references (view,
+pages, tests) updated accordingly.
+
+**Two state machines, still not merged** (explicit requirement): `AsyncStateView`
+(Loading/Success/Empty/Error — untouched, zero edits this phase) governs
+whether an offer was fetched at all; `TripOfferState` governs the offer's own
+lifecycle once fetched, including the new post-Accept sub-flow. `TripsPage`
+composes them (`AsyncStateView.successBuilder` renders `TripOfferView` keyed
+by `TripOfferState`) without collapsing them into one enum.
+
+### New repository contract
+
+`DriverTripOfferRepository.acceptOffer({Duration delay = 1200ms, DispatchAcceptStatus outcome = success})`
+→ `Future<DispatchAcceptResult>`. `DispatchAcceptStatus` (success/failed/timeout)
+and `DispatchAcceptResult` are new types in
+`domain/models/dispatch_accept_result.dart` — a dedicated result type, not a
+`bool`, so a third outcome (timeout) fits naturally.
+
+### New files under `apps/driver/lib/features/trips/`
+
+| File | Purpose |
+|------|---------|
+| `domain/models/trip_offer_state.dart` | Replaces `trip_offer_status.dart` — see above |
+| `domain/models/dispatch_accept_result.dart` | `DispatchAcceptStatus` + `DispatchAcceptResult` |
+| `presentation/widgets/trip_address_row.dart` | Extracted from `TripOfferCard`'s private `_AddressRow` so `TripAssignedCard` could reuse it instead of duplicating (explicit task requirement: "Không duplicate UI đã có") |
+| `presentation/widgets/accept_loading_button.dart` | Full-width disabled button + spinner; replaces the Accept/Reject row entirely during `accepting` (so Reject is unavailable by omission, not just disabled) |
+| `presentation/widgets/dispatch_status_banner.dart` | Failed/Timeout banner with a required `onRetry` — the spec always ends error handling in an explicit Retry, never a silent auto-revert |
+| `presentation/widgets/trip_assigned_card.dart` | ✓ Trip Assigned, pickup/destination (via `TripAddressRow`), estimated fare, "Start Navigation" (`onNavigate` mock callback only) |
+| `presentation/pages/dispatch_session_preview_page.dart` | New "Dispatch Session Preview" list (Accepting/Assigned/Failed/Timeout), linked from `TripOfferPreviewMenuPage`; renders via the same `TripOfferStatePreviewPage`, no repository call |
+
+**Modified:** `driver_trip_offer_repository.dart` (+`acceptOffer`), `trip_offer_view.dart`
+(+`_AcceptingContent`, `assigned`/`failed`/`timeout` cases, +`onNavigate`/`onRetry`
+params), `trips_page.dart` (accept/retry/navigate handlers + a second dev
+PopupMenuButton — "Accept outcome (dev)": Success/Failed/Timeout), `trip_offer_card.dart`
+(uses the extracted `TripAddressRow`), `trip_offer_preview_menu_page.dart`
+(now lists only the 3 base offer states + one "Dispatch Session Preview" tile,
+rather than looping over every enum value).
+
+### Race-condition guard (explicit requirement: "không được race condition")
+
+`AnimatedSwitcher` keeps the outgoing widget mounted for ~350ms during its
+crossfade — so the in-flight `newOffer` content (with its ticking
+`CountdownIndicator`) is technically still alive for a moment after Accept is
+pressed and the state has already moved to `accepting`. Rather than relying
+solely on widget disposal timing, `TripsPage._handleExpired` guards with
+`if (_state != TripOfferState.newOffer) return;` before transitioning to
+`expired` — correct regardless of exactly when the old countdown widget gets
+torn down.
+
+### Test-writing lesson learned this phase (documented so it isn't relearned)
+
+The offer's 15-second countdown runs a **continuously-ticking**
+`AnimationController` for the entire time `TripOfferState.newOffer` is
+showing. That makes `tester.pumpAndSettle()` **unsafe** during that window —
+it keeps fast-forwarding simulated time trying to reach "nothing left
+animating," and since the countdown never stops on its own before 15s, it
+will run right through the whole thing and expire the offer out from under
+the test. A fixed-duration `pump()` avoids that, but is itself a timing
+gamble against a `PopupMenuButton`'s own open/close transition (a few
+attempts at 300–400ms still produced a flaky hit-test miss on the popup
+item). The reliable fix: for the new "Accept outcome (dev)" menu, tests grab
+the `PopupMenuButton<DispatchAcceptStatus>` widget and call its `onSelected`
+callback **directly**, bypassing the popup UI's own timing entirely — see
+`_selectAcceptOutcome()` in `test/widget_test.dart`. Also fixed: one test
+left a pending 1.2s `Future.delayed` timer running past the test's end
+(flutter_test fails a test for that on its own), drained by pumping past the
+delay before the test finishes.
+
+**Verified this session:** `flutter analyze` — 0 issues (no warnings).
+`flutter test` — 24/24 pass (16 from D-01–D-03, unaffected apart from the
+`TripOfferStatus`→`TripOfferState` rename and the preview-menu test update
+for the new 3-state + Dispatch-Session-tile layout, + 8 new: Accept→Assigned,
+loading button disabled while accepting, countdown cannot fire after Accept,
+Accept→Failed, Accept→Timeout, Retry→fresh New Offer, Assigned shows correct
+data, onNavigate fires exactly once).
+
+## Phase D-03 — Driver App: Incoming Trip Module (COMPLETE — 2026-07-07)
+
+Reference: `docs/project/MVP_DEVELOPMENT_PLAN.md` Section 6 (Driver App
+Roadmap, stage D4 — UI portion) and Section 12 (Phase Registry). UI only —
+no backend, API, or protobuf changes. No state management library
+introduced.
+
+**New files under `apps/driver/lib/features/trips/`:**
+| File | Purpose |
+|------|---------|
+| `domain/models/trip_offer_status.dart` | `TripOfferStatus` enum (newOffer/accepted/rejected/expired) |
+| `domain/models/rider_info.dart` | `RiderInfo` — name, rating, avatar initial |
+| `domain/models/trip_offer.dart` | `TripOffer` — rider, pickup/destination, distance-to-pickup, trip distance/duration/fare, nullable `surgeMultiplier` (`hasSurge` only true above 1.0x) |
+| `domain/models/mock_trip_offer_catalog.dart` | Single shared sample offer, used by both the repository's "normal" mode and the preview pages (one source of truth for demo data) |
+| `data/driver_trip_offer_repository.dart` | `DriverTripOfferDemoMode` enum (normal/empty/error) + `DriverTripOfferRepository.fetchOffer({mode, delay})` — `delay` is a real parameter (default 700ms), satisfying "configurable delay" literally |
+| `presentation/widgets/rider_info_card.dart` | Avatar (initials) + name + rating |
+| `presentation/widgets/trip_offer_card.dart` | Composes `RiderInfoCard` + pickup/destination rows + distance-to-pickup + surge badge (only rendered when `offer.hasSurge`) |
+| `presentation/widgets/fare_estimate_card.dart` | Estimated fare (headline) + trip distance/duration |
+| `presentation/widgets/countdown_indicator.dart` | `CountdownIndicator` — 15s `AnimationController`-driven circular countdown; turns red under 5s remaining; fires `onExpired` exactly once via a status listener when it completes |
+| `presentation/widgets/trip_action_buttons.dart` | Accept/Reject row |
+| `presentation/widgets/trip_offer_view.dart` | `TripOfferView` — content-only widget composing everything per `TripOfferStatus`, wrapped in an `AnimatedSwitcher` for cross-fade; reused by both the live `TripsPage` and the dev preview pages |
+| `presentation/pages/trips_page.dart` | Rewritten (was the D-01 placeholder) — live flow: `AsyncStateView<TripOffer?>` for the fetch, then a local New Offer→Accepted/Rejected/Expired state machine; two AppBar actions: data dev-preview menu (Normal/Empty/Error) + a link to the trip-offer state preview menu |
+| `presentation/pages/trip_offer_preview_menu_page.dart` + `trip_offer_state_preview_page.dart` | Same menu→single-state-preview pattern as `apps/rider`'s `TripPreviewMenuPage`/`TripStatePreviewPage` (R-02) and this app's own Home dev menu (D-02) |
+
+**Design note:** `AsyncStateView`'s Empty state here means "no incoming offer right now" (`TripOffer?` is `null`) — distinct from the New Offer/Accepted/Rejected/Expired state machine, which only exists once an offer has actually been fetched successfully. These are two independent concerns (data availability vs. offer lifecycle), same pattern as Home's dashboard-fetch vs. availability-toggle split (D-02).
+
+**Bug found and fixed during this phase (test-only, not app code):** the countdown-expiry test asserted `find.text('Offer Expired')` immediately after `tester.pump(const Duration(seconds: 16))`, but the `AnimatedSwitcher` cross-fade was still mid-transition at that exact frame (old "New Offer" content and the new "Offer Expired" banner briefly coexist). Fixed by adding `await tester.pumpAndSettle();` after the pump, before asserting — the same class of timing issue as R-04's overflow bugs, but this one was in the test, not the widget.
+
+**Verified this session:** `flutter analyze` — 0 issues. `flutter test` —
+16/16 pass (8 from D-01/D-02 + 8 new: Trips tab loads offer with countdown,
+Accept → "Trip Accepted", Reject → "Trip Rejected", countdown reaching zero
+auto-shows "Offer Expired", Empty/Error via the dev preview menu, the
+preview menu lists all 4 states, one state preview page renders correctly).
 
 ## Phase D-02 — Driver App: Home Dashboard Module (COMPLETE — 2026-07-06)
 
