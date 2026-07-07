@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 import 'package:rider/core/network/api_client.dart';
+import 'package:rider/core/routing/route_service.dart';
 import 'package:rider/features/booking/presentation/pages/booking_page.dart';
 import 'package:rider/features/map/domain/models/trip_selection.dart';
 import 'package:rider/features/map/presentation/pages/map_page.dart';
@@ -15,7 +16,10 @@ abstract final class AppRoutes {
 class AppRouter {
   AppRouter._();
 
-  static GoRouter create({required ApiClient apiClient}) {
+  static GoRouter create({
+    required ApiClient apiClient,
+    required RouteService routeService,
+  }) {
     return GoRouter(
       initialLocation: AppRoutes.home,
       routes: [
@@ -26,7 +30,10 @@ class AppRouter {
               routes: [
                 GoRoute(
                   path: AppRoutes.home,
-                  builder: (context, state) => MapPage(apiClient: apiClient),
+                  builder: (context, state) => MapPage(
+                    apiClient: apiClient,
+                    routeService: routeService,
+                  ),
                 ),
               ],
             ),

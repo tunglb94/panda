@@ -2,7 +2,8 @@
 Last updated: 2026-07-07 by Principal Engineer AI
 
 ## Current Phase
-Phase 25 — Rider Driver Tracking (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
+Phase 26 — Route Engine Foundation (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
+Previous: Phase 25 — Rider Driver Tracking (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
 Previous: Phase 24 — Driver Live Location (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
 Previous: Phase 22 — Driver Trip Execution (COMPLETE)
 Previous: Phase 21 — Driver Trip Offer (COMPLETE)
@@ -1571,6 +1572,46 @@ flutter analyze
 
 ### Human Checkpoint
 HC-P24 + HC-P25 pending CTO approval to proceed to next phase.
+
+---
+
+## Phase 26 — Route Engine Foundation (COMPLETE — pub get + analyze pending)
+
+### Rider App (Flutter — analyze pending on home machine)
+
+**New files:**
+| File | Purpose |
+|------|---------|
+| `apps/rider/lib/core/routing/route_model.dart` | `RouteModel` value class: `polylinePoints: List<LatLng>`, `distanceMeters: int`, `durationSeconds: int`, `distanceText: String`, `durationText: String` |
+| `apps/rider/lib/core/routing/route_service.dart` | `abstract interface class RouteService` — `Future<RouteModel> getRoute(LatLng origin, LatLng destination)` |
+| `apps/rider/lib/core/routing/polyline_decoder.dart` | Pure function `decodePolyline(String encoded) → List<LatLng>` — standard Google encoded polyline algorithm |
+| `apps/rider/lib/core/routing/google_route_service.dart` | `GoogleRouteService implements RouteService` — calls Google Directions API; parses `overview_polyline`, distance, duration |
+
+**Modified files:**
+| File | Change |
+|------|--------|
+| `apps/rider/lib/core/config/app_config.dart` | Added `googleMapsApiKey` → `String.fromEnvironment('GOOGLE_MAPS_API_KEY', defaultValue: '')` |
+| `apps/rider/lib/core/router/app_router.dart` | `create({ApiClient, RouteService})` — passes `routeService` to `MapPage` |
+| `apps/rider/lib/app.dart` | Accepts + forwards `RouteService routeService` |
+| `apps/rider/lib/main.dart` | Creates `GoogleRouteService(apiKey: AppConfig.googleMapsApiKey)`, passes to `RiderApp` |
+| `apps/rider/lib/features/map/presentation/pages/map_page.dart` | Accepts `RouteService routeService`; adds `Set<Polyline> _polylines`, `RouteModel? _routeInfo`, `bool _routeLoading`; calls `_fetchRoute()` on confirm; draws polyline on map; shows distance + duration in confirmed panel |
+
+### Architecture decisions
+- `RouteService` is a pure abstract interface — no Google import leaks beyond `google_route_service.dart` and `route_model.dart`
+- Future Mapbox/OSRM swap: create new `MapboxRouteService implements RouteService`, wire in `main.dart` — zero other changes
+- Polyline drawn in deep blue `0xFF1565C0`, width 5
+- Route fetched automatically on destination confirm and on pickup edit (re-confirm path); polylines cleared immediately on edit
+- Stale-result guard: if `_pickupPoint`/`_destinationPoint` changed during the async fetch, result is discarded
+
+### Action required on home machine
+```bash
+cd apps/rider
+flutter pub get
+flutter analyze
+```
+
+### Human Checkpoint
+HC-P26 pending CTO approval to proceed to next phase.
 
 ---
 

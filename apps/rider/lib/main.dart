@@ -3,6 +3,7 @@ import 'package:rider/app.dart';
 import 'package:rider/core/auth/auth_state.dart';
 import 'package:rider/core/config/app_config.dart';
 import 'package:rider/core/network/api_client.dart';
+import 'package:rider/core/routing/google_route_service.dart';
 import 'package:rider/core/storage/token_storage.dart';
 
 void main() async {
@@ -17,9 +18,12 @@ void main() async {
     authState: authState,
   );
 
+  final routeService = GoogleRouteService(apiKey: AppConfig.googleMapsApiKey);
+
   runApp(RiderApp(
     authState: authState,
     tokenStorage: tokenStorage,
     apiClient: apiClient,
+    routeService: routeService,
   ));
 }

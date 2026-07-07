@@ -4,10 +4,12 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:rider/features/booking/presentation/widgets/booking_bottom_sheet.dart';
-import 'package:rider/features/map/domain/models/trip_selection.dart';
-import 'package:rider/features/map/data/driver_tracking_repository.dart';
 import 'package:rider/core/network/api_client.dart';
+import 'package:rider/core/routing/route_model.dart';
+import 'package:rider/core/routing/route_service.dart';
+import 'package:rider/features/booking/presentation/widgets/booking_bottom_sheet.dart';
+import 'package:rider/features/map/data/driver_tracking_repository.dart';
+import 'package:rider/features/map/domain/models/trip_selection.dart';
 
 // ─── Location resolution state machine ───────────────────────────────────────
 
@@ -33,9 +35,11 @@ class MapPage extends StatefulWidget {
   const MapPage({
     super.key,
     required this.apiClient,
+    required this.routeService,
   });
 
   final ApiClient apiClient;
+  final RouteService routeService;
 
   @override
   State<MapPage> createState() => MapPageState();
@@ -54,6 +58,9 @@ class MapPageState extends State<MapPage> {
   LatLng? _pickupPoint;
   LatLng? _destinationPoint;
   Set<Marker> _markers = {};
+  Set<Polyline> _polylines = {};
+  RouteModel? _routeInfo;
+  bool _routeLoading = false;
 
   // — Driver tracking (Phase 25) ————————————————————————————————————————————————
   late final DriverTrackingRepository _trackingRepo;
@@ -203,6 +210,9 @@ class MapPageState extends State<MapPage> {
           : _SelectionMode.destinationPending;
       _rebuildMarkers();
     });
+    if (_selectionMode == _SelectionMode.confirmed) {
+      _fetchRoute();
+    }
   }
 
   void _confirmDestination() {
@@ -211,6 +221,7 @@ class MapPageState extends State<MapPage> {
       _selectionMode = _SelectionMode.confirmed;
       _rebuildMarkers();
     });
+    _fetchRoute();
   }
 
   void _editPickup() {
@@ -218,6 +229,8 @@ class MapPageState extends State<MapPage> {
     setState(() {
       _pickupPoint = null;
       _selectionMode = _SelectionMode.pickupPending;
+      _polylines = {};
+      _routeInfo = null;
       _rebuildMarkers();
     });
     if (lastPickup != null) {
@@ -230,10 +243,39 @@ class MapPageState extends State<MapPage> {
     setState(() {
       _destinationPoint = null;
       _selectionMode = _SelectionMode.destinationPending;
+      _polylines = {};
+      _routeInfo = null;
       _rebuildMarkers();
     });
     if (lastDestination != null) {
       _controller?.animateCamera(CameraUpdate.newLatLng(lastDestination));
+    }
+  }
+
+  Future<void> _fetchRoute() async {
+    final pickup = _pickupPoint;
+    final destination = _destinationPoint;
+    if (pickup == null || destination == null) return;
+    setState(() => _routeLoading = true);
+    try {
+      final route = await widget.routeService.getRoute(pickup, destination);
+      if (!mounted) return;
+      if (_pickupPoint != pickup || _destinationPoint != destination) return;
+      setState(() {
+        _routeInfo = route;
+        _polylines = {
+          Polyline(
+            polylineId: const PolylineId('route'),
+            points: route.polylinePoints,
+            color: const Color(0xFF1565C0),
+            width: 5,
+          ),
+        };
+        _routeLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _routeLoading = false);
     }
   }
 
@@ -322,6 +364,7 @@ class MapPageState extends State<MapPage> {
           onMapCreated: _onMapCreated,
           onCameraMove: _onCameraMove,
           markers: _markers,
+          polylines: _polylines,
           myLocationEnabled: true,
           myLocationButtonEnabled: true,
           zoomControlsEnabled: true,
@@ -347,6 +390,9 @@ class MapPageState extends State<MapPage> {
             onBookRide: _tripSelection != null
                 ? () => BookingBottomSheet.show(context, tripSelection: _tripSelection!)
                 : null,
+            routeDistanceText: _routeInfo?.distanceText,
+            routeDurationText: _routeInfo?.durationText,
+            routeLoading: _routeLoading,
           ),
         ),
       ],
@@ -388,6 +434,9 @@ class _SelectionPanel extends StatelessWidget {
     required this.onEditPickup,
     required this.onEditDestination,
     this.onBookRide,
+    this.routeDistanceText,
+    this.routeDurationText,
+    this.routeLoading = false,
   });
 
   final _SelectionMode mode;
@@ -399,6 +448,9 @@ class _SelectionPanel extends StatelessWidget {
   final VoidCallback onEditPickup;
   final VoidCallback onEditDestination;
   final VoidCallback? onBookRide;
+  final String? routeDistanceText;
+  final String? routeDurationText;
+  final bool routeLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -489,6 +541,10 @@ class _SelectionPanel extends StatelessWidget {
 
   Widget _buildConfirmed(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
+    final textStyle = Theme.of(context)
+        .textTheme
+        .bodySmall
+        ?.copyWith(color: Colors.grey.shade700);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -516,7 +572,30 @@ class _SelectionPanel extends StatelessWidget {
             child: const Text('Edit'),
           ),
         ),
-        const SizedBox(height: 20),
+        if (routeLoading) ...[
+          const SizedBox(height: 12),
+          const Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        ] else if (routeDistanceText != null && routeDurationText != null) ...[
+          const Divider(height: 20),
+          Row(
+            children: [
+              Icon(Icons.route, size: 16, color: Colors.grey.shade600),
+              const SizedBox(width: 6),
+              Text(routeDistanceText!, style: textStyle),
+              const SizedBox(width: 16),
+              Icon(Icons.access_time, size: 16, color: Colors.grey.shade600),
+              const SizedBox(width: 6),
+              Text(routeDurationText!, style: textStyle),
+            ],
+          ),
+        ],
+        const SizedBox(height: 16),
         FilledButton.icon(
           onPressed: onBookRide,
           icon: const Icon(Icons.local_taxi),
