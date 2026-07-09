@@ -1,4 +1,4 @@
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'route_point.dart';
 
 class RouteProgressModel {
   const RouteProgressModel({
@@ -22,5 +22,5 @@ class RouteProgressModel {
   final bool isOnRoute;
 
   /// Closest point on the route polyline to the current position.
-  final LatLng nearestRoutePoint;
+  final RoutePoint nearestRoutePoint;
 }

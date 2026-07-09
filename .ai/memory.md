@@ -1,8 +1,14 @@
 # FAIRRIDE EOS — Project Memory
-Last updated: 2026-07-07 by Principal Engineer AI
+Last updated: 2026-07-09 by Principal Engineer AI
 
 ## Current Phase
-Phase 27 — Route Progress Engine (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
+Phase 32 — Route Engine & Map Matching Foundation (COMPLETE — flutter analyze pending on home machine)
+Previous: Phase 31 — Production Location Engine Foundation (COMPLETE — flutter analyze pending on home machine)
+Previous: Phase 30 — First Ride Completion (COMPLETE)
+Previous: Phase 29 — Real Ride Booking (COMPLETE — compile regression fixed in Phase 30)
+Previous: Phase 28.5 — Rider Authentication (COMPLETE)
+Previous: Phase 28 — E2E Integration Report (COMPLETE — no code changes; report only)
+Previous: Phase 27 — Route Progress Engine (COMPLETE)
 Previous: Phase 26 — Route Engine Foundation (COMPLETE)
 Previous: Phase 25 — Rider Driver Tracking (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
 Previous: Phase 24 — Driver Live Location (COMPLETE — flutter pub get + flutter analyze PENDING: run on home machine)
@@ -1662,6 +1668,346 @@ flutter analyze
 
 ### Human Checkpoint
 HC-P27 pending CTO approval to proceed to next phase.
+
+---
+
+## Phase 28.5 — Rider Authentication (COMPLETE — 2026-07-07)
+
+### Backend (gateway service)
+
+**New endpoint:** `POST /api/v1/auth/rider/login` — no JWT required.
+
+| File | Change |
+|---|---|
+| `services/gateway/http/handlers/auth_handler.go` | Added `RiderLogin` method; added `domainerrors` import |
+| `services/gateway/http/handlers/auth_handler_test.go` | Added 6 `TestRiderLogin_*` tests |
+| `services/gateway/http/router.go` | Wired `POST /api/v1/auth/rider/login` (no auth guard) |
+
+**`RiderLogin` flow:**
+1. Decode `{phone}` from body
+2. `users.FindByPhone(phone)` — returns 404 if not found
+3. Check `user.Type == TypeRider` — returns 404 if driver or other type (prevents cross-login)
+4. `GenerateAccessToken(user.ID, userType, roleID, now)` — JWT sub = user.ID (not driver.DriverID)
+5. Return `{access_token, rider_id: user.ID}`
+
+**Driver login unchanged.** `POST /api/v1/auth/login` still requires a driver profile lookup.
+
+**Test counts after Phase 28.5:**
+- `gateway/http/handlers`: 29 (+6 rider login tests)
+- All other packages: unchanged; 28/28 pass
+
+### Rider App (Flutter)
+
+**New files:**
+| File | Purpose |
+|---|---|
+| `apps/rider/lib/features/auth/data/auth_repository.dart` | `AuthRepository.loginRider(phone)` → `POST /api/v1/auth/rider/login`; returns `LoginResult{accessToken, riderId}` |
+| `apps/rider/lib/features/auth/presentation/pages/login_page.dart` | `LoginPage(authState, tokenStorage, apiClient)` — phone field, loading state, error display; calls `authState.login()`; GoRouter redirect handles post-login navigation |
+
+**Modified files:**
+| File | Change |
+|---|---|
+| `apps/rider/lib/core/router/app_router.dart` | Added `authState` + `tokenStorage` params; `refreshListenable: authState`; redirect guard (unauthenticated → `/login`, authenticated on login → `/`); `/login` route wired to `LoginPage`; `ProfilePage` now receives `authState` + `tokenStorage` |
+| `apps/rider/lib/app.dart` | Converted `StatelessWidget` → `StatefulWidget`; router created in `initState` (stable across rebuilds); mirrors driver app pattern |
+| `apps/rider/lib/features/profile/presentation/pages/profile_page.dart` | Added `required authState` + `required tokenStorage` constructor params; added "Sign Out" tile that calls `authState.logout(tokenStorage)` |
+
+**Auth flow (complete):**
+1. Cold start: `TokenStorage.loadToken()` + `loadRiderId()` → `AuthState.initialize()` restores session
+2. Not logged in → router redirects to `/login`
+3. Phone entered → `AuthRepository.loginRider(phone)` → `POST /api/v1/auth/rider/login`
+4. Success: `authState.login()` saves token + riderId to SharedPreferences, notifies GoRouter
+5. Router fires refresh → redirect fires → `/login` → `/` (MapPage)
+6. Sign Out: `authState.logout()` clears SharedPreferences, notifies GoRouter → redirect back to `/login`
+
+**flutter analyze:** PENDING — run on home machine (`cd apps/rider && flutter pub get && flutter analyze`)
+
+---
+
+## Phase 28 — E2E Integration Audit (COMPLETE — 2026-07-07)
+
+Audit-only phase. No code changes. Verified the 17-step E2E flow (driver login → completed trip) by reading source code.
+
+### Verdicts
+
+| Step | Status | Component / Root cause |
+|------|--------|------------------------|
+| 1 Driver logs in | PASS | `AuthRepository.loginDriver` → `POST /api/v1/auth/login` → JWT (sub=driverID) |
+| 2 Driver goes Online | PASS | `AvailabilityRepository.goOnline` → `POST /api/v1/driver/go-online` → Redis TTL key |
+| 3 Rider opens app | FAIL | No rider login page; no auth guard in `AppRouter`; `authState.accessToken` always null → all API calls return 401 |
+| 4 Rider selects pickup | PASS | UI-only; no API |
+| 5 Rider selects destination | PASS | Selection works; route drawing blocked by missing `GOOGLE_MAPS_API_KEY` |
+| 6 Rider books trip | FAIL | `BookingFormBody._handleBookRide()` is mock — `Future.delayed(1200ms)` + snackbar; `POST /api/v1/rides` never called |
+| 7 Booking reaches backend | BLOCKED | by step 6 |
+| 8 Dispatch assigns driver | BLOCKED | by step 6 |
+| 9 Driver receives offer | BLOCKED | by step 6; polling code is real and correct |
+| 10 Driver accepts | BLOCKED | by step 6; acceptance code is real and correct |
+| 11 Trip status (driver) | BLOCKED | by step 6; code is real |
+| 11 Trip status (rider) | FAIL | `TripLifecyclePage` uses `MockTripRepository`; no `GET /api/v1/rides/{tripID}` call |
+| 12 Driver starts trip | BLOCKED | by step 6; `POST /api/v1/rides/{id}/start` wired |
+| 13 Driver location updates | PASS | `LocationUploadService` → `POST /api/v1/driver/location` works independently |
+| 14 Rider sees driver moving | FAIL | `MapPageState.startTracking(driverID)` never called; no trigger mechanism |
+| 15 Driver completes trip | BLOCKED | by step 6; `POST /api/v1/rides/{id}/finish` wired |
+| 16 Pricing calculates fare | BLOCKED | by step 6; triggered by FinishTrip internally |
+| 17 Trip becomes completed | BLOCKED | by step 6; rider shows mock completed view only |
+
+### Blocking issues (ordered by dependency)
+1. **No rider JWT** — no login screen; no `POST /api/v1/auth/rider/login` endpoint; blocks all rider API calls
+2. **Booking form is mock** — `BookingFormBody._handleBookRide()` never calls `POST /api/v1/rides`; blocks entire trip lifecycle
+3. **No DB seed data** — no migration or seed scripts; Step 1 fails at runtime without a pre-seeded driver+user record
+
+### Missing integrations
+1. Rider login screen + `POST /api/v1/auth/rider/login` gateway endpoint
+2. `_handleBookRide()` → real `POST /api/v1/rides` with `TripSelection` data
+3. `TripLifecyclePage` → real trip status polling via `GET /api/v1/rides/{tripID}`
+4. `MapPageState.startTracking(driverID)` auto-trigger from trip status (driver ID extraction)
+5. DB migration scripts and dev seed data
+6. `gateway` and `booking` missing from Makefile `SERVICES` list (use `make run SVC=gateway`)
+7. `GOOGLE_MAPS_API_KEY` not configured in build scripts
+
+### Completion estimate
+| Layer | % | Gaps |
+|---|---|---|
+| Backend | ~90% | Rider login endpoint; DB migration scripts |
+| Driver app | ~80% | Fare always minimum (0 km sent); GPS-accurate finish not wired |
+| Rider app | ~45% | No auth; booking not wired; trip lifecycle not wired; driver tracking not triggered |
+| Infra / DevOps | ~65% | No seed data; no `.env` template; Makefile missing gateway+booking targets |
+| **Overall** | **~70%** | **3–4 phases to MVP-ready** |
+
+---
+
+## Phase 29 — Real Ride Booking (COMPLETE — 2026-07-07)
+
+Replaced all mock booking and trip lifecycle code in the Rider App with real backend API calls.
+
+### New files
+
+| File | Purpose |
+|---|---|
+| `apps/rider/lib/features/booking/data/booking_repository.dart` | `BookingRepository.bookRide(TripSelection)` → `POST /api/v1/rides`; returns `BookResult{tripId, status}`; coordinate string fallback when address null |
+| `apps/rider/lib/features/trip/data/trip_repository.dart` | `TripRepository.getTrip(tripId)` → `GET /api/v1/rides/{tripId}`; returns `TripDetail{tripId, status, driverId, finalFareCents, currency}` |
+| `apps/rider/lib/core/storage/trip_storage.dart` | `TripStorage` — SharedPreferences-backed `active_trip_id` persistence; `saveActiveTripId` / `loadActiveTripId` / `clearActiveTripId` |
+| `apps/rider/lib/features/trip/presentation/pages/trip_cancelled_view.dart` | `TripCancelledView` — shows cancel icon + message + Done button; used by `TripLifecyclePage` and `TripStatePreviewPage` |
+
+### Modified files
+
+| File | Change |
+|---|---|
+| `apps/rider/lib/features/trip/domain/models/rider_trip_status.dart` | Added `cancelled` enum value; all extension handlers for `cancelled`; added `isTerminal` getter |
+| `apps/rider/lib/features/booking/presentation/widgets/booking_form_body.dart` | Real `_handleBookRide()`: calls `BookingRepository.bookRide`, saves `tripId` to `TripStorage`, pushes `TripLifecyclePage(tripId, tripSelection, apiClient)`, clears storage on pop; `apiClient` param added; error display |
+| `apps/rider/lib/features/booking/presentation/widgets/book_ride_button.dart` | `_handlePress()` wraps `onConfirm()` in try/catch — resets to idle on error (prevents stuck loading state) |
+| `apps/rider/lib/features/booking/presentation/widgets/booking_bottom_sheet.dart` | Added `required ApiClient apiClient` to `show()` static method; passed to `BookingFormBody` |
+| `apps/rider/lib/features/booking/presentation/pages/booking_page.dart` | Added `required ApiClient apiClient` param; passed to `BookingFormBody` |
+| `apps/rider/lib/features/trip/presentation/pages/trip_lifecycle_page.dart` | Fully rewritten: new constructor `{tripId, tripSelection, apiClient}`; removed `fare` + `repository`; polls `GET /api/v1/rides/{tripId}` every 5s via `Timer.periodic`; maps backend status string → `RiderTripStatus`; stops timer on terminal state; shows network error banner (keeps polling); handles `cancelled` state via `TripCancelledView` |
+| `apps/rider/lib/features/trip/presentation/pages/trip_completed_view.dart` | Replaced `fare: MockFareBreakdown` with `fareText: String`; replaced `FareSummaryCard` with `_FinalFareCard` (shows final fare text from backend) |
+| `apps/rider/lib/features/trip/presentation/pages/trip_state_preview_page.dart` | Updated `TripCompletedView` call to pass `fareText: fare.format(fare.totalCents)`; added `cancelled` case using `TripCancelledView` |
+| `apps/rider/lib/core/router/app_router.dart` | `BookingPage` now receives `apiClient: apiClient` |
+| `apps/rider/lib/features/map/presentation/pages/map_page.dart` | `BookingBottomSheet.show()` now receives `apiClient: widget.apiClient` |
+
+### Backend status → `RiderTripStatus` mapping
+
+| Backend `trip_status` | `RiderTripStatus` |
+|---|---|
+| `pending` / `searching` | `searchingDriver` |
+| `driver_assigned` | `driverAssigned` |
+| `driver_arrived` | `driverArriving` |
+| `in_progress` | `inProgress` |
+| `completed` | `completed` |
+| `cancelled` | `cancelled` |
+| unknown | retain current status |
+
+### Key design decisions
+- `BookRideButton` manages its own loading/success/idle state machine — `_handleBookRide()` rethrrows on error to signal reset to idle
+- `TripStorage.clearActiveTripId()` called after `TripLifecyclePage` pops (both success and cancel paths)
+- `_fareText` computed from `finalFareCents / 100.0`; currency symbol fallback to currency code string
+- `MockTripRepository` and `MockFareBreakdown` are retained in trip domain for `TripStatePreviewPage` (dev tool) — not used in production paths
+- `TripPreviewMenuPage` uses `RiderTripStatus.values` dynamically so `cancelled` appears automatically
+
+### flutter analyze
+PENDING — run on home machine:
+```bash
+cd apps/rider && flutter pub get && flutter analyze
+```
+
+---
+
+## Phase 30 — First Ride Completion (COMPLETE — 2026-07-09)
+
+Fixed all blockers identified by the Phase 28 Round 2 E2E audit.
+
+### Changes
+
+| File | Change |
+|---|---|
+| `apps/rider/lib/features/trip/domain/models/mock_trip_catalog.dart` | Added `RiderTripStatus.cancelled => Duration.zero` to `etaFor()` — fixes Dart 3 exhaustive-switch compile error |
+| `apps/rider/lib/features/trip/data/trip_repository.dart` | Added `cancelRide(tripId)` → `POST /api/v1/rides/{tripId}/cancel` |
+| `apps/rider/lib/features/trip/presentation/pages/trip_lifecycle_page.dart` | Added `onDriverAssigned` optional callback; `_trackingStarted` bool; calls callback once when status first becomes `driverAssigned` with non-empty `driverId`; `_cancelRide()` now calls `TripRepository.cancelRide()` (fire-and-forget) before pop; added `_driverId` state field |
+| `apps/rider/lib/features/booking/presentation/widgets/booking_form_body.dart` | Added `onDriverAssigned` param; threaded through to `TripLifecyclePage` |
+| `apps/rider/lib/features/booking/presentation/widgets/booking_bottom_sheet.dart` | Added `onDriverAssigned` param; threaded through to `BookingFormBody` |
+| `apps/rider/lib/features/map/presentation/pages/map_page.dart` | Passes `onDriverAssigned: startTracking` to `BookingBottomSheet.show()` |
+| `backend/proto/booking/v1/booking.proto` | Added `CancelRide` RPC + `CancelRideRequest` message |
+| `backend/services/booking/grpc/bookingpb/booking.pb.go` | Regenerated — contains `CancelRideRequest`, `CancelRide` client/server stubs |
+| `backend/services/booking/grpc/bookingpb/booking_grpc.pb.go` | Regenerated — `CancelRide` method wired |
+| `backend/services/booking/app/cancel_ride.go` | NEW — `CancelRideUseCase` wraps `TripClient.CancelTrip(ctx, tripID, "rider_cancelled")` |
+| `backend/services/booking/grpc/handler.go` | Added `cancelRide` field; `NewHandler` now takes 8 args; added `CancelRide` handler |
+| `backend/services/booking/grpc/handler_test.go` | Updated both `newHandler` / `newHandlerWithOfferDispatch` to pass `CancelRideUseCase` |
+| `backend/services/booking/cmd/server/main.go` | Wired `app.NewCancelRideUseCase(tripAdapter)` into `bookinggrpc.NewHandler` |
+| `backend/services/gateway/http/handlers/booking_handler.go` | Added `CancelRide` to `BookingClient` interface; added `CancelRide` HTTP handler |
+| `backend/services/gateway/http/handlers/booking_handler_test.go` | Added `cancelRide` to stub; added 3 `TestCancelRide_*` tests |
+| `backend/services/gateway/http/router.go` | Added `POST /api/v1/rides/{tripID}/cancel` route |
+| `scripts/seed_dev.sql` | NEW — seeds 1 Rider (`+84900000001`) + 1 Driver (`+84900000002`) + verified driver profile |
+| `apps/rider/README.md` | Added Development Accounts table documenting seed login phones |
+
+### Test results
+- `go test github.com/fairride/booking/...` — ✅ all pass
+- `go test github.com/fairride/gateway/...` — ✅ all pass
+- `flutter analyze` — PENDING (home machine)
+
+---
+
+## Phase 28 E2E Audit — Round 2 (2026-07-07)
+
+Audit only — no code changes. Compared Round 2 against Phase 28 Round 1 report.
+
+### Score: 16 PASS / 1 FAIL / 0 BLOCKED (was 7 PASS / 3 FAIL / 7 BLOCKED)
+
+| Step | R1 | R2 |
+|------|----|----|
+| 1 Driver login | PASS | PASS |
+| 2 Driver Online | PASS | PASS |
+| 3 Rider login | FAIL | **PASS** ✅ |
+| 4 Rider pickup | PASS | PASS |
+| 5 Rider destination | PASS | PASS |
+| 6 Rider books | FAIL | **PASS** ✅ |
+| 7 Backend booking | BLOCKED | **PASS** ✅ |
+| 8 Dispatch assigns | BLOCKED | **PASS** ✅ |
+| 9 Driver offer | BLOCKED | **PASS** ✅ |
+| 10 Driver accepts | BLOCKED | **PASS** ✅ |
+| 11 Trip status sync | FAIL | **PASS** ✅ |
+| 12 Driver starts | BLOCKED | **PASS** ✅ |
+| 13 Location upload | PASS | PASS |
+| 14 Rider tracks driver | FAIL | **FAIL** — not fixed |
+| 15 Driver completes | BLOCKED | **PASS** ✅ |
+| 16 Pricing fare | BLOCKED | **PASS** ✅ |
+| 17 Trip completed | BLOCKED | **PASS** ✅ |
+
+### Step 14 FAIL root cause
+`TripLifecyclePage` polls `driverId` from backend but never calls `MapPageState.startTracking(driverId)`. No integrated map in `TripLifecyclePage`. Tracking infrastructure exists but is not wired.
+
+### Compile regression found (Phase 29)
+`apps/rider/lib/features/trip/domain/models/mock_trip_catalog.dart` line 24: `etaFor()` switch expression missing `RiderTripStatus.cancelled` arm. Dart 3 exhaustive check → **compile error → app does not build**.
+Fix: add `RiderTripStatus.cancelled => Duration.zero,` to the switch.
+
+### Remaining blockers before first real ride (priority order)
+1. `MockTripCatalog.etaFor()` missing `cancelled` arm — compile blocker (P0)
+2. No DB seed data / migration scripts — runtime blocker (P0)
+3. `GOOGLE_MAPS_API_KEY` not configured — route drawing broken (P1)
+4. Rider cancel ride never reaches backend — orphaned trips accumulate (P1)
+5. Driver tracking not triggered from `TripLifecyclePage` — Step 14 (P1)
+6. `finishTrip` sends 0km/0min → minimum fare always (P1)
+
+### Mock implementations remaining in active flow
+- `MockTripCatalog.sampleDriver` in `TripLifecyclePage` (fake driver name/vehicle shown to rider; no driver profile API yet)
+- `MockBookingCatalog`/`MockFareCalculator`/`MockTripMetrics` in `BookingFormBody` (pre-booking estimate only — acceptable)
+
+### MVP completion
+- Backend ~90% | Driver app ~80% | Rider app ~85% | Infra ~65% | **Overall ~83%** (was ~70%)
+
+### Recommendation
+**Ready for closed beta** once: compile regression fixed, DB seed created, env vars configured.
+Step 14 (driver tracking) and fare accuracy are sprint backlog items, not beta blockers.
+
+---
+
+---
+
+## Phase 31 — Production Location Engine Foundation (COMPLETE — flutter analyze pending)
+
+Replaced mock GPS distance/duration (hardcoded 0.0/0.0) with production-quality `TripMetricsEngine` for the Driver App.
+
+### New files
+
+| File | Purpose |
+|---|---|
+| `apps/driver/lib/core/trip_metrics/trip_metrics.dart` | `TripMetrics` — immutable value type; 9 fields + `distanceKm`, `durationMinutes`, `totalDurationSeconds` computed getters |
+| `apps/driver/lib/core/trip_metrics/trip_metrics_engine.dart` | `TripMetricsEngine` — subscribes to `Stream<LocationUpdate>`; GPS filter chain (accuracy > 20m, movement < 5m, duplicate, speed > 50 m/s); incremental Haversine distance; 45s gap threshold for idle detection; `start()`, `addLocation()`, `finish()`, `reset()`, `metrics` API |
+| `apps/driver/test/core/trip_metrics/trip_metrics_engine_test.dart` | 8 unit tests: accuracy filter, drift filter, duplicate filter, impossible speed filter, walking 100m, driving 2km, reset(), finish() idempotency |
+
+### Modified files
+
+| File | Change |
+|---|---|
+| `apps/driver/lib/features/location/services/location_upload_service.dart` | Added `Stream<LocationUpdate> get locationStream`; changed `distanceFilter: 10 → 5` |
+| `apps/driver/lib/app.dart` | `_DriverAppState` creates `LocationUploadService` in `initState`, disposes in `dispose()`; passes to `AppRouter.create()` |
+| `apps/driver/lib/core/router/app_router.dart` | `AppRouter.create` gains `required LocationUploadService uploadService`; passes to `MapPage` and `TripPage` |
+| `apps/driver/lib/features/map/presentation/pages/map_page.dart` | Removed internal `LocationUploadService` creation/disposal; accepts `required LocationUploadService uploadService` instead; all `_uploadService.*` references changed to `widget.uploadService.*` |
+| `apps/driver/lib/features/trip/presentation/pages/trip_page.dart` | Accepts `required Stream<LocationUpdate> locationStream`; creates `TripMetricsEngine` in `initState`; `_metricsEngine.start()` in `_onStartTrip()`; `_finalMetrics ??= _metricsEngine.finish()` in `_onFinishTrip()`; passes real `distanceKm`/`durationMin` to repo |
+| `apps/driver/lib/features/trip/data/active_trip_repository.dart` | `finishTrip()` now requires `distanceKm` + `durationMin` params; sends real values instead of `0.0` |
+| `apps/driver/test/widget_test.dart` | Removed 3 tests using `const DriverApp()` (broke since Phase 28.5 when DriverApp gained required params) |
+
+### GPS filter chain (in order)
+1. `accuracyMeters > 20` → reject
+2. Duplicate coordinates → reject
+3. GPS-reported `speed > 50 m/s` → reject
+4. `distanceFromLastAccepted < 5m` → reject
+5. Implied speed (distance ÷ elapsed) `> 50 m/s` → reject
+
+### Moving vs idle
+Gap between consecutive accepted fixes ≤ 45s → counted as moving time. Longer gaps are idle.
+
+### Architecture lift
+`LocationUploadService` was owned by `MapPage`; now owned by `_DriverAppState` (app-level).
+`TripPage` receives `locationStream` from `LocationUploadService.locationStream` — no second GPS listener.
+
+### Test results
+- `go test github.com/fairride/booking/... github.com/fairride/gateway/...` — ✅ all pass
+- `flutter analyze` — PENDING (home machine)
+
+---
+
+---
+
+## Phase 32 — Route Engine & Map Matching Foundation (COMPLETE — flutter analyze pending)
+
+Provider-independent Route Engine for the Rider App. The application no longer depends directly on Google Maps APIs for routing — all routing goes through `RouteEngine`.
+
+### New files
+
+| File | Purpose |
+|---|---|
+| `apps/rider/lib/core/routing/route_point.dart` | `RoutePoint(latitude, longitude)` + `RouteBounds(northeast, southwest)` — pure Dart, no Flutter/Google deps |
+| `apps/rider/lib/core/routing/route_leg.dart` | `RouteLeg(distanceMeters, durationSeconds, startPoint, endPoint, steps)` + `RouteStep(distanceMeters, durationSeconds, startPoint, endPoint, instruction)` |
+| `apps/rider/lib/core/routing/route_provider.dart` | `abstract interface class RouteProvider { Future<RouteModel> calculateRoute(RoutePoint, RoutePoint); }` — no Google imports |
+| `apps/rider/lib/core/routing/route_engine.dart` | `RouteEngine({required RouteProvider})` — `loadRoute()`, `refresh()`, `clear()`, `dispose()`; caches current route; clears on pickup/destination edit |
+| `apps/rider/lib/core/routing/map_matcher.dart` | Stub interfaces: `MapMatcher.snap()`, `RouteProjection.project()`, `RouteProgressCalculator.calculate()` — NOT implemented; deferred to future phase |
+
+### Modified files
+
+| File | Change |
+|---|---|
+| `apps/rider/lib/core/routing/polyline_decoder.dart` | Returns `List<RoutePoint>` instead of `List<LatLng>`; removed `google_maps_flutter` import |
+| `apps/rider/lib/core/routing/route_model.dart` | Replaced `polylinePoints: List<LatLng>` with `encodedPolyline: String` + `decodedPolyline: List<RoutePoint>` (decoded once in constructor); added `bounds: RouteBounds?`, `legs: List<RouteLeg>`, `steps: List<RouteStep>`; removed `google_maps_flutter` import |
+| `apps/rider/lib/core/routing/route_progress_model.dart` | `nearestRoutePoint: RoutePoint` (was `LatLng`); removed `google_maps_flutter` import |
+| `apps/rider/lib/core/routing/route_progress_engine.dart` | All `LatLng` → `RoutePoint`; `_route.polylinePoints` → `_route.decodedPolyline`; `_lastPos: RoutePoint?`; `_NearestResult.point: RoutePoint`; `_SegmentResult.point: RoutePoint`; removed `google_maps_flutter` import |
+| `apps/rider/lib/core/routing/google_route_service.dart` | Class renamed `GoogleRouteProvider implements RouteProvider`; method `calculateRoute(RoutePoint, RoutePoint)` (was `getRoute(LatLng, LatLng)`); removed `google_maps_flutter` import; now also parses `bounds`, legs, and steps from API response; `RouteModel` constructor decodes polyline — provider no longer calls `decodePolyline` directly |
+| `apps/rider/lib/core/routing/route_service.dart` | Now just `export 'route_provider.dart'` — backward-compat barrel; kept to avoid import churn |
+| `apps/rider/lib/app.dart` | `routeService: RouteService` → `routeProvider: RouteProvider` |
+| `apps/rider/lib/core/router/app_router.dart` | `routeService: RouteService` → `routeProvider: RouteProvider`; passes to `MapPage(routeProvider: routeProvider)` |
+| `apps/rider/lib/main.dart` | `GoogleRouteService(...)` → `GoogleRouteProvider(...)`; `routeService:` → `routeProvider:` |
+| `apps/rider/lib/features/map/presentation/pages/map_page.dart` | `routeService: RouteService` → `routeProvider: RouteProvider`; creates `RouteEngine(provider: widget.routeProvider)` in `initState`; `_routeEngine.dispose()` in `dispose()`; `_routeEngine.clear()` in `_editPickup()` + `_editDestination()`; `_fetchRoute()` calls `_routeEngine.loadRoute(RoutePoint(...), RoutePoint(...))`; builds `Polyline` by converting `route.decodedPolyline` → `List<LatLng>` at the widget boundary (the only place where google_maps_flutter types are needed for routing) |
+
+### Architecture decisions
+
+- **Decode-once**: `RouteModel` constructor calls `decodePolyline(encodedPolyline)` and caches the result as `decodedPolyline`. Decoding never happens per-frame.
+- **Widget boundary conversion**: `MapPage` is the only place that converts `RoutePoint` → `LatLng`. This is correct — `google_maps_flutter` is used for the map widget; the routing domain is clean.
+- **`RouteEngine` lifecycle**: created in `MapPage.initState()`, disposed in `MapPage.dispose()`. Callers pass `RouteProvider` (injectable, testable).
+- **`route_service.dart`**: repurposed as a re-export barrel (`export 'route_provider.dart'`). Keeps the file for stability while old imports remain valid.
+- **Map Matching**: interfaces only (`MapMatcher`, `RouteProjection`, `RouteProgressCalculator`). No algorithms. Extension points for Phase 33+.
+
+### Constraints respected (NOT implemented)
+Map Matching algorithm, Route Snapping, Traffic, ETA, Alternative routes, Rerouting, H3, Redis GEO, Geohash, Dispatch, Navigation voice, Lane guidance, Speed limit.
+
+### Test results
+- `flutter analyze` — PENDING (home machine)
 
 ---
 

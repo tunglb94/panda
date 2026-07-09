@@ -18,12 +18,12 @@ void main() async {
     authState: authState,
   );
 
-  final routeService = GoogleRouteService(apiKey: AppConfig.googleMapsApiKey);
+  final routeProvider = GoogleRouteProvider(apiKey: AppConfig.googleMapsApiKey);
 
   runApp(RiderApp(
     authState: authState,
     tokenStorage: tokenStorage,
     apiClient: apiClient,
-    routeService: routeService,
+    routeProvider: routeProvider,
   ));
 }

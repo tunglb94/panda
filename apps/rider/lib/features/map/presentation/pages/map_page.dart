@@ -7,10 +7,12 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:rider/core/location/location_engine.dart';
 import 'package:rider/core/location/location_engine_config.dart';
 import 'package:rider/core/network/api_client.dart';
+import 'package:rider/core/routing/route_engine.dart';
 import 'package:rider/core/routing/route_model.dart';
+import 'package:rider/core/routing/route_point.dart';
 import 'package:rider/core/routing/route_progress_engine.dart';
 import 'package:rider/core/routing/route_progress_model.dart';
-import 'package:rider/core/routing/route_service.dart';
+import 'package:rider/core/routing/route_provider.dart';
 import 'package:rider/features/booking/presentation/widgets/booking_bottom_sheet.dart';
 import 'package:rider/features/map/data/driver_tracking_repository.dart';
 import 'package:rider/features/map/domain/models/trip_selection.dart';
@@ -39,11 +41,11 @@ class MapPage extends StatefulWidget {
   const MapPage({
     super.key,
     required this.apiClient,
-    required this.routeService,
+    required this.routeProvider,
   });
 
   final ApiClient apiClient;
-  final RouteService routeService;
+  final RouteProvider routeProvider;
 
   @override
   State<MapPage> createState() => MapPageState();
@@ -66,6 +68,9 @@ class MapPageState extends State<MapPage> {
   RouteModel? _routeInfo;
   bool _routeLoading = false;
 
+  // — Route engine (Phase 32) ──────────────────────────────────────────────────
+  late final RouteEngine _routeEngine;
+
   // — Route progress (Phase 27) ————————————————————————————————————————————————
   late final LocationEngine _locationEngine;
   RouteProgressEngine? _progressEngine;
@@ -84,6 +89,7 @@ class MapPageState extends State<MapPage> {
   @override
   void initState() {
     super.initState();
+    _routeEngine = RouteEngine(provider: widget.routeProvider);
     _locationEngine = LocationEngine(
       config: const LocationEngineConfig(distanceFilter: 5.0),
     );
@@ -95,6 +101,7 @@ class MapPageState extends State<MapPage> {
   void dispose() {
     _progressSub?.cancel();
     _progressEngine?.dispose();
+    _routeEngine.dispose();
     _locationEngine.dispose();
     _stopTracking();
     _controller?.dispose();
@@ -243,6 +250,7 @@ class MapPageState extends State<MapPage> {
   void _editPickup() {
     final lastPickup = _pickupPoint;
     _stopProgressTracking();
+    _routeEngine.clear();
     setState(() {
       _pickupPoint = null;
       _selectionMode = _SelectionMode.pickupPending;
@@ -259,6 +267,7 @@ class MapPageState extends State<MapPage> {
   void _editDestination() {
     final lastDestination = _destinationPoint;
     _stopProgressTracking();
+    _routeEngine.clear();
     setState(() {
       _destinationPoint = null;
       _selectionMode = _SelectionMode.destinationPending;
@@ -278,16 +287,22 @@ class MapPageState extends State<MapPage> {
     if (pickup == null || destination == null) return;
     setState(() => _routeLoading = true);
     try {
-      final route = await widget.routeService.getRoute(pickup, destination);
+      final route = await _routeEngine.loadRoute(
+        RoutePoint(latitude: pickup.latitude, longitude: pickup.longitude),
+        RoutePoint(latitude: destination.latitude, longitude: destination.longitude),
+      );
       if (!mounted) return;
       if (_pickupPoint != pickup || _destinationPoint != destination) return;
+      final polylinePoints = route.decodedPolyline
+          .map((p) => LatLng(p.latitude, p.longitude))
+          .toList();
       setState(() {
         _routeInfo = route;
         _routeProgress = null;
         _polylines = {
           Polyline(
             polylineId: const PolylineId('route'),
-            points: route.polylinePoints,
+            points: polylinePoints,
             color: const Color(0xFF1565C0),
             width: 5,
           ),
@@ -435,7 +450,7 @@ class MapPageState extends State<MapPage> {
             onEditPickup: _editPickup,
             onEditDestination: _editDestination,
             onBookRide: _tripSelection != null
-                ? () => BookingBottomSheet.show(context, tripSelection: _tripSelection!)
+                ? () => BookingBottomSheet.show(context, tripSelection: _tripSelection!, apiClient: widget.apiClient, onDriverAssigned: startTracking)
                 : null,
             routeDistanceText: _routeInfo?.distanceText,
             routeDurationText: _routeInfo?.durationText,

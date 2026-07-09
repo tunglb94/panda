@@ -1,10 +1,9 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-
 import 'package:rider/core/location/location_engine.dart';
 import 'route_model.dart';
+import 'route_point.dart';
 import 'route_progress_model.dart';
 
 /// Continuously matches device GPS position against the active [RouteModel]
@@ -37,7 +36,7 @@ class RouteProgressEngine {
 
   final _ctrl = StreamController<RouteProgressModel>.broadcast();
   StreamSubscription<LocationUpdate>? _sub;
-  LatLng? _lastPos;
+  RoutePoint? _lastPos;
 
   Stream<RouteProgressModel> get progressStream => _ctrl.stream;
 
@@ -61,7 +60,7 @@ class RouteProgressEngine {
   // ─── Precomputation ──────────────────────────────────────────────────────────
 
   void _precompute() {
-    final pts = _route.polylinePoints;
+    final pts = _route.decodedPolyline;
     _cumDist = List.filled(pts.length, 0.0);
     for (int i = 1; i < pts.length; i++) {
       _cumDist[i] = _cumDist[i - 1] + _haversine(pts[i - 1], pts[i]);
@@ -73,7 +72,7 @@ class RouteProgressEngine {
 
   void _onLocationUpdate(LocationUpdate update) {
     if (_ctrl.isClosed) return;
-    final pos = LatLng(update.latitude, update.longitude);
+    final pos = RoutePoint(latitude: update.latitude, longitude: update.longitude);
 
     // Ignore GPS jitter — don't recompute if barely moved.
     if (_lastPos != null && _haversine(_lastPos!, pos) < _jitter) return;
@@ -85,8 +84,7 @@ class RouteProgressEngine {
         : 0.0;
     final remainingMeters =
         (_totalDistance - nearest.cumulative).clamp(0.0, double.infinity).round();
-    final remainingSecs =
-        (_route.durationSeconds * (1.0 - progress)).round();
+    final remainingSecs = (_route.durationSeconds * (1.0 - progress)).round();
 
     _ctrl.add(RouteProgressModel(
       progressPercent: progress,
@@ -99,15 +97,15 @@ class RouteProgressEngine {
 
   // ─── Geometry ─────────────────────────────────────────────────────────────────
 
-  _NearestResult _findNearest(LatLng pos) {
-    final pts = _route.polylinePoints;
+  _NearestResult _findNearest(RoutePoint pos) {
+    final pts = _route.decodedPolyline;
     if (pts.isEmpty) return _NearestResult(pos, double.infinity, 0.0);
     if (pts.length == 1) {
       return _NearestResult(pts.first, _haversine(pos, pts.first), 0.0);
     }
 
     double minDist = double.infinity;
-    LatLng nearestPt = pts.first;
+    RoutePoint nearestPt = pts.first;
     double nearestCum = 0.0;
 
     for (int i = 0; i < pts.length - 1; i++) {
@@ -126,7 +124,8 @@ class RouteProgressEngine {
   /// Returns the closest point on segment [a]→[b] to [p] using an
   /// equirectangular projection — accurate enough for the short polyline
   /// segments produced by the Directions API.
-  static _SegmentResult _closestOnSegment(LatLng p, LatLng a, LatLng b) {
+  static _SegmentResult _closestOnSegment(
+      RoutePoint p, RoutePoint a, RoutePoint b) {
     final abx = b.longitude - a.longitude;
     final aby = b.latitude - a.latitude;
     final apx = p.longitude - a.longitude;
@@ -136,11 +135,11 @@ class RouteProgressEngine {
     final t = ((apx * abx + apy * aby) / ab2).clamp(0.0, 1.0);
     return _SegmentResult(
       t,
-      LatLng(a.latitude + t * aby, a.longitude + t * abx),
+      RoutePoint(latitude: a.latitude + t * aby, longitude: a.longitude + t * abx),
     );
   }
 
-  static double _haversine(LatLng a, LatLng b) {
+  static double _haversine(RoutePoint a, RoutePoint b) {
     const r = 6371000.0;
     final lat1 = a.latitude * pi / 180;
     final lat2 = b.latitude * pi / 180;
@@ -157,7 +156,7 @@ class RouteProgressEngine {
 
 class _NearestResult {
   const _NearestResult(this.point, this.distToRoute, this.cumulative);
-  final LatLng point;
+  final RoutePoint point;
   final double distToRoute;
   final double cumulative;
 }
@@ -165,5 +164,5 @@ class _NearestResult {
 class _SegmentResult {
   const _SegmentResult(this.t, this.point);
   final double t;
-  final LatLng point;
+  final RoutePoint point;
 }
