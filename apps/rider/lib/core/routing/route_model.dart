@@ -14,6 +14,20 @@ class RouteModel {
     this.steps = const [],
   }) : decodedPolyline = decodePolyline(encodedPolyline);
 
+  /// Bypasses polyline decoding — use in unit tests with known [RoutePoint]
+  /// lists only.
+  RouteModel.fromDecodedPoints({
+    required List<RoutePoint> decodedPoints,
+    required this.distanceMeters,
+    required this.durationSeconds,
+    this.distanceText = '',
+    this.durationText = '',
+    this.bounds,
+    this.legs = const [],
+    this.steps = const [],
+  })  : encodedPolyline = '',
+        decodedPolyline = decodedPoints;
+
   final String encodedPolyline;
 
   /// Decoded once in the constructor — never re-decoded per frame.

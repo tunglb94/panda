@@ -2,49 +2,47 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:rider/core/location/location_engine.dart';
+import 'route_engine.dart';
 import 'route_model.dart';
 import 'route_point.dart';
-import 'route_progress_model.dart';
+import 'route_progress.dart';
 
-/// Continuously matches device GPS position against the active [RouteModel]
-/// and emits [RouteProgressModel] updates via [progressStream].
+/// Continuously matches GPS position against the active [RouteEngine] route
+/// and emits [RouteProgress] updates via [progressStream].
 ///
-/// The engine does NOT start or stop the [LocationEngine] — the caller owns
-/// that lifecycle. Call [start] to begin listening and [stop] / [dispose]
-/// when done.
+/// The engine subscribes to [locationStream] on [start] and unsubscribes on
+/// [stop] / [dispose]. It never owns the [RouteEngine] lifecycle.
 class RouteProgressEngine {
   RouteProgressEngine({
-    required RouteModel route,
-    required LocationEngine locationEngine,
-    double onRouteThresholdMeters = 50.0,
+    required Stream<LocationUpdate> locationStream,
+    required RouteEngine routeEngine,
+    double onRouteThresholdMeters = 30.0,
     double jitterThresholdMeters = 5.0,
-  })  : _route = route,
-        _locationEngine = locationEngine,
+  })  : _locationStream = locationStream,
+        _routeEngine = routeEngine,
         _threshold = onRouteThresholdMeters,
-        _jitter = jitterThresholdMeters {
-    _precompute();
-  }
+        _jitter = jitterThresholdMeters;
 
-  final RouteModel _route;
-  final LocationEngine _locationEngine;
+  final Stream<LocationUpdate> _locationStream;
+  final RouteEngine _routeEngine;
   final double _threshold;
   final double _jitter;
 
-  // Precomputed cumulative distances (metres) from route start to each point.
-  late final List<double> _cumDist;
-  late final double _totalDistance;
-
-  final _ctrl = StreamController<RouteProgressModel>.broadcast();
+  final _ctrl = StreamController<RouteProgress>.broadcast();
   StreamSubscription<LocationUpdate>? _sub;
+
+  RouteModel? _cachedRoute;
+  List<double> _cumDist = const [];
+  double _totalDistance = 0.0;
   RoutePoint? _lastPos;
 
-  Stream<RouteProgressModel> get progressStream => _ctrl.stream;
+  Stream<RouteProgress> get progressStream => _ctrl.stream;
 
-  // ─── Lifecycle ──────────────────────────────────────────────────────────────
+  // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
   void start() {
     if (_sub != null) return;
-    _sub = _locationEngine.locationStream.listen(_onLocationUpdate);
+    _sub = _locationStream.listen(_onLocationUpdate);
   }
 
   void stop() {
@@ -57,73 +55,89 @@ class RouteProgressEngine {
     if (!_ctrl.isClosed) _ctrl.close();
   }
 
-  // ─── Precomputation ──────────────────────────────────────────────────────────
-
-  void _precompute() {
-    final pts = _route.decodedPolyline;
-    _cumDist = List.filled(pts.length, 0.0);
-    for (int i = 1; i < pts.length; i++) {
-      _cumDist[i] = _cumDist[i - 1] + _haversine(pts[i - 1], pts[i]);
-    }
-    _totalDistance = pts.length > 1 ? _cumDist.last : 0.0;
-  }
-
-  // ─── GPS update handler ───────────────────────────────────────────────────────
+  // ─── GPS update handler ──────────────────────────────────────────────────────
 
   void _onLocationUpdate(LocationUpdate update) {
     if (_ctrl.isClosed) return;
+
+    final route = _routeEngine.currentRoute;
+    if (route == null) return;
+
+    // Recompute cumulative distances only when the route object changes.
+    if (!identical(route, _cachedRoute)) {
+      _cachedRoute = route;
+      _rebuildCumulativeDistances(route);
+      _lastPos = null; // reset jitter baseline on new route
+    }
+
     final pos = RoutePoint(latitude: update.latitude, longitude: update.longitude);
 
-    // Ignore GPS jitter — don't recompute if barely moved.
+    // Suppress GPS jitter — skip if position hasn't moved meaningfully.
     if (_lastPos != null && _haversine(_lastPos!, pos) < _jitter) return;
     _lastPos = pos;
 
-    final nearest = _findNearest(pos);
+    final nearest = _findNearest(pos, route);
     final progress = _totalDistance > 0
         ? (nearest.cumulative / _totalDistance).clamp(0.0, 1.0)
         : 0.0;
+    final completedMeters = nearest.cumulative.round();
     final remainingMeters =
         (_totalDistance - nearest.cumulative).clamp(0.0, double.infinity).round();
-    final remainingSecs = (_route.durationSeconds * (1.0 - progress)).round();
+    final remainingSecs = (route.durationSeconds * (1.0 - progress)).round();
 
-    _ctrl.add(RouteProgressModel(
+    _ctrl.add(RouteProgress(
       progressPercent: progress,
-      remainingDistance: remainingMeters,
-      remainingDuration: remainingSecs,
+      travelledMeters: completedMeters,
+      remainingMeters: remainingMeters,
+      completedDistanceMeters: completedMeters,
+      remainingDurationSeconds: remainingSecs,
+      nearestRouteIndex: nearest.segmentIndex,
       isOnRoute: nearest.distToRoute < _threshold,
-      nearestRoutePoint: nearest.point,
     ));
   }
 
-  // ─── Geometry ─────────────────────────────────────────────────────────────────
+  // ─── Precomputation ──────────────────────────────────────────────────────────
 
-  _NearestResult _findNearest(RoutePoint pos) {
-    final pts = _route.decodedPolyline;
-    if (pts.isEmpty) return _NearestResult(pos, double.infinity, 0.0);
+  void _rebuildCumulativeDistances(RouteModel route) {
+    final pts = route.decodedPolyline;
+    if (pts.length < 2) {
+      _cumDist = pts.isEmpty ? const [] : [0.0];
+      _totalDistance = 0.0;
+      return;
+    }
+    final d = List<double>.filled(pts.length, 0.0);
+    for (int i = 1; i < pts.length; i++) {
+      d[i] = d[i - 1] + _haversine(pts[i - 1], pts[i]);
+    }
+    _cumDist = d;
+    _totalDistance = d.last;
+  }
+
+  // ─── Geometry ────────────────────────────────────────────────────────────────
+
+  _NearestResult _findNearest(RoutePoint pos, RouteModel route) {
+    final pts = route.decodedPolyline;
+    if (pts.isEmpty) return _NearestResult(0, double.infinity, 0.0);
     if (pts.length == 1) {
-      return _NearestResult(pts.first, _haversine(pos, pts.first), 0.0);
+      return _NearestResult(0, _haversine(pos, pts.first), 0.0);
     }
 
     double minDist = double.infinity;
-    RoutePoint nearestPt = pts.first;
-    double nearestCum = 0.0;
+    int bestIndex = 0;
+    double bestCum = 0.0;
 
     for (int i = 0; i < pts.length - 1; i++) {
       final sr = _closestOnSegment(pos, pts[i], pts[i + 1]);
       final d = _haversine(pos, sr.point);
       if (d < minDist) {
         minDist = d;
-        nearestPt = sr.point;
-        // Interpolate cumulative distance within the segment.
-        nearestCum = _cumDist[i] + sr.t * (_cumDist[i + 1] - _cumDist[i]);
+        bestIndex = i;
+        bestCum = _cumDist[i] + sr.t * (_cumDist[i + 1] - _cumDist[i]);
       }
     }
-    return _NearestResult(nearestPt, minDist, nearestCum);
+    return _NearestResult(bestIndex, minDist, bestCum);
   }
 
-  /// Returns the closest point on segment [a]→[b] to [p] using an
-  /// equirectangular projection — accurate enough for the short polyline
-  /// segments produced by the Directions API.
   static _SegmentResult _closestOnSegment(
       RoutePoint p, RoutePoint a, RoutePoint b) {
     final abx = b.longitude - a.longitude;
@@ -131,11 +145,14 @@ class RouteProgressEngine {
     final apx = p.longitude - a.longitude;
     final apy = p.latitude - a.latitude;
     final ab2 = abx * abx + aby * aby;
-    if (ab2 < 1e-18) return _SegmentResult(0.0, a); // zero-length segment
+    if (ab2 < 1e-18) return _SegmentResult(0.0, a);
     final t = ((apx * abx + apy * aby) / ab2).clamp(0.0, 1.0);
     return _SegmentResult(
       t,
-      RoutePoint(latitude: a.latitude + t * aby, longitude: a.longitude + t * abx),
+      RoutePoint(
+        latitude: a.latitude + t * aby,
+        longitude: a.longitude + t * abx,
+      ),
     );
   }
 
@@ -155,8 +172,8 @@ class RouteProgressEngine {
 // ─── Internal result types ────────────────────────────────────────────────────
 
 class _NearestResult {
-  const _NearestResult(this.point, this.distToRoute, this.cumulative);
-  final RoutePoint point;
+  const _NearestResult(this.segmentIndex, this.distToRoute, this.cumulative);
+  final int segmentIndex;
   final double distToRoute;
   final double cumulative;
 }

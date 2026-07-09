@@ -2,7 +2,8 @@
 Last updated: 2026-07-09 by Principal Engineer AI
 
 ## Current Phase
-Phase 32 — Route Engine & Map Matching Foundation (COMPLETE — flutter analyze pending on home machine)
+Phase 33 — Route Progress Engine (COMPLETE — flutter analyze pending on home machine)
+Previous: Phase 32 — Route Engine & Map Matching Foundation (COMPLETE — flutter analyze pending on home machine)
 Previous: Phase 31 — Production Location Engine Foundation (COMPLETE — flutter analyze pending on home machine)
 Previous: Phase 30 — First Ride Completion (COMPLETE)
 Previous: Phase 29 — Real Ride Booking (COMPLETE — compile regression fixed in Phase 30)
@@ -2005,6 +2006,38 @@ Provider-independent Route Engine for the Rider App. The application no longer d
 
 ### Constraints respected (NOT implemented)
 Map Matching algorithm, Route Snapping, Traffic, ETA, Alternative routes, Rerouting, H3, Redis GEO, Geohash, Dispatch, Navigation voice, Lane guidance, Speed limit.
+
+### Test results
+- `flutter analyze` — PENDING (home machine)
+
+---
+
+## Phase 33 — Route Progress Engine (COMPLETE — flutter analyze pending)
+
+Provider-independent, stream-driven `RouteProgressEngine` for the Rider App. Engine reads the active route from `RouteEngine` (no constructor route param), subscribes to any `Stream<LocationUpdate>`, and emits `RouteProgress` snapshots.
+
+### Key design decisions
+- Constructor: `RouteProgressEngine({required Stream<LocationUpdate> locationStream, required RouteEngine routeEngine, double onRouteThresholdMeters = 30.0, double jitterThresholdMeters = 5.0})`
+- Route change detected via `!identical(route, _cachedRoute)` — triggers `_rebuildCumulativeDistances`, O(n) once per route change
+- Per-GPS-update cost: O(n) segment scan; returns `_NearestResult(segmentIndex, distToRoute, cumulative)`
+- Off-route threshold: 30 m (was 50 m in Phase 27)
+- Engine created once in `MapPage.initState`, not per-route-load
+- `_progressEngine.stop()` / `.start()` for battery management; `dispose()` in `MapPage.dispose()`
+
+### New files
+| File | Purpose |
+|---|---|
+| `apps/rider/lib/core/routing/route_progress.dart` | `RouteProgress` immutable value type (replaces `RouteProgressModel`) |
+| `apps/rider/test/core/routing/route_progress_engine_test.dart` | 6 unit tests: start→0%, mid→50%, end→100%, off-route, remainingMeters decreases, no route→no emission |
+
+### Modified files
+| File | Change |
+|---|---|
+| `apps/rider/lib/core/routing/route_progress_engine.dart` | Full rewrite: new constructor, `RouteEngine` dep, `RouteProgress` output, `_NearestResult` uses `segmentIndex` |
+| `apps/rider/lib/core/routing/route_progress_model.dart` | Replaced with barrel: `export 'route_progress.dart'` |
+| `apps/rider/lib/core/routing/map_matcher.dart` | `RouteProgressModel` → `RouteProgress` in `RouteProgressCalculator.calculate` |
+| `apps/rider/lib/core/routing/route_model.dart` | Added `RouteModel.fromDecodedPoints` factory constructor (test-only; bypasses polyline decoding) |
+| `apps/rider/lib/features/map/presentation/pages/map_page.dart` | Engine created in `initState`; `RouteProgress?` type; field names `remainingMeters`/`remainingDurationSeconds` |
 
 ### Test results
 - `flutter analyze` — PENDING (home machine)

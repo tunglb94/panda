@@ -8,10 +8,9 @@ import 'package:rider/core/location/location_engine.dart';
 import 'package:rider/core/location/location_engine_config.dart';
 import 'package:rider/core/network/api_client.dart';
 import 'package:rider/core/routing/route_engine.dart';
-import 'package:rider/core/routing/route_model.dart';
 import 'package:rider/core/routing/route_point.dart';
+import 'package:rider/core/routing/route_progress.dart';
 import 'package:rider/core/routing/route_progress_engine.dart';
-import 'package:rider/core/routing/route_progress_model.dart';
 import 'package:rider/core/routing/route_provider.dart';
 import 'package:rider/features/booking/presentation/widgets/booking_bottom_sheet.dart';
 import 'package:rider/features/map/data/driver_tracking_repository.dart';
@@ -71,11 +70,11 @@ class MapPageState extends State<MapPage> {
   // — Route engine (Phase 32) ──────────────────────────────────────────────────
   late final RouteEngine _routeEngine;
 
-  // — Route progress (Phase 27) ————————————————————————————————————————————————
+  // — Route progress (Phase 33) ————————————————————————————————————————————————
   late final LocationEngine _locationEngine;
-  RouteProgressEngine? _progressEngine;
-  StreamSubscription<RouteProgressModel>? _progressSub;
-  RouteProgressModel? _routeProgress;
+  late final RouteProgressEngine _progressEngine;
+  StreamSubscription<RouteProgress>? _progressSub;
+  RouteProgress? _routeProgress;
 
   // — Driver tracking (Phase 25) ————————————————————————————————————————————————
   late final DriverTrackingRepository _trackingRepo;
@@ -93,6 +92,10 @@ class MapPageState extends State<MapPage> {
     _locationEngine = LocationEngine(
       config: const LocationEngineConfig(distanceFilter: 5.0),
     );
+    _progressEngine = RouteProgressEngine(
+      locationStream: _locationEngine.locationStream,
+      routeEngine: _routeEngine,
+    );
     _trackingRepo = DriverTrackingRepository(apiClient: widget.apiClient);
     _resolveLocation();
   }
@@ -100,7 +103,7 @@ class MapPageState extends State<MapPage> {
   @override
   void dispose() {
     _progressSub?.cancel();
-    _progressEngine?.dispose();
+    _progressEngine.dispose();
     _routeEngine.dispose();
     _locationEngine.dispose();
     _stopTracking();
@@ -309,35 +312,29 @@ class MapPageState extends State<MapPage> {
         };
         _routeLoading = false;
       });
-      _startProgressTracking(route);
+      _startProgressTracking();
     } catch (_) {
       if (!mounted) return;
       setState(() => _routeLoading = false);
     }
   }
 
-  void _startProgressTracking(RouteModel route) {
+  void _startProgressTracking() {
     _stopProgressTracking();
     if (_locationEngine.state == LocationEngineState.stopped) {
       unawaited(_locationEngine.start());
     }
-    final engine = RouteProgressEngine(
-      route: route,
-      locationEngine: _locationEngine,
-    );
-    _progressEngine = engine;
-    _progressSub = engine.progressStream.listen((p) {
+    _progressSub = _progressEngine.progressStream.listen((p) {
       if (!mounted) return;
       setState(() => _routeProgress = p);
     });
-    engine.start();
+    _progressEngine.start();
   }
 
   void _stopProgressTracking() {
     _progressSub?.cancel();
     _progressSub = null;
-    _progressEngine?.dispose();
-    _progressEngine = null;
+    _progressEngine.stop();
     _locationEngine.stop();
   }
 
@@ -515,7 +512,7 @@ class _SelectionPanel extends StatelessWidget {
   final String? routeDistanceText;
   final String? routeDurationText;
   final bool routeLoading;
-  final RouteProgressModel? routeProgress;
+  final RouteProgress? routeProgress;
 
   @override
   Widget build(BuildContext context) {
@@ -753,7 +750,7 @@ class _PointRow extends StatelessWidget {
 class _RouteProgressBar extends StatelessWidget {
   const _RouteProgressBar({required this.progress});
 
-  final RouteProgressModel progress;
+  final RouteProgress progress;
 
   @override
   Widget build(BuildContext context) {
@@ -779,11 +776,11 @@ class _RouteProgressBar extends StatelessWidget {
           children: [
             Icon(Icons.route, size: 16, color: Colors.grey.shade600),
             const SizedBox(width: 6),
-            Text(_formatDistance(progress.remainingDistance), style: textStyle),
+            Text(_formatDistance(progress.remainingMeters), style: textStyle),
             const SizedBox(width: 16),
             Icon(Icons.access_time, size: 16, color: Colors.grey.shade600),
             const SizedBox(width: 6),
-            Text(_formatDuration(progress.remainingDuration), style: textStyle),
+            Text(_formatDuration(progress.remainingDurationSeconds), style: textStyle),
             const Spacer(),
             if (!progress.isOnRoute)
               Text(

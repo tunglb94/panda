@@ -1,6 +1,6 @@
 import 'route_model.dart';
 import 'route_point.dart';
-import 'route_progress_model.dart';
+import 'route_progress.dart';
 
 /// Snaps a raw GPS fix onto the nearest road in the route network.
 ///
@@ -22,7 +22,7 @@ abstract interface class RouteProjection {
 ///
 /// Not implemented in Phase 32 — algorithms deferred to a future phase.
 abstract interface class RouteProgressCalculator {
-  Future<RouteProgressModel> calculate({
+  Future<RouteProgress> calculate({
     required RoutePoint position,
     required RouteModel route,
     required int elapsedSeconds,
