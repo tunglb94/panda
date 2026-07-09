@@ -2,7 +2,8 @@
 Last updated: 2026-07-09 by Principal Engineer AI
 
 ## Current Phase
-Phase 33 — Route Progress Engine (COMPLETE — flutter analyze pending on home machine)
+Phase 34 — Map Matching Engine (COMPLETE — flutter analyze + flutter test pending on home machine)
+Previous: Phase 33 — Route Progress Engine (COMPLETE — flutter analyze pending on home machine)
 Previous: Phase 32 — Route Engine & Map Matching Foundation (COMPLETE — flutter analyze pending on home machine)
 Previous: Phase 31 — Production Location Engine Foundation (COMPLETE — flutter analyze pending on home machine)
 Previous: Phase 30 — First Ride Completion (COMPLETE)
@@ -2041,6 +2042,31 @@ Provider-independent, stream-driven `RouteProgressEngine` for the Rider App. Eng
 
 ### Test results
 - `flutter analyze` — PENDING (home machine)
+
+---
+
+## Phase 34 — Map Matching Engine (COMPLETE — flutter analyze + flutter test pending)
+
+Provider-independent, pure-Dart engine that projects each raw GPS fix onto the active route polyline and emits a corrected [MatchedLocation]. Designed to be the single source of truth for all consumers that need position-on-route (ETA, Dispatch, Pricing, Navigation, Analytics).
+
+### Key design decisions
+- Constructor: `MapMatchingEngine({required Stream<LocationUpdate> locationStream, required RouteEngine routeEngine, double matchThresholdMeters = 30.0})`
+- Route change detected via `!identical(route, _cachedRoute)` — triggers O(n) precompute of cumulative distances, amortised over all subsequent updates
+- Per-update cost: O(n) segment scan; exact perpendicular projection (dot product in degree-space, then haversine for metric distance)
+- When `distanceFromRouteMeters > 30 m`: `isMatched = false`, `matchedPoint = originalPoint` (no rerouting)
+- `progressMeters` / `progressPercent` always reflect the projection even when `isMatched = false`
+- No Kalman filter, no HMM, no external API, no Flutter dependency
+
+### New files
+| File | Purpose |
+|---|---|
+| `apps/rider/lib/core/routing/matched_location.dart` | `MatchedLocation` immutable value type (8 fields) |
+| `apps/rider/lib/core/routing/map_matching_engine.dart` | `MapMatchingEngine` — stream-in / stream-out, broadcast `Stream<MatchedLocation>` |
+| `apps/rider/test/core/routing/map_matching_engine_test.dart` | 7 unit tests: straight line, curved route, on-route, 10m, 100m, end-of-route, no-route |
+
+### Test results
+- `flutter analyze` — PENDING (home machine)
+- `flutter test` — PENDING (home machine)
 
 ---
 
