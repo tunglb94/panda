@@ -2,7 +2,8 @@
 Last updated: 2026-07-09 by Principal Engineer AI
 
 ## Current Phase
-Phase B1 — Mock Payment Flow (COMPLETE — backend tests + flutter analyze pending on home machine)
+Phase B2 — Wallet Foundation (COMPLETE — 62/62 tests pass)
+Previous: Phase B1 — Mock Payment Flow (COMPLETE — backend tests + flutter analyze pending on home machine)
 Previous: Phase 34 — Map Matching Engine (COMPLETE — flutter analyze + flutter test pending on home machine)
 Previous: Phase 33 — Route Progress Engine (COMPLETE — flutter analyze pending on home machine)
 Previous: Phase 32 — Route Engine & Map Matching Foundation (COMPLETE — flutter analyze pending on home machine)
@@ -2068,6 +2069,79 @@ Provider-independent, pure-Dart engine that projects each raw GPS fix onto the a
 ### Test results
 - `flutter analyze` — PENDING (home machine)
 - `flutter test` — PENDING (home machine)
+
+---
+
+## Phase B2 — Wallet Foundation (COMPLETE — 2026-07-09)
+
+### Domain model
+
+**`services/wallet/domain/entity/`**
+
+| File | Entity | Key rules |
+|---|---|---|
+| `wallet.go` | `Wallet` | Types: `rider`, `driver`, `platform`; no balance field — balance always derived from ledger via `ComputeBalance([]LedgerEntry)` |
+| `ledger_entry.go` | `LedgerEntry` | Immutable (no UpdatedAt); `AmountCents` always > 0; `Direction`: `credit` or `debit`; signed value = direction × amount |
+| `transaction.go` | `Transaction` | Immutable; Types: `trip_payment`, `trip_earnings`, `platform_commission`, `refund`, `adjustment`; groups 1+ ledger entries |
+
+**`ComputeBalance` invariant:** Sums credits, subtracts debits. Returns error if any entry has a mismatched `WalletID` or `Currency`. Empty ledger → 0 (new wallet).
+
+### Repository interfaces (no implementations in B2)
+
+| Interface | Methods |
+|---|---|
+| `WalletRepository` | `Save`, `FindByID`, `FindByOwnerID` |
+| `LedgerEntryRepository` | `Save`, `FindByWalletID`, `FindByTransactionID` |
+| `TransactionRepository` | `Save`, `FindByID`, `FindByReferenceID` |
+
+`LedgerEntryRepository.Save` is append-only (returns `CodeAlreadyExists` if EntryID exists).
+`TransactionRepository.Save` is append-only.
+
+### Use cases (read-only in B2)
+
+| Use case | Input | Output |
+|---|---|---|
+| `GetWalletUseCase` | `ownerID` | `*entity.Wallet` |
+| `GetBalanceUseCase` | `ownerID` | `*GetBalanceResult{WalletID, OwnerID, BalanceCents, Currency}` |
+| `GetLedgerUseCase` | `walletID` | `[]entity.LedgerEntry` |
+| `GetTransactionUseCase` | `transactionID` | `*GetTransactionResult{Transaction, Entries}` |
+
+### Proto contract
+
+`proto/wallet/v1/wallet.proto` — `WalletService` with 4 RPCs:
+- `GetWallet(GetWalletRequest)` → `WalletResponse`
+- `GetBalance(GetBalanceRequest)` → `BalanceResponse{wallet_id, owner_id, balance_cents, currency}`
+- `GetLedger(GetLedgerRequest)` → `LedgerResponse{entries[]}`
+- `GetTransaction(GetTransactionRequest)` → `TransactionResponse{transaction, entries[]}`
+
+Generated: `services/wallet/grpc/walletpb/wallet.pb.go` + `wallet_grpc.pb.go`
+
+### gRPC handler
+
+`services/wallet/grpc/handler.go` — `Handler` embeds `UnimplementedWalletServiceServer`; 4 RPC methods + `toWalletProto`, `toLedgerEntryProto`, `toTransactionProto`, `toGRPCError`.
+
+### go.mod
+
+Added `grpc v1.64.0`, `protobuf v1.34.2`, `shared v0.0.0` to `services/wallet/go.mod`. No pgx (no persistence in B2).
+
+### Test results
+
+```
+ok  github.com/fairride/wallet/app             (15 tests)
+ok  github.com/fairride/wallet/domain/entity   (35 tests)
+ok  github.com/fairride/wallet/grpc            (12 tests)
+```
+**62/62 pass, -race clean.**
+
+### What is NOT in B2 (by design)
+- No PostgreSQL implementation
+- No settlement, topup, withdrawal, refund execution
+- No QR, VNPay, MoMo, Stripe
+- No HTTP endpoint
+- cmd/server/main.go: `server.Run("wallet", nil)` (Phase 1 skeleton)
+
+### Next phase suggestion
+Phase B3 — Wallet Persistence: PostgreSQL `wallets`, `ledger_entries`, `transactions` tables + repository implementations + integration tests.
 
 ---
 

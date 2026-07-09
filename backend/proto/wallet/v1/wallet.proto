@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package wallet.v1;
+
+option go_package = "github.com/fairride/wallet/grpc/walletpb";
+
+import "google/protobuf/timestamp.proto";
+
+// WalletService exposes read-only wallet data.
+// Write operations (settlement, topup, withdrawal) are added in later phases.
+service WalletService {
+  // GetWallet returns the wallet for an owner (rider, driver, or platform).
+  rpc GetWallet(GetWalletRequest) returns (WalletResponse);
+
+  // GetBalance returns the computed balance derived from the ledger.
+  rpc GetBalance(GetBalanceRequest) returns (BalanceResponse);
+
+  // GetLedger returns all ledger entries for a wallet.
+  rpc GetLedger(GetLedgerRequest) returns (LedgerResponse);
+
+  // GetTransaction returns a transaction and its associated ledger entries.
+  rpc GetTransaction(GetTransactionRequest) returns (TransactionResponse);
+}
+
+// ─── Requests ─────────────────────────────────────────────────────────────────
+
+message GetWalletRequest {
+  string owner_id = 1;
+}
+
+message GetBalanceRequest {
+  string owner_id = 1;
+}
+
+message GetLedgerRequest {
+  string wallet_id = 1;
+}
+
+message GetTransactionRequest {
+  string transaction_id = 1;
+}
+
+// ─── Responses ────────────────────────────────────────────────────────────────
+
+message WalletResponse {
+  WalletProto wallet = 1;
+}
+
+message BalanceResponse {
+  string wallet_id     = 1;
+  string owner_id      = 2;
+  int64  balance_cents = 3; // may be negative (overdraft possible in theory)
+  string currency      = 4;
+}
+
+message LedgerResponse {
+  repeated LedgerEntryProto entries = 1;
+}
+
+message TransactionResponse {
+  TransactionProto          transaction = 1;
+  repeated LedgerEntryProto entries     = 2;
+}
+
+// ─── Payloads ─────────────────────────────────────────────────────────────────
+
+message WalletProto {
+  string wallet_id   = 1;
+  string owner_id    = 2;
+  string wallet_type = 3; // "rider" | "driver" | "platform"
+  string currency    = 4; // ISO 4217 code e.g. "USD"
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message LedgerEntryProto {
+  string entry_id       = 1;
+  string wallet_id      = 2;
+  string transaction_id = 3;
+  string direction      = 4; // "credit" | "debit"
+  int64  amount_cents   = 5; // always positive; direction carries sign
+  string currency       = 6;
+  string description    = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+message TransactionProto {
+  string transaction_id = 1;
+  string type           = 2; // e.g. "trip_payment", "trip_earnings"
+  string reference_id   = 3; // e.g. trip_id
+  string currency       = 4;
+  string description    = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
