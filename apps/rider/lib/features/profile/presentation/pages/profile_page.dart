@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:rider/core/auth/auth_state.dart';
+import 'package:rider/core/network/api_client.dart';
+import 'package:rider/core/storage/token_storage.dart';
 import 'package:rider/features/history/presentation/pages/trip_history_page.dart';
 
 import '../../domain/models/mock_notification_repository.dart';
@@ -17,7 +20,16 @@ import 'settings_page.dart';
 /// screen has a genuine Loading → Success transition. All data is mock; see
 /// `docs/project/MVP_DEVELOPMENT_PLAN.md` Rider App Roadmap stage R8.
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({
+    super.key,
+    required this.authState,
+    required this.tokenStorage,
+    required this.apiClient,
+  });
+
+  final AuthState authState;
+  final TokenStorage tokenStorage;
+  final ApiClient apiClient;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -109,8 +121,30 @@ class _ProfilePageState extends State<ProfilePage> {
                       title: const Text('Trip History'),
                       trailing: const Icon(Icons.chevron_right, color: Colors.grey),
                       onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const TripHistoryPage()),
+                        MaterialPageRoute(
+                          builder: (_) => TripHistoryPage(apiClient: widget.apiClient),
+                        ),
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    ListTile(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      leading: Icon(
+                        Icons.logout,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      title: Text(
+                        'Sign Out',
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error),
+                      ),
+                      onTap: () async {
+                        await widget.authState.logout(widget.tokenStorage);
+                        // GoRouter's refreshListenable redirects to /login.
+                      },
                     ),
                   ],
                 ),

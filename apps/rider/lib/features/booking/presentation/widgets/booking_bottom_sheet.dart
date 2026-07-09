@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:rider/core/network/api_client.dart';
 import 'package:rider/features/map/domain/models/trip_selection.dart';
 
 import 'booking_form_body.dart';
@@ -15,6 +16,8 @@ class BookingBottomSheet {
   static Future<void> show(
     BuildContext context, {
     required TripSelection tripSelection,
+    required ApiClient apiClient,
+    void Function(String driverId)? onDriverAssigned,
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -49,7 +52,11 @@ class BookingBottomSheet {
                       ),
                     ),
                   ),
-                  BookingFormBody(tripSelection: tripSelection),
+                  BookingFormBody(
+                    tripSelection: tripSelection,
+                    apiClient: apiClient,
+                    onDriverAssigned: onDriverAssigned,
+                  ),
                 ],
               ),
             ),

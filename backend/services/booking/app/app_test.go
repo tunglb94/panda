@@ -98,6 +98,21 @@ func (s *stubTrip) PayTrip(_ context.Context, tripID, method string) (*app.TripI
 	return t, nil
 }
 
+func (s *stubTrip) MarkDriverArrived(_ context.Context, tripID string) error {
+	if t, ok := s.trips[tripID]; ok {
+		t.Status = "driver_arrived"
+	}
+	return nil
+}
+
+func (s *stubTrip) ListByRider(_ context.Context, _ string) ([]app.TripSummary, error) {
+	return nil, nil
+}
+
+func (s *stubTrip) ListByDriver(_ context.Context, _ string) ([]app.TripSummary, error) {
+	return nil, nil
+}
+
 type stubDispatch struct {
 	jobs       map[string]*app.DispatchInfo
 	acceptErr  error

@@ -47,6 +47,16 @@ func (r *stubRepo) FindByRiderID(_ context.Context, riderID string) ([]*entity.T
 	return out, nil
 }
 
+func (r *stubRepo) FindByDriverID(_ context.Context, driverID string) ([]*entity.Trip, error) {
+	var out []*entity.Trip
+	for _, t := range r.trips {
+		if t.DriverID == driverID {
+			out = append(out, t)
+		}
+	}
+	return out, nil
+}
+
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 var testNow = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -56,10 +66,13 @@ func newHandler(repo *stubRepo) *tripgrpc.Handler {
 		app.NewCreateTripUseCase(repo),
 		app.NewCancelTripUseCase(repo),
 		app.NewGetTripUseCase(repo),
+		app.NewMarkDriverArrivedUseCase(repo),
 		app.NewStartTripUseCase(repo),
 		app.NewCompleteTripUseCase(repo),
 		app.NewInitiatePaymentUseCase(repo),
 		app.NewPayTripUseCase(repo),
+		app.NewListTripsByRiderUseCase(repo),
+		app.NewListTripsByDriverUseCase(repo),
 	)
 }
 

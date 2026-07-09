@@ -4,19 +4,18 @@ import 'package:rider/features/booking/domain/models/mock_booking_catalog.dart';
 import 'package:rider/features/booking/domain/models/mock_fare_calculator.dart';
 import 'package:rider/features/map/domain/models/trip_selection.dart';
 
-import '../../domain/models/mock_trip_catalog.dart';
+import '../../domain/models/driver_profile.dart';
 import '../../domain/models/rider_trip_status.dart';
 import 'driver_arriving_view.dart';
 import 'driver_assigned_view.dart';
 import 'searching_driver_view.dart';
+import 'trip_cancelled_view.dart';
 import 'trip_completed_view.dart';
 import 'trip_in_progress_view.dart';
 
 /// Renders a single [RiderTripStatus] view in isolation, wrapped in its own
-/// `Scaffold`, using sample data from the Booking module. This is the
-/// "independently previewable for development" entry point requested for
-/// Phase R-02 — reachable from `TripPreviewMenuPage` without needing to run
-/// the full mock lifecycle.
+/// `Scaffold`, using sample data from the Booking module. Reachable from
+/// `TripPreviewMenuPage` without needing to run the full lifecycle.
 class TripStatePreviewPage extends StatelessWidget {
   const TripStatePreviewPage({super.key, required this.status});
 
@@ -32,7 +31,12 @@ class TripStatePreviewPage extends StatelessWidget {
       distanceKm: 6.4,
       durationMin: 14,
     );
-    final driver = MockTripCatalog.sampleDriver;
+    const driver = DriverProfile(
+      vehicleBrand: 'Toyota',
+      vehicleModel: 'Vios',
+      vehicleColor: 'White',
+      plateNumber: '51G-123.45',
+    );
 
     return Scaffold(
       appBar: AppBar(title: Text('${status.label} (Preview)')),
@@ -64,7 +68,10 @@ class TripStatePreviewPage extends StatelessWidget {
                 RiderTripStatus.completed => TripCompletedView(
                     tripSelection: _sampleTrip,
                     driver: driver,
-                    fare: fare,
+                    fareText: fare.format(fare.totalCents),
+                    onDone: () => Navigator.of(context).pop(),
+                  ),
+                RiderTripStatus.cancelled => TripCancelledView(
                     onDone: () => Navigator.of(context).pop(),
                   ),
               },

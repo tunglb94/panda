@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:rider/core/network/api_client.dart';
 import 'package:rider/features/booking/domain/models/mock_booking_catalog.dart';
 import 'package:rider/features/booking/presentation/widgets/booking_form_body.dart';
 import 'package:rider/features/map/domain/models/trip_selection.dart';
@@ -8,12 +9,16 @@ import 'package:rider/features/map/domain/models/trip_selection.dart';
 ///
 /// If reached from the Map page's confirmed pickup/destination selection,
 /// [tripSelection] carries the real selection over. Otherwise a sample
-/// selection is used so this screen is always demoable on its own — see
-/// `docs/project/MVP_DEVELOPMENT_PLAN.md` Rider App Roadmap stage R4/R-01.
+/// selection is used so this screen is always demoable on its own.
 class BookingPage extends StatelessWidget {
-  const BookingPage({super.key, this.tripSelection});
+  const BookingPage({
+    super.key,
+    this.tripSelection,
+    required this.apiClient,
+  });
 
   final TripSelection? tripSelection;
+  final ApiClient apiClient;
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +31,10 @@ class BookingPage extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 480),
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              child: BookingFormBody(tripSelection: trip),
+              child: BookingFormBody(
+                tripSelection: trip,
+                apiClient: apiClient,
+              ),
             ),
           ),
         ),

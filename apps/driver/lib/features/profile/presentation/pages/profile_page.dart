@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 
-import 'developer_page.dart';
+import '../../../../core/network/api_client.dart';
 
-/// Profile tab placeholder. The only functional entry point in this phase
-/// is "Developer" (Development Utilities requirement) — everything else
-/// about the driver's own profile arrives in a future phase, alongside
-/// `apps/rider`'s equivalent Profile module.
+import 'developer_page.dart';
+import 'driver_trip_history_page.dart';
+
 class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({super.key, required this.apiClient});
+
+  final ApiClient apiClient;
 
   @override
   Widget build(BuildContext context) {
@@ -38,6 +39,21 @@ class ProfilePage extends StatelessWidget {
                     style: TextStyle(color: Colors.grey.shade500),
                   ),
                   const SizedBox(height: 24),
+                  ListTile(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    leading: Icon(Icons.receipt_long_outlined, color: primary),
+                    title: const Text('Trip History'),
+                    trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => DriverTripHistoryPage(apiClient: apiClient),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   ListTile(
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),

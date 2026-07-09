@@ -152,3 +152,99 @@ func TestLogin_DBNotConfigured(t *testing.T) {
 		t.Errorf("status = %d, want 503", w.Code)
 	}
 }
+
+// ─── RiderLogin tests ──────────────────────────────────────────────────────────
+
+func testRider() *identityentity.User {
+	return identityentity.ReconstituteUser(
+		"user-002", "+9876543210", "Test Rider", "",
+		identityentity.TypeRider, identityentity.StatusActive,
+		"role-002", time.Now(), time.Now(),
+	)
+}
+
+func TestRiderLogin_Success(t *testing.T) {
+	h, uf, _ := newAuthHandler(t)
+	uf.user = testRider()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/rider/login",
+		strings.NewReader(`{"phone":"+9876543210"}`))
+	w := httptest.NewRecorder()
+	h.RiderLogin(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 — body: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["access_token"] == "" {
+		t.Error("expected non-empty access_token")
+	}
+	if resp["rider_id"] != "user-002" {
+		t.Errorf("rider_id = %q, want user-002", resp["rider_id"])
+	}
+	if _, hasDriverID := resp["driver_id"]; hasDriverID {
+		t.Error("response must not contain driver_id")
+	}
+}
+
+func TestRiderLogin_MissingPhone(t *testing.T) {
+	h, _, _ := newAuthHandler(t)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/rider/login",
+		strings.NewReader(`{}`))
+	w := httptest.NewRecorder()
+	h.RiderLogin(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", w.Code)
+	}
+}
+
+func TestRiderLogin_BlankPhone(t *testing.T) {
+	h, _, _ := newAuthHandler(t)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/rider/login",
+		strings.NewReader(`{"phone":"  "}`))
+	w := httptest.NewRecorder()
+	h.RiderLogin(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", w.Code)
+	}
+}
+
+func TestRiderLogin_UserNotFound(t *testing.T) {
+	h, uf, _ := newAuthHandler(t)
+	uf.err = domainerrors.NotFound("user not found")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/rider/login",
+		strings.NewReader(`{"phone":"+1"}`))
+	w := httptest.NewRecorder()
+	h.RiderLogin(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", w.Code)
+	}
+}
+
+func TestRiderLogin_NotARider(t *testing.T) {
+	h, uf, _ := newAuthHandler(t)
+	uf.user = testUser() // TypeDriver user
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/rider/login",
+		strings.NewReader(`{"phone":"+1234567890"}`))
+	w := httptest.NewRecorder()
+	h.RiderLogin(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404 — body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestRiderLogin_DBNotConfigured(t *testing.T) {
+	h := handlers.NewAuthHandler(nil, nil, newTestTokenService(t))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/rider/login",
+		strings.NewReader(`{"phone":"+1"}`))
+	w := httptest.NewRecorder()
+	h.RiderLogin(w, req)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("status = %d, want 503", w.Code)
+	}
+}

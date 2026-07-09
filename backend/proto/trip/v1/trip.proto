@@ -18,12 +18,28 @@ service TripService {
   // GetTrip returns a trip by its ID.
   rpc GetTrip(GetTripRequest) returns (TripResponse);
 
+  // MarkDriverArrived transitions a trip from DriverAssigned to DriverArrived.
+  rpc MarkDriverArrived(GetTripRequest) returns (TripResponse);
+
   // StartTrip transitions a trip from DriverAssigned/DriverArrived to InProgress.
   rpc StartTrip(StartTripRequest) returns (TripResponse);
 
   // CompleteTrip transitions a trip from InProgress to Completed and records the fare.
   // The caller is responsible for computing the fare before calling this RPC.
   rpc CompleteTrip(CompleteTripRequest) returns (TripResponse);
+
+  // InitiatePayment transitions a completed trip to PaymentPending.
+  rpc InitiatePayment(GetTripRequest) returns (TripResponse);
+
+  // PayTrip processes payment and transitions PaymentPending → Settled.
+  // req.reason carries the payment method ("cash" | "wallet").
+  rpc PayTrip(CancelTripRequest) returns (TripResponse);
+
+  // ListTripsByRider returns all trips for a rider, newest first.
+  rpc ListTripsByRider(ListTripsRequest) returns (TripsResponse);
+
+  // ListTripsByDriver returns all trips for a driver, newest first.
+  rpc ListTripsByDriver(ListTripsRequest) returns (TripsResponse);
 }
 
 // ─── Request messages ────────────────────────────────────────────────────────
@@ -57,6 +73,14 @@ message CompleteTripRequest {
 
 message TripResponse {
   TripProto trip = 1;
+}
+
+message ListTripsRequest {
+  string party_id = 1; // rider_id for ListTripsByRider; driver_id for ListTripsByDriver
+}
+
+message TripsResponse {
+  repeated TripProto trips = 1;
 }
 
 // ─── Shared payload ───────────────────────────────────────────────────────────

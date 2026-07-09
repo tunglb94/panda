@@ -7,7 +7,6 @@ import '../../../../core/auth/auth_state.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/token_storage.dart';
 import '../../../home/data/availability_repository.dart';
-import '../../../location/data/location_upload_repository.dart';
 import '../../../location/services/location_upload_service.dart';
 
 // ─── Location state machine ───────────────────────────────────────────────────
@@ -28,11 +27,13 @@ class MapPage extends StatefulWidget {
     required this.authState,
     required this.tokenStorage,
     required this.apiClient,
+    required this.uploadService,
   });
 
   final AuthState authState;
   final TokenStorage tokenStorage;
   final ApiClient apiClient;
+  final LocationUploadService uploadService;
 
   @override
   State<MapPage> createState() => _MapPageState();
@@ -53,7 +54,6 @@ class _MapPageState extends State<MapPage> {
   String? _availError;
 
   // — Location upload ——————————————————————————————————————————————————————————
-  late final LocationUploadService _uploadService;
   UploadStatus _uploadStatus = UploadStatus.idle;
   StreamSubscription<UploadStatus>? _uploadStatusSub;
 
@@ -63,10 +63,7 @@ class _MapPageState extends State<MapPage> {
   void initState() {
     super.initState();
     _availRepo = AvailabilityRepository(widget.apiClient);
-    _uploadService = LocationUploadService(
-      repository: LocationUploadRepository(apiClient: widget.apiClient),
-    );
-    _uploadStatusSub = _uploadService.statusStream.listen((s) {
+    _uploadStatusSub = widget.uploadService.statusStream.listen((s) {
       if (mounted) setState(() => _uploadStatus = s);
     });
     _resolveLocation();
@@ -76,7 +73,6 @@ class _MapPageState extends State<MapPage> {
   @override
   void dispose() {
     _uploadStatusSub?.cancel();
-    _uploadService.dispose();
     _mapController?.dispose();
     super.dispose();
   }
@@ -132,7 +128,7 @@ class _MapPageState extends State<MapPage> {
     try {
       final result = await _availRepo.getAvailability();
       if (mounted) setState(() => _isOnline = result.isOnline);
-      if (result.isOnline) unawaited(_uploadService.start());
+      if (result.isOnline) unawaited(widget.uploadService.start());
     } catch (_) {
       // Non-fatal — default to offline
     } finally {
@@ -153,9 +149,9 @@ class _MapPageState extends State<MapPage> {
       if (!mounted) return;
       setState(() => _isOnline = result.isOnline);
       if (result.isOnline) {
-        unawaited(_uploadService.start());
+        unawaited(widget.uploadService.start());
       } else {
-        _uploadService.stop();
+        widget.uploadService.stop();
       }
     } on ApiException catch (e) {
       if (mounted) setState(() => _availError = e.message);

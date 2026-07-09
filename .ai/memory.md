@@ -2,7 +2,8 @@
 Last updated: 2026-07-09 by Principal Engineer AI
 
 ## Current Phase
-Phase B2 — Wallet Foundation (COMPLETE — 62/62 tests pass)
+MVP Stabilization (8 features IN PROGRESS — backend COMPLETE, Flutter flutter analyze pending on home machine)
+Previous: Phase B2 — Wallet Foundation (COMPLETE — 62/62 tests pass)
 Previous: Phase B1 — Mock Payment Flow (COMPLETE — backend tests + flutter analyze pending on home machine)
 Previous: Phase 34 — Map Matching Engine (COMPLETE — flutter analyze + flutter test pending on home machine)
 Previous: Phase 33 — Route Progress Engine (COMPLETE — flutter analyze pending on home machine)
@@ -2233,6 +2234,65 @@ Extended the trip lifecycle with `payment_pending → payment_success → settle
 ### Verification
 - Backend: compile + tests PENDING on home machine (gRPC manual extension, schema change)
 - Flutter: `flutter analyze` PENDING on home machine
+
+## MVP Stabilization Phase (IN PROGRESS — 2026-07-09)
+
+8 features targeting production readiness of the active ride flow. Backend COMPLETE + all tests pass. Flutter pending `flutter analyze` on home machine.
+
+### Feature Status
+| # | Feature | Backend | Rider App | Driver App |
+|---|---------|---------|-----------|------------|
+| 1 | Driver Arrived (real API) | ✅ | N/A | ✅ |
+| 2 | Replace Rider Mock Driver | ✅ (gateway) | ✅ | N/A |
+| 3 | Trip History | ✅ | ✅ | ✅ |
+| 4 | Rating (1-5 stars, comment, one submit) | ✅ | ✅ | ✅ |
+| 5 | Better Loading States | N/A | ✅ | ✅ |
+| 6 | Error Handling | N/A | ✅ | ✅ |
+| 7 | Offline Recovery (WidgetsBindingObserver) | N/A | ✅ | ✅ |
+| 8 | Remove Remaining Ride Mocks | N/A | ✅ | N/A |
+
+### Key Backend Files Created/Modified (this phase)
+- `proto/trip/v1/trip.proto` — 10 RPCs (added `MarkDriverArrived`, `ListTripsByRider`, `ListTripsByDriver`)
+- `proto/booking/v1/booking.proto` — 12 RPCs (added `ArriveAtPickup`, `PayRide`, `ListRiderTrips`, `ListDriverTrips`)
+- `proto/review/v1/review.proto` — NEW: `SubmitRating`, `GetTripRating`
+- `services/review/` — NEW service: domain, app, postgres (ratings table + UNIQUE(trip_id,role)), grpc, cmd
+- `services/gateway/http/handlers/driver_profile_handler.go` — GET /api/v1/drivers/{driverID}/profile
+- `services/gateway/http/handlers/rating_handler.go` — POST/GET /api/v1/rides/{tripID}/rate, /rating
+- `services/gateway/http/router.go` — new routes: arrive, rate, rating, profile, rider/trips, driver/trips
+- `services/gateway/cmd/server/main.go` — wired driver profile + review gRPC connections
+
+### Key Flutter Files Created/Modified (this phase)
+- `apps/rider/lib/features/trip/domain/models/driver_profile.dart` — NEW DriverProfile model
+- `apps/rider/lib/features/trip/data/trip_repository.dart` — `fetchDriverProfile`, `submitRating`
+- `apps/rider/lib/features/trip/presentation/pages/trip_lifecycle_page.dart` — DriverProfile fetch, `_PostTripView` (rating+done), `WidgetsBindingObserver`, descriptive payment loading
+- `apps/rider/lib/features/history/presentation/pages/trip_history_page.dart` — REWRITTEN: real API `GET /api/v1/rider/trips`
+- `apps/driver/lib/features/trip/data/active_trip_repository.dart` — `arriveAtPickup`, `isActive` includes driver_arrived
+- `apps/driver/lib/features/trip/presentation/pages/trip_page.dart` — `_actingLabel`, `_LabelledSpinner`, `_TripCompletedCard` stateful with rating, `WidgetsBindingObserver`, `_resumeActiveTrip`, `_submitDriverRating`
+- `apps/driver/lib/features/profile/presentation/pages/driver_trip_history_page.dart` — NEW: real API `GET /api/v1/driver/trips`
+- `apps/driver/lib/features/profile/presentation/pages/profile_page.dart` — Trip History tile, apiClient param
+- `apps/driver/lib/core/router/app_router.dart` — passes apiClient to ProfilePage
+
+### Rating API contract
+- `POST /api/v1/rides/{tripID}/rate` — body: `{"stars": 1-5, "comment": "optional"}`, role=rider/driver from JWT
+- `GET /api/v1/rides/{tripID}/rating?role=rider|driver`
+- One submission only — backend returns `AlreadyExists` (HTTP 409) on duplicate
+- Review service: `services/review/` at `REVIEW_ADDR` gRPC
+
+### Backend: ratings table schema (review service postgres)
+```sql
+CREATE TABLE IF NOT EXISTS ratings (
+    id          TEXT PRIMARY KEY,
+    trip_id     TEXT NOT NULL,
+    role        TEXT NOT NULL,
+    stars       INT NOT NULL,
+    comment     TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(trip_id, role)
+);
+```
+
+### Pending (flutter analyze on home machine)
+- All Flutter changes need `flutter analyze` clean run on home machine
 
 ## Notes
 - Implementation mode began 2026-07-01. Documentation phase paused.

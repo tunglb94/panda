@@ -15,3 +15,13 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+
+## Development Accounts
+
+Seed the local database with `scripts/seed_dev.sql` before first run.
+Auth is password-less — enter only the phone number on the login screen.
+
+| Role   | Phone          | Notes                          |
+|--------|----------------|--------------------------------|
+| Rider  | +84900000001   | Active, default rider role     |
+| Driver | +84900000002   | Active, verified driver profile|

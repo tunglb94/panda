@@ -86,12 +86,15 @@ func register(srv *sharedgrpc.Server, ready *server.ReadinessTracker) {
 		bookRide,
 		acceptOffer,
 		app.NewRejectDispatchOfferUseCase(dispatchAdapter),
+		app.NewArriveAtPickupUseCase(tripAdapter),
 		app.NewStartTripUseCase(tripAdapter),
 		finishTrip,
 		app.NewGetBookingDetailsUseCase(tripAdapter, dispatchAdapter),
 		app.NewGetDriverCurrentOfferUseCase(dispatchAdapter, tripAdapter),
 		app.NewCancelRideUseCase(tripAdapter),
 		app.NewPayRideUseCase(tripAdapter),
+		app.NewListRiderTripsUseCase(tripAdapter),
+		app.NewListDriverTripsUseCase(tripAdapter),
 	)
 	bookingpb.RegisterBookingServiceServer(srv.Inner(), handler)
 }

@@ -18,18 +18,17 @@ import (
 // Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
-// Phase B1: payment RPC method name constants added manually.
 const (
-	TripService_InitiatePayment_FullMethodName = "/trip.v1.TripService/InitiatePayment"
-	TripService_PayTrip_FullMethodName         = "/trip.v1.TripService/PayTrip"
-)
-
-const (
-	TripService_CreateTrip_FullMethodName   = "/trip.v1.TripService/CreateTrip"
-	TripService_CancelTrip_FullMethodName   = "/trip.v1.TripService/CancelTrip"
-	TripService_GetTrip_FullMethodName      = "/trip.v1.TripService/GetTrip"
-	TripService_StartTrip_FullMethodName    = "/trip.v1.TripService/StartTrip"
-	TripService_CompleteTrip_FullMethodName = "/trip.v1.TripService/CompleteTrip"
+	TripService_CreateTrip_FullMethodName        = "/trip.v1.TripService/CreateTrip"
+	TripService_CancelTrip_FullMethodName        = "/trip.v1.TripService/CancelTrip"
+	TripService_GetTrip_FullMethodName           = "/trip.v1.TripService/GetTrip"
+	TripService_MarkDriverArrived_FullMethodName = "/trip.v1.TripService/MarkDriverArrived"
+	TripService_StartTrip_FullMethodName         = "/trip.v1.TripService/StartTrip"
+	TripService_CompleteTrip_FullMethodName      = "/trip.v1.TripService/CompleteTrip"
+	TripService_InitiatePayment_FullMethodName   = "/trip.v1.TripService/InitiatePayment"
+	TripService_PayTrip_FullMethodName           = "/trip.v1.TripService/PayTrip"
+	TripService_ListTripsByRider_FullMethodName  = "/trip.v1.TripService/ListTripsByRider"
+	TripService_ListTripsByDriver_FullMethodName = "/trip.v1.TripService/ListTripsByDriver"
 )
 
 // TripServiceClient is the client API for TripService service.
@@ -42,15 +41,22 @@ type TripServiceClient interface {
 	CancelTrip(ctx context.Context, in *CancelTripRequest, opts ...grpc.CallOption) (*TripResponse, error)
 	// GetTrip returns a trip by its ID.
 	GetTrip(ctx context.Context, in *GetTripRequest, opts ...grpc.CallOption) (*TripResponse, error)
+	// MarkDriverArrived transitions a trip from DriverAssigned to DriverArrived.
+	MarkDriverArrived(ctx context.Context, in *GetTripRequest, opts ...grpc.CallOption) (*TripResponse, error)
 	// StartTrip transitions a trip from DriverAssigned/DriverArrived to InProgress.
 	StartTrip(ctx context.Context, in *StartTripRequest, opts ...grpc.CallOption) (*TripResponse, error)
 	// CompleteTrip transitions a trip from InProgress to Completed and records the fare.
 	// The caller is responsible for computing the fare before calling this RPC.
 	CompleteTrip(ctx context.Context, in *CompleteTripRequest, opts ...grpc.CallOption) (*TripResponse, error)
-	// InitiatePayment transitions a completed trip to payment_pending.
+	// InitiatePayment transitions a completed trip to PaymentPending.
 	InitiatePayment(ctx context.Context, in *GetTripRequest, opts ...grpc.CallOption) (*TripResponse, error)
-	// PayTrip processes mock payment: payment_pending → settled.
+	// PayTrip processes payment and transitions PaymentPending → Settled.
+	// req.reason carries the payment method ("cash" | "wallet").
 	PayTrip(ctx context.Context, in *CancelTripRequest, opts ...grpc.CallOption) (*TripResponse, error)
+	// ListTripsByRider returns all trips for a rider, newest first.
+	ListTripsByRider(ctx context.Context, in *ListTripsRequest, opts ...grpc.CallOption) (*TripsResponse, error)
+	// ListTripsByDriver returns all trips for a driver, newest first.
+	ListTripsByDriver(ctx context.Context, in *ListTripsRequest, opts ...grpc.CallOption) (*TripsResponse, error)
 }
 
 type tripServiceClient struct {
@@ -82,6 +88,15 @@ func (c *tripServiceClient) CancelTrip(ctx context.Context, in *CancelTripReques
 func (c *tripServiceClient) GetTrip(ctx context.Context, in *GetTripRequest, opts ...grpc.CallOption) (*TripResponse, error) {
 	out := new(TripResponse)
 	err := c.cc.Invoke(ctx, TripService_GetTrip_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tripServiceClient) MarkDriverArrived(ctx context.Context, in *GetTripRequest, opts ...grpc.CallOption) (*TripResponse, error) {
+	out := new(TripResponse)
+	err := c.cc.Invoke(ctx, TripService_MarkDriverArrived_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -124,6 +139,24 @@ func (c *tripServiceClient) PayTrip(ctx context.Context, in *CancelTripRequest, 
 	return out, nil
 }
 
+func (c *tripServiceClient) ListTripsByRider(ctx context.Context, in *ListTripsRequest, opts ...grpc.CallOption) (*TripsResponse, error) {
+	out := new(TripsResponse)
+	err := c.cc.Invoke(ctx, TripService_ListTripsByRider_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tripServiceClient) ListTripsByDriver(ctx context.Context, in *ListTripsRequest, opts ...grpc.CallOption) (*TripsResponse, error) {
+	out := new(TripsResponse)
+	err := c.cc.Invoke(ctx, TripService_ListTripsByDriver_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TripServiceServer is the server API for TripService service.
 // All implementations must embed UnimplementedTripServiceServer
 // for forward compatibility
@@ -134,16 +167,22 @@ type TripServiceServer interface {
 	CancelTrip(context.Context, *CancelTripRequest) (*TripResponse, error)
 	// GetTrip returns a trip by its ID.
 	GetTrip(context.Context, *GetTripRequest) (*TripResponse, error)
+	// MarkDriverArrived transitions a trip from DriverAssigned to DriverArrived.
+	MarkDriverArrived(context.Context, *GetTripRequest) (*TripResponse, error)
 	// StartTrip transitions a trip from DriverAssigned/DriverArrived to InProgress.
 	StartTrip(context.Context, *StartTripRequest) (*TripResponse, error)
 	// CompleteTrip transitions a trip from InProgress to Completed and records the fare.
 	// The caller is responsible for computing the fare before calling this RPC.
 	CompleteTrip(context.Context, *CompleteTripRequest) (*TripResponse, error)
-	// InitiatePayment transitions a completed trip to payment_pending.
+	// InitiatePayment transitions a completed trip to PaymentPending.
 	InitiatePayment(context.Context, *GetTripRequest) (*TripResponse, error)
-	// PayTrip processes mock payment: payment_pending → payment_success → settled.
-	// Uses CancelTripRequest: TripId = trip ID, Reason = payment method ("cash"|"wallet").
+	// PayTrip processes payment and transitions PaymentPending → Settled.
+	// req.reason carries the payment method ("cash" | "wallet").
 	PayTrip(context.Context, *CancelTripRequest) (*TripResponse, error)
+	// ListTripsByRider returns all trips for a rider, newest first.
+	ListTripsByRider(context.Context, *ListTripsRequest) (*TripsResponse, error)
+	// ListTripsByDriver returns all trips for a driver, newest first.
+	ListTripsByDriver(context.Context, *ListTripsRequest) (*TripsResponse, error)
 	mustEmbedUnimplementedTripServiceServer()
 }
 
@@ -160,6 +199,9 @@ func (UnimplementedTripServiceServer) CancelTrip(context.Context, *CancelTripReq
 func (UnimplementedTripServiceServer) GetTrip(context.Context, *GetTripRequest) (*TripResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTrip not implemented")
 }
+func (UnimplementedTripServiceServer) MarkDriverArrived(context.Context, *GetTripRequest) (*TripResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method MarkDriverArrived not implemented")
+}
 func (UnimplementedTripServiceServer) StartTrip(context.Context, *StartTripRequest) (*TripResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartTrip not implemented")
 }
@@ -171,6 +213,12 @@ func (UnimplementedTripServiceServer) InitiatePayment(context.Context, *GetTripR
 }
 func (UnimplementedTripServiceServer) PayTrip(context.Context, *CancelTripRequest) (*TripResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PayTrip not implemented")
+}
+func (UnimplementedTripServiceServer) ListTripsByRider(context.Context, *ListTripsRequest) (*TripsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListTripsByRider not implemented")
+}
+func (UnimplementedTripServiceServer) ListTripsByDriver(context.Context, *ListTripsRequest) (*TripsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListTripsByDriver not implemented")
 }
 func (UnimplementedTripServiceServer) mustEmbedUnimplementedTripServiceServer() {}
 
@@ -235,6 +283,24 @@ func _TripService_GetTrip_Handler(srv interface{}, ctx context.Context, dec func
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TripServiceServer).GetTrip(ctx, req.(*GetTripRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TripService_MarkDriverArrived_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTripRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TripServiceServer).MarkDriverArrived(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TripService_MarkDriverArrived_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TripServiceServer).MarkDriverArrived(ctx, req.(*GetTripRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -311,6 +377,42 @@ func _TripService_PayTrip_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TripService_ListTripsByRider_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTripsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TripServiceServer).ListTripsByRider(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TripService_ListTripsByRider_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TripServiceServer).ListTripsByRider(ctx, req.(*ListTripsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TripService_ListTripsByDriver_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTripsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TripServiceServer).ListTripsByDriver(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TripService_ListTripsByDriver_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TripServiceServer).ListTripsByDriver(ctx, req.(*ListTripsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TripService_ServiceDesc is the grpc.ServiceDesc for TripService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -331,6 +433,10 @@ var TripService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _TripService_GetTrip_Handler,
 		},
 		{
+			MethodName: "MarkDriverArrived",
+			Handler:    _TripService_MarkDriverArrived_Handler,
+		},
+		{
 			MethodName: "StartTrip",
 			Handler:    _TripService_StartTrip_Handler,
 		},
@@ -345,6 +451,14 @@ var TripService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PayTrip",
 			Handler:    _TripService_PayTrip_Handler,
+		},
+		{
+			MethodName: "ListTripsByRider",
+			Handler:    _TripService_ListTripsByRider_Handler,
+		},
+		{
+			MethodName: "ListTripsByDriver",
+			Handler:    _TripService_ListTripsByDriver_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -42,6 +42,9 @@ func (s *stubBookingClient) AcceptDispatchOffer(ctx context.Context, in *booking
 func (s *stubBookingClient) RejectDispatchOffer(ctx context.Context, in *bookingpb.RejectDispatchOfferRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error) {
 	return s.rejectDispatchOffer(ctx, in, opts...)
 }
+func (s *stubBookingClient) ArriveAtPickup(ctx context.Context, in *bookingpb.StartTripRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error) {
+	return &bookingpb.BookingActionResponse{TripId: in.GetTripId(), Status: "driver_arrived"}, nil
+}
 func (s *stubBookingClient) StartTrip(ctx context.Context, in *bookingpb.StartTripRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error) {
 	return s.startTrip(ctx, in, opts...)
 }
@@ -63,9 +66,14 @@ func (s *stubBookingClient) CancelRide(ctx context.Context, in *bookingpb.Cancel
 	}
 	return &bookingpb.BookingActionResponse{TripId: in.GetTripId(), Status: "cancelled"}, nil
 }
-
 func (s *stubBookingClient) PayRide(ctx context.Context, in *bookingpb.StartTripRequest, opts ...grpc.CallOption) (*bookingpb.FinishedTripResponse, error) {
 	return &bookingpb.FinishedTripResponse{TripId: in.GetTripId(), Status: "settled"}, nil
+}
+func (s *stubBookingClient) ListRiderTrips(_ context.Context, _ *bookingpb.ListTripsRequest, _ ...grpc.CallOption) (*bookingpb.TripListResponse, error) {
+	return &bookingpb.TripListResponse{}, nil
+}
+func (s *stubBookingClient) ListDriverTrips(_ context.Context, _ *bookingpb.ListTripsRequest, _ ...grpc.CallOption) (*bookingpb.TripListResponse, error) {
+	return &bookingpb.TripListResponse{}, nil
 }
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────

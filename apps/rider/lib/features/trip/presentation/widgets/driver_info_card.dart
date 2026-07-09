@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../domain/models/mock_driver.dart';
+import '../../domain/models/driver_profile.dart';
 
-/// Shows the assigned driver: avatar (mock), name, rating, vehicle model,
-/// and license plate.
 class DriverInfoCard extends StatelessWidget {
   const DriverInfoCard({super.key, required this.driver});
 
-  final MockDriver driver;
+  final DriverProfile driver;
 
   @override
   Widget build(BuildContext context) {
@@ -24,14 +22,7 @@ class DriverInfoCard extends StatelessWidget {
           CircleAvatar(
             radius: 26,
             backgroundColor: primary.withValues(alpha: 0.12),
-            child: Text(
-              driver.avatarInitial,
-              style: TextStyle(
-                color: primary,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
-            ),
+            child: Icon(Icons.directions_car, color: primary, size: 24),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -39,24 +30,20 @@ class DriverInfoCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  driver.name,
+                  driver.vehicleDisplay,
                   style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
                 ),
-                const SizedBox(height: 3),
-                Row(
-                  children: [
-                    Icon(Icons.star, size: 14, color: Colors.amber.shade700),
-                    const SizedBox(width: 4),
-                    Text(
-                      driver.rating.toStringAsFixed(1),
-                      style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
-                    ),
-                  ],
-                ),
+                if (driver.vehicleColor.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    driver.vehicleColor,
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  ),
+                ],
                 const SizedBox(height: 3),
                 Text(
-                  '${driver.vehicleModel} · ${driver.plateNumber}',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  driver.plateNumber,
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
                 ),
               ],
             ),

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:rider/core/network/api_client.dart';
 import 'package:rider/features/map/domain/models/trip_selection.dart';
 import 'package:rider/features/trip/data/trip_repository.dart';
-import 'package:rider/features/trip/domain/models/mock_trip_catalog.dart';
+import 'package:rider/features/trip/domain/models/driver_profile.dart';
 import 'package:rider/features/trip/domain/models/rider_trip_status.dart';
 
 import 'driver_arriving_view.dart';
@@ -42,7 +42,8 @@ class TripLifecyclePage extends StatefulWidget {
   State<TripLifecyclePage> createState() => _TripLifecyclePageState();
 }
 
-class _TripLifecyclePageState extends State<TripLifecyclePage> {
+class _TripLifecyclePageState extends State<TripLifecyclePage>
+    with WidgetsBindingObserver {
   RiderTripStatus _status = RiderTripStatus.searchingDriver;
   Timer? _pollTimer;
   bool _isPolling = false;
@@ -52,18 +53,28 @@ class _TripLifecyclePageState extends State<TripLifecyclePage> {
   bool _trackingStarted = false;
   String? _pollError;
   bool _isPaying = false;
+  DriverProfile _driverProfile = DriverProfile.loading;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _poll();
     _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _poll());
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pollTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && !_status.isTerminal) {
+      _poll();
+    }
   }
 
   Future<void> _poll() async {
@@ -86,6 +97,7 @@ class _TripLifecyclePageState extends State<TripLifecyclePage> {
           detail.driverId.isNotEmpty) {
         _trackingStarted = true;
         widget.onDriverAssigned?.call(detail.driverId);
+        _fetchDriverProfile(detail.driverId);
       }
       if (newStatus.isTerminal) {
         _pollTimer?.cancel();
@@ -97,6 +109,17 @@ class _TripLifecyclePageState extends State<TripLifecyclePage> {
       if (mounted) setState(() => _pollError = 'Network error. Retrying…');
     } finally {
       _isPolling = false;
+    }
+  }
+
+  Future<void> _fetchDriverProfile(String driverId) async {
+    try {
+      final profile = await TripRepository(widget.apiClient).fetchDriverProfile(driverId);
+      if (mounted) setState(() => _driverProfile = profile);
+    } on ApiException catch (_) {
+      // Non-fatal: driver card stays on loading placeholder.
+    } catch (_) {
+      // Ignore.
     }
   }
 
@@ -133,6 +156,10 @@ class _TripLifecyclePageState extends State<TripLifecyclePage> {
     final amount = _finalFareCents / 100.0;
     final sym = _currency.toUpperCase() == 'USD' ? r'$' : _currency;
     return '$sym${amount.toStringAsFixed(2)}';
+  }
+
+  Future<void> _submitRating(int stars, String? comment) async {
+    await TripRepository(widget.apiClient).submitRating(widget.tripId, stars, comment: comment);
   }
 
   void _cancelRide() {
@@ -195,7 +222,6 @@ class _TripLifecyclePageState extends State<TripLifecyclePage> {
   }
 
   Widget _buildCurrentView() {
-    final driver = MockTripCatalog.sampleDriver;
     return switch (_status) {
       RiderTripStatus.searchingDriver => SearchingDriverView(
           key: const ValueKey(RiderTripStatus.searchingDriver),
@@ -205,24 +231,24 @@ class _TripLifecyclePageState extends State<TripLifecyclePage> {
       RiderTripStatus.driverAssigned => DriverAssignedView(
           key: const ValueKey(RiderTripStatus.driverAssigned),
           tripSelection: widget.tripSelection,
-          driver: driver,
+          driver: _driverProfile,
           onCancel: _cancelRide,
         ),
       RiderTripStatus.driverArriving => DriverArrivingView(
           key: const ValueKey(RiderTripStatus.driverArriving),
           tripSelection: widget.tripSelection,
-          driver: driver,
+          driver: _driverProfile,
           onCancel: _cancelRide,
         ),
       RiderTripStatus.inProgress => TripInProgressView(
           key: const ValueKey(RiderTripStatus.inProgress),
           tripSelection: widget.tripSelection,
-          driver: driver,
+          driver: _driverProfile,
         ),
       RiderTripStatus.completed => TripCompletedView(
           key: const ValueKey(RiderTripStatus.completed),
           tripSelection: widget.tripSelection,
-          driver: driver,
+          driver: _driverProfile,
           fareText: _fareText,
           onDone: _finish,
         ),
@@ -239,10 +265,11 @@ class _TripLifecyclePageState extends State<TripLifecyclePage> {
         ),
       RiderTripStatus.paymentSuccess ||
       RiderTripStatus.settled =>
-        _PaymentSuccessView(
+        _PostTripView(
           key: const ValueKey('payment_done'),
           fareText: _fareText,
           onDone: _finish,
+          onSubmitRating: _submitRating,
         ),
     };
   }
@@ -308,7 +335,20 @@ class _PaymentPendingView extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           if (isPaying)
-            const CircularProgressIndicator()
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 12),
+                Text(
+                  'Processing payment…',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ],
+            )
           else ...[
             FilledButton.icon(
               onPressed: onPayCash,
@@ -334,15 +374,54 @@ class _PaymentPendingView extends StatelessWidget {
   }
 }
 
-class _PaymentSuccessView extends StatelessWidget {
-  const _PaymentSuccessView({
+class _PostTripView extends StatefulWidget {
+  const _PostTripView({
     super.key,
     required this.fareText,
     required this.onDone,
+    required this.onSubmitRating,
   });
 
   final String fareText;
   final VoidCallback onDone;
+  final Future<void> Function(int stars, String? comment) onSubmitRating;
+
+  @override
+  State<_PostTripView> createState() => _PostTripViewState();
+}
+
+class _PostTripViewState extends State<_PostTripView> {
+  int _stars = 0;
+  bool _submitted = false;
+  bool _submitting = false;
+  String? _error;
+  final _commentController = TextEditingController();
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_stars == 0) return;
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      final comment = _commentController.text.trim();
+      await widget.onSubmitRating(_stars, comment.isEmpty ? null : comment);
+      if (mounted) setState(() { _submitted = true; _submitting = false; });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _submitting = false;
+          _error = 'Could not submit rating. You can skip.';
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -364,27 +443,102 @@ class _PaymentSuccessView extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            fareText,
+            widget.fareText,
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Thank you for riding with FAIRRIDE!',
-            style: theme.textTheme.bodyMedium
-                ?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          const SizedBox(height: 32),
-          FilledButton(
-            onPressed: onDone,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
+          if (_submitted) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Thank you for riding with FAIRRIDE!',
+              style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
             ),
-            child: const Text('Done'),
-          ),
+            const SizedBox(height: 32),
+            FilledButton(
+              onPressed: widget.onDone,
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+              child: const Text('Done'),
+            ),
+          ] else ...[
+            const SizedBox(height: 24),
+            Text(
+              'Rate your trip',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            _StarRow(selected: _stars, onSelect: (s) => setState(() => _stars = s)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _commentController,
+              maxLines: 2,
+              maxLength: 200,
+              decoration: const InputDecoration(
+                hintText: 'Optional comment…',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 4),
+              Text(_error!, style: TextStyle(color: cs.error, fontSize: 13)),
+            ],
+            const SizedBox(height: 8),
+            if (_submitting)
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Submitting rating…',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ],
+              )
+            else ...[
+              FilledButton(
+                onPressed: _stars > 0 ? _submit : null,
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                child: const Text('Submit Rating'),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: widget.onDone,
+                child: const Text('Skip'),
+              ),
+            ],
+          ],
         ],
       ),
+    );
+  }
+}
+
+class _StarRow extends StatelessWidget {
+  const _StarRow({required this.selected, required this.onSelect});
+
+  final int selected;
+  final void Function(int) onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(5, (i) {
+        final star = i + 1;
+        return IconButton(
+          onPressed: () => onSelect(star),
+          icon: Icon(
+            star <= selected ? Icons.star : Icons.star_border,
+            size: 36,
+            color: star <= selected ? Colors.amber : Colors.grey,
+          ),
+        );
+      }),
     );
   }
 }

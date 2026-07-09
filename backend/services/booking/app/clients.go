@@ -34,9 +34,22 @@ type FareInfo struct {
 	CurrencyCode string
 }
 
+// TripSummary is a lightweight trip view used in list operations.
+type TripSummary struct {
+	TripID         string
+	Status         string
+	PickupAddress  string
+	DropoffAddress string
+	FinalFare      int64
+	Currency       string
+	CreatedAt      time.Time
+}
+
 // TripClient abstracts calls to the Trip service.
 type TripClient interface {
 	CreateTrip(ctx context.Context, riderID, pickupAddress, dropoffAddress string) (tripID string, err error)
+	// MarkDriverArrived transitions a trip from driver_assigned to driver_arrived.
+	MarkDriverArrived(ctx context.Context, tripID string) error
 	StartTrip(ctx context.Context, tripID string) error
 	CompleteTrip(ctx context.Context, tripID string, finalFareTotal int64, fareCurrency string) (*TripInfo, error)
 	GetTrip(ctx context.Context, tripID string) (*TripInfo, error)
@@ -46,6 +59,10 @@ type TripClient interface {
 	InitiatePayment(ctx context.Context, tripID string) error
 	// PayTrip processes mock payment and transitions payment_pending → settled.
 	PayTrip(ctx context.Context, tripID, paymentMethod string) (*TripInfo, error)
+	// ListByRider returns all trips for a rider, newest first.
+	ListByRider(ctx context.Context, riderID string) ([]TripSummary, error)
+	// ListByDriver returns all trips for a driver, newest first.
+	ListByDriver(ctx context.Context, driverID string) ([]TripSummary, error)
 }
 
 // DriverOfferInfo is the active pending offer directed at a driver.

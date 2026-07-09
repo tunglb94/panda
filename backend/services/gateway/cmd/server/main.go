@@ -16,6 +16,7 @@ import (
 	"github.com/fairride/gateway/http/middleware"
 	identitypostgres "github.com/fairride/identity/infrastructure/postgres"
 	"github.com/fairride/identity/infrastructure/jwt"
+	"github.com/fairride/review/grpc/reviewpb"
 	sharedconfig "github.com/fairride/shared/config"
 	"github.com/fairride/shared/database"
 	"github.com/fairride/shared/logger"
@@ -86,7 +87,7 @@ func main() {
 		avh = handlers.NewAvailabilityHandler(nil)
 	}
 
-	// Dispatch service: driver location upload (Phase 24) + rider location query (Phase 25).
+	// Dispatch service: driver location upload + rider location query.
 	// If DISPATCH_ADDR is unset, location endpoints return 503 gracefully.
 	var lh *handlers.LocationHandler
 	if dispatchAddr := os.Getenv("DISPATCH_ADDR"); dispatchAddr != "" {
@@ -102,8 +103,40 @@ func main() {
 		lh = handlers.NewLocationHandler(nil)
 	}
 
+	// Driver profile service: rider reads assigned driver's profile.
+	// Shares the same connection as the availability handler when DRIVER_ADDR is set.
+	var dph *handlers.DriverProfileHandler
+	if driverAddr := os.Getenv("DRIVER_ADDR"); driverAddr != "" {
+		driverProfileConn, connErr := grpc.NewClient(driverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if connErr != nil {
+			log.Warn().Err(connErr).Str("addr", driverAddr).Msg("gateway: driver profile connection failed — profile will return 503")
+		} else {
+			defer driverProfileConn.Close()
+			dph = handlers.NewDriverProfileHandler(driverpb.NewDriverProfileServiceClient(driverProfileConn))
+		}
+	}
+	if dph == nil {
+		dph = handlers.NewDriverProfileHandler(nil)
+	}
+
+	// Review service: submit and fetch trip ratings.
+	// If REVIEW_ADDR is unset, rating endpoints return 503 gracefully.
+	var rh *handlers.RatingHandler
+	if reviewAddr := os.Getenv("REVIEW_ADDR"); reviewAddr != "" {
+		reviewConn, connErr := grpc.NewClient(reviewAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if connErr != nil {
+			log.Warn().Err(connErr).Str("addr", reviewAddr).Msg("gateway: review service connection failed — ratings will return 503")
+		} else {
+			defer reviewConn.Close()
+			rh = handlers.NewRatingHandler(reviewpb.NewReviewServiceClient(reviewConn))
+		}
+	}
+	if rh == nil {
+		rh = handlers.NewRatingHandler(nil)
+	}
+
 	authMW := middleware.Auth(tokenSvc)
-	router := httpgateway.NewRouter(bh, ah, avh, lh, authMW, log)
+	router := httpgateway.NewRouter(bh, ah, avh, lh, dph, rh, authMW, log)
 
 	addr := cfg.HTTP.Addr
 	srv := &http.Server{

@@ -34,7 +34,7 @@ class TripPage extends StatefulWidget {
   State<TripPage> createState() => _TripPageState();
 }
 
-class _TripPageState extends State<TripPage> {
+class _TripPageState extends State<TripPage> with WidgetsBindingObserver {
   late final TripOfferRepository _offerRepo;
   late final ActiveTripRepository _activeTripRepo;
   late final TripMetricsEngine _metricsEngine;
@@ -43,9 +43,11 @@ class _TripPageState extends State<TripPage> {
   TripOffer? _offer;
   ActiveTrip? _activeTrip;
   String? _errorMessage;
+  String _actingLabel = 'Please wait…';
   int _countdownSeconds = 0;
   bool _hasArrived = false;
   TripMetrics? _finalMetrics;
+  String? _completedTripId;
 
   Timer? _pollTimer;
   Timer? _countdownTimer;
@@ -55,6 +57,7 @@ class _TripPageState extends State<TripPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _offerRepo = TripOfferRepository(apiClient: widget.apiClient);
     _activeTripRepo = ActiveTripRepository(apiClient: widget.apiClient);
     _metricsEngine = TripMetricsEngine(locationStream: widget.locationStream);
@@ -63,11 +66,42 @@ class _TripPageState extends State<TripPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pollTimer?.cancel();
     _countdownTimer?.cancel();
     _paymentPollTimer?.cancel();
     _metricsEngine.reset();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    switch (_state) {
+      case _PageState.polling:
+        _poll();
+      case _PageState.activeTrip || _PageState.awaitingPayment:
+        _resumeActiveTrip();
+      default:
+        break;
+    }
+  }
+
+  Future<void> _resumeActiveTrip() async {
+    final tripId = _activeTrip?.tripId;
+    if (tripId == null) return;
+    try {
+      final trip = await _activeTripRepo.fetchTrip(tripId);
+      if (!mounted) return;
+      setState(() => _activeTrip = trip);
+      if (trip.isAwaitingPayment && _state == _PageState.activeTrip) {
+        _paymentPollTimer?.cancel();
+        setState(() => _state = _PageState.awaitingPayment);
+        _startPaymentPolling();
+      }
+    } on ApiException catch (_) {
+      // Ignore; regular timers will handle retry
+    }
   }
 
   // ─── Initialization ──────────────────────────────────────────────────────────
@@ -84,7 +118,7 @@ class _TripPageState extends State<TripPage> {
           setState(() {
             _state = _PageState.activeTrip;
             _activeTrip = trip;
-            _hasArrived = false;
+            _hasArrived = trip.status == 'driver_arrived';
           });
           return;
         }
@@ -194,11 +228,7 @@ class _TripPageState extends State<TripPage> {
         setState(() {
           _state = _PageState.completed;
           _activeTrip = updated;
-        });
-        Future.delayed(const Duration(seconds: 4), () {
-          if (mounted && _state == _PageState.completed) {
-            _startPolling();
-          }
+          _completedTripId = updated.tripId;
         });
       } else {
         setState(() => _activeTrip = updated);
@@ -206,6 +236,24 @@ class _TripPageState extends State<TripPage> {
     } on ApiException catch (_) {
       // Ignore transient poll errors; rider may still be paying.
     }
+  }
+
+  void _onRatingDone() {
+    _startPolling();
+  }
+
+  Future<void> _submitDriverRating(int stars, String? comment) async {
+    final tripId = _completedTripId;
+    if (tripId != null) {
+      try {
+        final body = <String, dynamic>{'stars': stars};
+        if (comment != null && comment.isNotEmpty) body['comment'] = comment;
+        await widget.apiClient.post('/api/v1/rides/$tripId/rate', body: body);
+      } catch (_) {
+        // Non-fatal: proceed to offer queue regardless.
+      }
+    }
+    if (mounted) _onRatingDone();
   }
 
   void _startCountdown(TripOffer offer) {
@@ -240,7 +288,7 @@ class _TripPageState extends State<TripPage> {
     if (offer == null) return;
     _pollTimer?.cancel();
     _countdownTimer?.cancel();
-    setState(() => _state = _PageState.acting);
+    setState(() { _actingLabel = 'Accepting offer…'; _state = _PageState.acting; });
     try {
       await _offerRepo.acceptOffer(offer.tripId);
       await _activeTripRepo.saveActiveTripId(offer.tripId);
@@ -269,7 +317,7 @@ class _TripPageState extends State<TripPage> {
     if (offer == null) return;
     _pollTimer?.cancel();
     _countdownTimer?.cancel();
-    setState(() => _state = _PageState.acting);
+    setState(() { _actingLabel = 'Rejecting…'; _state = _PageState.acting; });
     try {
       await _offerRepo.rejectOffer(offer.tripId);
       if (!mounted) return;
@@ -285,14 +333,31 @@ class _TripPageState extends State<TripPage> {
 
   // ─── Trip execution actions ──────────────────────────────────────────────────
 
-  void _onArrived() {
-    setState(() => _hasArrived = true);
+  Future<void> _onArrived() async {
+    final trip = _activeTrip;
+    if (trip == null) return;
+    setState(() { _actingLabel = 'Marking arrived…'; _state = _PageState.acting; });
+    try {
+      await _activeTripRepo.arriveAtPickup(trip.tripId);
+      if (!mounted) return;
+      setState(() {
+        _state = _PageState.activeTrip;
+        _activeTrip = trip.copyWith(status: 'driver_arrived');
+        _hasArrived = true;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _state = _PageState.error;
+        _errorMessage = e.message;
+      });
+    }
   }
 
   Future<void> _onStartTrip() async {
     final trip = _activeTrip;
     if (trip == null) return;
-    setState(() => _state = _PageState.acting);
+    setState(() { _actingLabel = 'Starting trip…'; _state = _PageState.acting; });
     try {
       await _activeTripRepo.startTrip(trip.tripId);
       if (!mounted) return;
@@ -313,7 +378,7 @@ class _TripPageState extends State<TripPage> {
   Future<void> _onFinishTrip() async {
     final trip = _activeTrip;
     if (trip == null) return;
-    setState(() => _state = _PageState.acting);
+    setState(() { _actingLabel = 'Finishing trip…'; _state = _PageState.acting; });
     // Capture metrics once; if the API call fails and driver retries, reuse
     // the same snapshot rather than calling finish() a second time.
     _finalMetrics ??= _metricsEngine.finish();
@@ -363,8 +428,7 @@ class _TripPageState extends State<TripPage> {
 
   Widget _buildBody() {
     return switch (_state) {
-      _PageState.initializing =>
-        const Center(child: CircularProgressIndicator()),
+      _PageState.initializing => const _LabelledSpinner(label: 'Starting up…'),
       _PageState.polling => _PollingView(onRetry: _poll),
       _PageState.offerAvailable => _OfferCard(
           offer: _offer!,
@@ -372,16 +436,20 @@ class _TripPageState extends State<TripPage> {
           onAccept: _onAccept,
           onReject: _onReject,
         ),
-      _PageState.acting => const Center(child: CircularProgressIndicator()),
+      _PageState.acting => _LabelledSpinner(label: _actingLabel),
       _PageState.activeTrip => _TripExecutionCard(
           trip: _activeTrip!,
           hasArrived: _hasArrived,
-          onArrived: _onArrived,
+          onArrived: () => _onArrived(),
           onStartTrip: _onStartTrip,
           onFinishTrip: _onFinishTrip,
         ),
       _PageState.awaitingPayment => _AwaitingPaymentCard(trip: _activeTrip!),
-      _PageState.completed => _TripCompletedCard(trip: _activeTrip!),
+      _PageState.completed => _TripCompletedCard(
+          trip: _activeTrip!,
+          onSubmitRating: _submitDriverRating,
+          onSkip: _onRatingDone,
+        ),
       _PageState.error => _ErrorView(
           message: _errorMessage ?? 'An error occurred',
           onRetry: _initialize,
@@ -681,7 +749,7 @@ class _StatusBanner extends StatelessWidget {
     if (status == 'in_progress') {
       return ('In Progress', cs.tertiary, Icons.directions_car);
     }
-    if (status == 'driver_assigned' && hasArrived) {
+    if (status == 'driver_arrived' || (status == 'driver_assigned' && hasArrived)) {
       return ('Arrived at Pickup', cs.primary, Icons.where_to_vote);
     }
     return ('Heading to Pickup', cs.secondary, Icons.navigation);
@@ -717,7 +785,7 @@ class _ActionButton extends StatelessWidget {
         child: const Text('Complete Trip'),
       );
     }
-    if (status == 'driver_assigned' && hasArrived) {
+    if (status == 'driver_arrived' || (status == 'driver_assigned' && hasArrived)) {
       return FilledButton(
         onPressed: onStartTrip,
         style: FilledButton.styleFrom(
@@ -837,10 +905,45 @@ class _AwaitingPaymentCard extends StatelessWidget {
   }
 }
 
-class _TripCompletedCard extends StatelessWidget {
-  const _TripCompletedCard({required this.trip});
+class _TripCompletedCard extends StatefulWidget {
+  const _TripCompletedCard({
+    required this.trip,
+    required this.onSubmitRating,
+    required this.onSkip,
+  });
 
   final ActiveTrip trip;
+  final Future<void> Function(int stars, String? comment) onSubmitRating;
+  final VoidCallback onSkip;
+
+  @override
+  State<_TripCompletedCard> createState() => _TripCompletedCardState();
+}
+
+class _TripCompletedCardState extends State<_TripCompletedCard> {
+  int _stars = 0;
+  bool _submitted = false;
+  bool _submitting = false;
+  String? _error;
+  final _commentController = TextEditingController();
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_stars == 0) return;
+    setState(() { _submitting = true; _error = null; });
+    try {
+      final comment = _commentController.text.trim();
+      await widget.onSubmitRating(_stars, comment.isEmpty ? null : comment);
+      if (mounted) setState(() { _submitted = true; _submitting = false; });
+    } catch (_) {
+      if (mounted) setState(() { _submitting = false; _error = 'Could not submit. You can skip.'; });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -869,14 +972,14 @@ class _TripCompletedCard extends StatelessWidget {
                     icon: Icons.location_on,
                     color: cs.primary,
                     label: 'Pickup',
-                    address: trip.pickupAddress,
+                    address: widget.trip.pickupAddress,
                   ),
                   const SizedBox(height: 12),
                   _AddressRow(
                     icon: Icons.flag,
                     color: cs.error,
                     label: 'Destination',
-                    address: trip.dropoffAddress,
+                    address: widget.trip.dropoffAddress,
                   ),
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 16),
@@ -891,7 +994,7 @@ class _TripCompletedCard extends StatelessWidget {
                             ?.copyWith(color: cs.onSurfaceVariant),
                       ),
                       Text(
-                        _fareLabel(trip),
+                        _fareLabel(widget.trip),
                         style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: cs.primary,
@@ -903,12 +1006,56 @@ class _TripCompletedCard extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Returning to offer queue…',
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: cs.onSurfaceVariant),
-          ),
+          const SizedBox(height: 24),
+          if (_submitted) ...[
+            Text(
+              'Thanks for your feedback!',
+              style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: widget.onSkip,
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+              child: const Text('Back to Queue'),
+            ),
+          ] else ...[
+            Text(
+              'Rate your rider',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            _StarRow(selected: _stars, onSelect: (s) => setState(() => _stars = s)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _commentController,
+              maxLines: 2,
+              maxLength: 200,
+              decoration: const InputDecoration(
+                hintText: 'Optional comment…',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 4),
+              Text(_error!, style: TextStyle(color: cs.error, fontSize: 13)),
+            ],
+            const SizedBox(height: 8),
+            if (_submitting)
+              const CircularProgressIndicator()
+            else ...[
+              FilledButton(
+                onPressed: _stars > 0 ? _submit : null,
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                child: const Text('Submit Rating'),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: widget.onSkip,
+                child: const Text('Skip'),
+              ),
+            ],
+          ],
         ],
       ),
     );
@@ -920,6 +1067,31 @@ class _TripCompletedCard extends StatelessWidget {
       return '${trip.fareCurrency} ${amount.toStringAsFixed(2)}';
     }
     return '—';
+  }
+}
+
+class _StarRow extends StatelessWidget {
+  const _StarRow({required this.selected, required this.onSelect});
+
+  final int selected;
+  final void Function(int) onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(5, (i) {
+        final star = i + 1;
+        return IconButton(
+          onPressed: () => onSelect(star),
+          icon: Icon(
+            star <= selected ? Icons.star : Icons.star_border,
+            size: 36,
+            color: star <= selected ? Colors.amber : Colors.grey,
+          ),
+        );
+      }),
+    );
   }
 }
 
@@ -1010,6 +1182,32 @@ class _InfoChip extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _LabelledSpinner extends StatelessWidget {
+  const _LabelledSpinner({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
+          Text(
+            label,
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          ),
+        ],
       ),
     );
   }

@@ -25,12 +25,16 @@ class _BookRideButtonState extends State<BookRideButton> {
   Future<void> _handlePress() async {
     if (_state != _BookState.idle) return;
     setState(() => _state = _BookState.loading);
-    await widget.onConfirm();
-    if (!mounted) return;
-    setState(() => _state = _BookState.success);
-    await Future.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    setState(() => _state = _BookState.idle);
+    try {
+      await widget.onConfirm();
+      if (!mounted) return;
+      setState(() => _state = _BookState.success);
+      await Future.delayed(const Duration(milliseconds: 900));
+      if (mounted) setState(() => _state = _BookState.idle);
+    } catch (_) {
+      // onConfirm signalled failure — reset so the user can retry.
+      if (mounted) setState(() => _state = _BookState.idle);
+    }
   }
 
   @override

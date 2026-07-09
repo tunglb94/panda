@@ -1,4 +1,5 @@
 import 'package:rider/core/network/api_client.dart';
+import 'package:rider/features/trip/domain/models/driver_profile.dart';
 
 class TripDetail {
   const TripDetail({
@@ -47,6 +48,22 @@ class TripRepository {
     await _client.post(
       '/api/v1/rides/$tripId/pay',
       body: {'payment_method': paymentMethod},
+    );
+  }
+
+  Future<void> submitRating(String tripId, int stars, {String? comment}) async {
+    final body = <String, dynamic>{'stars': stars};
+    if (comment != null && comment.isNotEmpty) body['comment'] = comment;
+    await _client.post('/api/v1/rides/$tripId/rate', body: body);
+  }
+
+  Future<DriverProfile> fetchDriverProfile(String driverId) async {
+    final body = await _client.get('/api/v1/drivers/$driverId/profile');
+    return DriverProfile(
+      vehicleBrand: body['vehicle_brand'] as String? ?? '',
+      vehicleModel: body['vehicle_model'] as String? ?? '',
+      vehicleColor: body['vehicle_color'] as String? ?? '',
+      plateNumber: body['plate_number'] as String? ?? '—',
     );
   }
 }

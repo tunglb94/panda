@@ -120,6 +120,17 @@ func (t *Trip) IsCancellable() bool {
 	return cancellableStatuses[t.Status]
 }
 
+// MarkDriverArrived transitions the trip from DriverAssigned to DriverArrived.
+// Returns CodePreconditionFailed if the trip is not in DriverAssigned status.
+func (t *Trip) MarkDriverArrived(now time.Time) error {
+	if t.Status != StatusDriverAssigned {
+		return errors.PreconditionFailed("driver arrived cannot be set from status: " + string(t.Status))
+	}
+	t.Status = StatusDriverArrived
+	t.UpdatedAt = now
+	return nil
+}
+
 // Start transitions the trip from DriverAssigned or DriverArrived to InProgress.
 // Returns CodePreconditionFailed if the current status is not a valid start point.
 func (t *Trip) Start(now time.Time) error {

@@ -46,6 +46,16 @@ func (r *stubRepo) FindByRiderID(_ context.Context, riderID string) ([]*entity.T
 	return out, nil
 }
 
+func (r *stubRepo) FindByDriverID(_ context.Context, driverID string) ([]*entity.Trip, error) {
+	var out []*entity.Trip
+	for _, t := range r.trips {
+		if t.DriverID == driverID {
+			out = append(out, t)
+		}
+	}
+	return out, nil
+}
+
 // ─── CreateTrip ──────────────────────────────────────────────────────────────
 
 func TestCreateTrip_Valid(t *testing.T) {

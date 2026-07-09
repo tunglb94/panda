@@ -4,6 +4,7 @@ package adapters
 
 import (
 	"context"
+	"time"
 
 	"github.com/fairride/booking/app"
 	"github.com/fairride/trip/grpc/trippb"
@@ -28,6 +29,11 @@ func (a *TripAdapter) CreateTrip(ctx context.Context, riderID, pickup, dropoff s
 		return "", err
 	}
 	return resp.GetTrip().GetTripId(), nil
+}
+
+func (a *TripAdapter) MarkDriverArrived(ctx context.Context, tripID string) error {
+	_, err := a.client.MarkDriverArrived(ctx, &trippb.GetTripRequest{TripId: tripID})
+	return err
 }
 
 func (a *TripAdapter) StartTrip(ctx context.Context, tripID string) error {
@@ -71,6 +77,42 @@ func (a *TripAdapter) PayTrip(ctx context.Context, tripID, paymentMethod string)
 		return nil, err
 	}
 	return protoToTripInfo(resp.GetTrip()), nil
+}
+
+func (a *TripAdapter) ListByRider(ctx context.Context, riderID string) ([]app.TripSummary, error) {
+	resp, err := a.client.ListTripsByRider(ctx, &trippb.ListTripsRequest{PartyId: riderID})
+	if err != nil {
+		return nil, err
+	}
+	return protoToSummaries(resp.GetTrips()), nil
+}
+
+func (a *TripAdapter) ListByDriver(ctx context.Context, driverID string) ([]app.TripSummary, error) {
+	resp, err := a.client.ListTripsByDriver(ctx, &trippb.ListTripsRequest{PartyId: driverID})
+	if err != nil {
+		return nil, err
+	}
+	return protoToSummaries(resp.GetTrips()), nil
+}
+
+func protoToSummaries(trips []*trippb.TripProto) []app.TripSummary {
+	out := make([]app.TripSummary, len(trips))
+	for i, t := range trips {
+		var createdAt time.Time
+		if ts := t.GetCreatedAt(); ts != nil {
+			createdAt = ts.AsTime()
+		}
+		out[i] = app.TripSummary{
+			TripID:         t.GetTripId(),
+			Status:         t.GetStatus(),
+			PickupAddress:  t.GetPickupAddress(),
+			DropoffAddress: t.GetDropoffAddress(),
+			FinalFare:      t.GetFinalFareTotal(),
+			Currency:       t.GetFareCurrency(),
+			CreatedAt:      createdAt,
+		}
+	}
+	return out
 }
 
 func protoToTripInfo(t *trippb.TripProto) *app.TripInfo {

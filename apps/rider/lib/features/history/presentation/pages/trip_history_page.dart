@@ -1,193 +1,260 @@
 import 'package:flutter/material.dart';
 
-import 'package:rider/features/profile/presentation/widgets/async_state_view.dart';
+import 'package:rider/core/network/api_client.dart';
 
-import '../../domain/models/mock_trip_history_repository.dart';
-import '../../domain/models/trip_history_entry.dart';
-import '../../domain/models/trip_history_filters.dart';
-import '../../domain/models/trip_history_status.dart';
-import '../widgets/history_filter_bar.dart';
-import '../widgets/trip_history_section_header.dart';
-import '../widgets/trip_history_tile.dart';
-import 'trip_detail_page.dart';
-
-/// Trip History screen: search + status/date filters over a mock trip list,
-/// grouped by day. Reuses `AsyncStateView` (Profile module, R-03) for the
-/// Loading/Success/Empty/Error states.
 class TripHistoryPage extends StatefulWidget {
-  const TripHistoryPage({super.key});
+  const TripHistoryPage({super.key, required this.apiClient});
+
+  final ApiClient apiClient;
 
   @override
   State<TripHistoryPage> createState() => _TripHistoryPageState();
 }
 
 class _TripHistoryPageState extends State<TripHistoryPage> {
-  static const _repository = MockTripHistoryRepository();
-
-  TripHistoryDemoMode _mode = TripHistoryDemoMode.normal;
-  late Future<List<TripHistoryEntry>> _future;
-
-  String _query = '';
-  TripHistoryStatusFilter _statusFilter = TripHistoryStatusFilter.all;
-  TripHistoryDateFilter _dateFilter = TripHistoryDateFilter.all;
+  late Future<List<_TripSummary>> _future;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _future = _load();
   }
 
-  void _load() {
-    setState(() {
-      _future = _repository.fetchHistory(mode: _mode);
-    });
-  }
-
-  List<TripHistoryEntry> _applyFilters(List<TripHistoryEntry> all) {
-    return all.where((entry) {
-      final statusOk = switch (_statusFilter) {
-        TripHistoryStatusFilter.all => true,
-        TripHistoryStatusFilter.completed => entry.status == TripHistoryStatus.completed,
-        TripHistoryStatusFilter.cancelled => entry.status == TripHistoryStatus.cancelled,
-      };
-      final dateOk = _dateFilter.matches(entry.dateTime);
-      final queryOk = entry.matchesQuery(_query);
-      return statusOk && dateOk && queryOk;
-    }).toList()
-      ..sort((a, b) => b.dateTime.compareTo(a.dateTime));
+  Future<List<_TripSummary>> _load() async {
+    final body = await widget.apiClient.get('/api/v1/rider/trips');
+    final raw = (body['trips'] as List<dynamic>?) ?? [];
+    return raw.map((e) => _TripSummary.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Trip History'),
-        actions: [
-          PopupMenuButton<TripHistoryDemoMode>(
-            tooltip: 'Preview state (dev)',
-            icon: const Icon(Icons.tune),
-            onSelected: (mode) {
-              _mode = mode;
-              _load();
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: TripHistoryDemoMode.normal, child: Text('Normal')),
-              PopupMenuItem(value: TripHistoryDemoMode.empty, child: Text('Empty (dev)')),
-              PopupMenuItem(value: TripHistoryDemoMode.error, child: Text('Error (dev)')),
-            ],
-          ),
-        ],
+      appBar: AppBar(title: const Text('Trip History')),
+      body: FutureBuilder<List<_TripSummary>>(
+        future: _future,
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snap.hasError) {
+            return _ErrorView(
+              message: snap.error is ApiException
+                  ? (snap.error as ApiException).message
+                  : 'Failed to load history.',
+              onRetry: () => setState(() => _future = _load()),
+            );
+          }
+          final trips = snap.data ?? [];
+          if (trips.isEmpty) {
+            return const Center(
+              child: Text(
+                'No trips yet.',
+                style: TextStyle(color: Colors.grey),
+              ),
+            );
+          }
+          return RefreshIndicator(
+            onRefresh: () async => setState(() => _future = _load()),
+            child: ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: trips.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, i) => _TripTile(trip: trips[i]),
+            ),
+          );
+        },
       ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Column(
+    );
+  }
+}
+
+class _TripSummary {
+  const _TripSummary({
+    required this.tripId,
+    required this.status,
+    required this.pickupAddress,
+    required this.dropoffAddress,
+    required this.finalFare,
+    required this.currency,
+    required this.createdAt,
+  });
+
+  final String tripId;
+  final String status;
+  final String pickupAddress;
+  final String dropoffAddress;
+  final int finalFare;
+  final String currency;
+  final DateTime createdAt;
+
+  factory _TripSummary.fromJson(Map<String, dynamic> j) {
+    DateTime dt;
+    try {
+      dt = DateTime.parse(j['created_at'] as String? ?? '');
+    } catch (_) {
+      dt = DateTime.fromMillisecondsSinceEpoch(0);
+    }
+    return _TripSummary(
+      tripId: j['trip_id'] as String? ?? '',
+      status: j['status'] as String? ?? '',
+      pickupAddress: j['pickup_address'] as String? ?? '',
+      dropoffAddress: j['dropoff_address'] as String? ?? '',
+      finalFare: (j['final_fare'] as num?)?.toInt() ?? 0,
+      currency: j['currency'] as String? ?? '',
+      createdAt: dt.toLocal(),
+    );
+  }
+
+  String get fareText {
+    if (finalFare <= 0 || currency.isEmpty) return '—';
+    final sym = currency.toUpperCase() == 'USD' ? r'$' : currency;
+    return '$sym${(finalFare / 100).toStringAsFixed(2)}';
+  }
+}
+
+class _TripTile extends StatelessWidget {
+  const _TripTile({required this.trip});
+
+  final _TripSummary trip;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final date = _formatDate(trip.createdAt);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                  child: HistoryFilterBar(
-                    query: _query,
-                    onQueryChanged: (q) => setState(() => _query = q),
-                    statusFilter: _statusFilter,
-                    onStatusChanged: (f) => setState(() => _statusFilter = f),
-                    dateFilter: _dateFilter,
-                    onDateChanged: (f) => setState(() => _dateFilter = f),
-                  ),
-                ),
-                Expanded(
-                  child: AsyncStateView<List<TripHistoryEntry>>(
-                    future: _future,
-                    isEmpty: (items) => items.isEmpty,
-                    emptyBuilder: (context) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey.shade400),
-                          const SizedBox(height: 12),
-                          const Text('No trips yet', style: TextStyle(fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Your completed and cancelled rides will show up here.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey.shade500),
-                          ),
-                        ],
-                      ),
-                    ),
-                    errorBuilder: (context, error) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.error_outline, size: 48, color: Colors.red.shade400),
-                          const SizedBox(height: 12),
-                          const Text("Couldn't load trip history",
-                              style: TextStyle(fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 12),
-                          OutlinedButton(onPressed: _load, child: const Text('Retry')),
-                        ],
-                      ),
-                    ),
-                    successBuilder: (context, all) {
-                      final filtered = _applyFilters(all);
-                      if (filtered.isEmpty) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.filter_alt_off_outlined,
-                                  size: 40, color: Colors.grey.shade400),
-                              const SizedBox(height: 12),
-                              const Text('No trips match these filters',
-                                  style: TextStyle(fontWeight: FontWeight.w600)),
-                              const SizedBox(height: 12),
-                              TextButton(
-                                onPressed: () => setState(() {
-                                  _query = '';
-                                  _statusFilter = TripHistoryStatusFilter.all;
-                                  _dateFilter = TripHistoryDateFilter.all;
-                                }),
-                                child: const Text('Clear filters'),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-
-                      final groups = <String, List<TripHistoryEntry>>{};
-                      for (final entry in filtered) {
-                        final label = TripHistorySectionHeader.labelFor(entry.dateTime);
-                        groups.putIfAbsent(label, () => []).add(entry);
-                      }
-
-                      return ListView(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                        children: [
-                          for (final group in groups.entries) ...[
-                            TripHistorySectionHeader(label: group.key),
-                            for (final entry in group.value) ...[
-                              TripHistoryTile(
-                                entry: entry,
-                                onTap: () => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => TripDetailPage(entry: entry),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                            ],
-                          ],
-                        ],
-                      );
-                    },
-                  ),
-                ),
+                _StatusChip(status: trip.status),
+                Text(date, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
               ],
             ),
-          ),
+            const SizedBox(height: 10),
+            _AddressRow(
+              icon: Icons.location_on,
+              color: cs.primary,
+              label: trip.pickupAddress,
+            ),
+            const SizedBox(height: 6),
+            _AddressRow(
+              icon: Icons.flag,
+              color: cs.error,
+              label: trip.dropoffAddress,
+            ),
+            if (trip.finalFare > 0) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  trip.fareText,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: cs.primary,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _formatDate(DateTime dt) {
+    final now = DateTime.now();
+    if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+      return 'Today ${_hhmm(dt)}';
+    }
+    return '${dt.day}/${dt.month}/${dt.year} ${_hhmm(dt)}';
+  }
+
+  static String _hhmm(DateTime dt) =>
+      '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final (label, color) = _info(cs);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
+  (String, Color) _info(ColorScheme cs) => switch (status) {
+        'completed' || 'settled' => ('Completed', cs.primary),
+        'cancelled' => ('Cancelled', cs.error),
+        'in_progress' => ('In Progress', cs.tertiary),
+        'payment_pending' || 'payment_success' => ('Payment Pending', cs.secondary),
+        _ => ('In Progress', cs.onSurfaceVariant),
+      };
+}
+
+class _AddressRow extends StatelessWidget {
+  const _AddressRow({required this.icon, required this.color, required this.label});
+
+  final IconData icon;
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(label, style: const TextStyle(fontSize: 13)),
+        ),
+      ],
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
+            const SizedBox(height: 12),
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
         ),
       ),
     );

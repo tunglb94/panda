@@ -27,8 +27,10 @@ const (
 	BookingService_GetBookingDetails_FullMethodName     = "/booking.v1.BookingService/GetBookingDetails"
 	BookingService_GetDriverCurrentOffer_FullMethodName = "/booking.v1.BookingService/GetDriverCurrentOffer"
 	BookingService_CancelRide_FullMethodName            = "/booking.v1.BookingService/CancelRide"
-	// Phase B1: payment RPC method name added manually.
-	BookingService_PayRide_FullMethodName = "/booking.v1.BookingService/PayRide"
+	BookingService_ArriveAtPickup_FullMethodName        = "/booking.v1.BookingService/ArriveAtPickup"
+	BookingService_PayRide_FullMethodName               = "/booking.v1.BookingService/PayRide"
+	BookingService_ListRiderTrips_FullMethodName        = "/booking.v1.BookingService/ListRiderTrips"
+	BookingService_ListDriverTrips_FullMethodName       = "/booking.v1.BookingService/ListDriverTrips"
 )
 
 // BookingServiceClient is the client API for BookingService service.
@@ -58,9 +60,16 @@ type BookingServiceClient interface {
 	// CancelRide is called by the rider to cancel an active trip.
 	// Delegates to the Trip service; trip transitions to cancelled.
 	CancelRide(ctx context.Context, in *CancelRideRequest, opts ...grpc.CallOption) (*BookingActionResponse, error)
-	// PayRide is called by the rider to pay for a completed trip.
-	// Uses StartTripRequest (TripId only); returns FinishedTripResponse.
+	// ArriveAtPickup is called by the driver when they reach the pickup location.
+	// Trip transitions from driver_assigned to driver_arrived.
+	ArriveAtPickup(ctx context.Context, in *StartTripRequest, opts ...grpc.CallOption) (*BookingActionResponse, error)
+	// PayRide is called after trip completion to process payment.
+	// Trip transitions from payment_pending to settled.
 	PayRide(ctx context.Context, in *StartTripRequest, opts ...grpc.CallOption) (*FinishedTripResponse, error)
+	// ListRiderTrips returns all trips for a rider, newest first.
+	ListRiderTrips(ctx context.Context, in *ListTripsRequest, opts ...grpc.CallOption) (*TripListResponse, error)
+	// ListDriverTrips returns all trips for a driver, newest first.
+	ListDriverTrips(ctx context.Context, in *ListTripsRequest, opts ...grpc.CallOption) (*TripListResponse, error)
 }
 
 type bookingServiceClient struct {
@@ -143,9 +152,36 @@ func (c *bookingServiceClient) CancelRide(ctx context.Context, in *CancelRideReq
 	return out, nil
 }
 
+func (c *bookingServiceClient) ArriveAtPickup(ctx context.Context, in *StartTripRequest, opts ...grpc.CallOption) (*BookingActionResponse, error) {
+	out := new(BookingActionResponse)
+	err := c.cc.Invoke(ctx, BookingService_ArriveAtPickup_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *bookingServiceClient) PayRide(ctx context.Context, in *StartTripRequest, opts ...grpc.CallOption) (*FinishedTripResponse, error) {
 	out := new(FinishedTripResponse)
 	err := c.cc.Invoke(ctx, BookingService_PayRide_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *bookingServiceClient) ListRiderTrips(ctx context.Context, in *ListTripsRequest, opts ...grpc.CallOption) (*TripListResponse, error) {
+	out := new(TripListResponse)
+	err := c.cc.Invoke(ctx, BookingService_ListRiderTrips_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *bookingServiceClient) ListDriverTrips(ctx context.Context, in *ListTripsRequest, opts ...grpc.CallOption) (*TripListResponse, error) {
+	out := new(TripListResponse)
+	err := c.cc.Invoke(ctx, BookingService_ListDriverTrips_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -179,8 +215,16 @@ type BookingServiceServer interface {
 	// CancelRide is called by the rider to cancel an active trip.
 	// Delegates to the Trip service; trip transitions to cancelled.
 	CancelRide(context.Context, *CancelRideRequest) (*BookingActionResponse, error)
-	// PayRide is called by the rider to pay for a trip in payment_pending status.
+	// ArriveAtPickup is called by the driver when they reach the pickup location.
+	// Trip transitions from driver_assigned to driver_arrived.
+	ArriveAtPickup(context.Context, *StartTripRequest) (*BookingActionResponse, error)
+	// PayRide is called after trip completion to process payment.
+	// Trip transitions from payment_pending to settled.
 	PayRide(context.Context, *StartTripRequest) (*FinishedTripResponse, error)
+	// ListRiderTrips returns all trips for a rider, newest first.
+	ListRiderTrips(context.Context, *ListTripsRequest) (*TripListResponse, error)
+	// ListDriverTrips returns all trips for a driver, newest first.
+	ListDriverTrips(context.Context, *ListTripsRequest) (*TripListResponse, error)
 	mustEmbedUnimplementedBookingServiceServer()
 }
 
@@ -212,8 +256,17 @@ func (UnimplementedBookingServiceServer) GetDriverCurrentOffer(context.Context, 
 func (UnimplementedBookingServiceServer) CancelRide(context.Context, *CancelRideRequest) (*BookingActionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CancelRide not implemented")
 }
+func (UnimplementedBookingServiceServer) ArriveAtPickup(context.Context, *StartTripRequest) (*BookingActionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ArriveAtPickup not implemented")
+}
 func (UnimplementedBookingServiceServer) PayRide(context.Context, *StartTripRequest) (*FinishedTripResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PayRide not implemented")
+}
+func (UnimplementedBookingServiceServer) ListRiderTrips(context.Context, *ListTripsRequest) (*TripListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListRiderTrips not implemented")
+}
+func (UnimplementedBookingServiceServer) ListDriverTrips(context.Context, *ListTripsRequest) (*TripListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListDriverTrips not implemented")
 }
 func (UnimplementedBookingServiceServer) mustEmbedUnimplementedBookingServiceServer() {}
 
@@ -372,6 +425,24 @@ func _BookingService_CancelRide_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BookingService_ArriveAtPickup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartTripRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BookingServiceServer).ArriveAtPickup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BookingService_ArriveAtPickup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BookingServiceServer).ArriveAtPickup(ctx, req.(*StartTripRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _BookingService_PayRide_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StartTripRequest)
 	if err := dec(in); err != nil {
@@ -386,6 +457,42 @@ func _BookingService_PayRide_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(BookingServiceServer).PayRide(ctx, req.(*StartTripRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BookingService_ListRiderTrips_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTripsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BookingServiceServer).ListRiderTrips(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BookingService_ListRiderTrips_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BookingServiceServer).ListRiderTrips(ctx, req.(*ListTripsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BookingService_ListDriverTrips_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTripsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BookingServiceServer).ListDriverTrips(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BookingService_ListDriverTrips_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BookingServiceServer).ListDriverTrips(ctx, req.(*ListTripsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -430,8 +537,20 @@ var BookingService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _BookingService_CancelRide_Handler,
 		},
 		{
+			MethodName: "ArriveAtPickup",
+			Handler:    _BookingService_ArriveAtPickup_Handler,
+		},
+		{
 			MethodName: "PayRide",
 			Handler:    _BookingService_PayRide_Handler,
+		},
+		{
+			MethodName: "ListRiderTrips",
+			Handler:    _BookingService_ListRiderTrips_Handler,
+		},
+		{
+			MethodName: "ListDriverTrips",
+			Handler:    _BookingService_ListDriverTrips_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

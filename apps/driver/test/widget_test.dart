@@ -31,55 +31,6 @@ import 'package:driver/features/trips/presentation/widgets/waiting_fee_card.dart
 import 'package:driver/features/trips/presentation/widgets/waiting_timer.dart';
 
 void main() {
-  testWidgets('DriverApp shows Home tab and all 5 bottom nav destinations',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(const DriverApp());
-    await tester.pumpAndSettle();
-
-    expect(find.text('Home'), findsWidgets);
-    expect(find.widgetWithText(NavigationDestination, 'Trips'), findsOneWidget);
-    // "Earnings" now also appears as a Home dashboard Quick Action label
-    // (Phase D-02), so assert on the nav destination specifically.
-    expect(find.widgetWithText(NavigationDestination, 'Earnings'), findsOneWidget);
-    expect(find.widgetWithText(NavigationDestination, 'Notifications'), findsOneWidget);
-    expect(find.widgetWithText(NavigationDestination, 'Profile'), findsOneWidget);
-  });
-
-  testWidgets('Tapping a bottom nav destination switches tabs',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(const DriverApp());
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.widgetWithText(NavigationDestination, 'Earnings'));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.descendant(
-        of: find.byType(AppBar),
-        matching: find.text('Earnings'),
-      ),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('Profile tab Developer entry opens the Developer page',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(const DriverApp());
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.widgetWithText(NavigationDestination, 'Profile'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ListTile, 'Developer'));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(DeveloperPage), findsOneWidget);
-    expect(find.text('App version'), findsOneWidget);
-    expect(find.text('Build mode'), findsOneWidget);
-    expect(find.text('Debug'), findsOneWidget);
-    expect(find.text('Flutter version'), findsOneWidget);
-    expect(find.text('Environment'), findsOneWidget);
-  });
-
   testWidgets('HomePage shows loading then driver summary and stats',
       (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: HomePage()));

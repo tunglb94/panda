@@ -107,6 +107,37 @@ func (r *TripRepository) FindByRiderID(ctx context.Context, riderID string) ([]*
 	return trips, nil
 }
 
+// FindByDriverID returns all trips for a driver, newest first.
+func (r *TripRepository) FindByDriverID(ctx context.Context, driverID string) ([]*entity.Trip, error) {
+	const q = `
+		SELECT trip_id, rider_id, driver_id, status,
+		       pickup_address, dropoff_address, cancellation_reason,
+		       final_fare_total, fare_currency, payment_method,
+		       created_at, updated_at
+		FROM trips
+		WHERE driver_id = $1
+		ORDER BY created_at DESC`
+
+	rows, err := r.pool.Query(ctx, q, driverID)
+	if err != nil {
+		return nil, domainerrors.Internal("trip: find by driver query failed").WithMeta("error", err.Error())
+	}
+	defer rows.Close()
+
+	var trips []*entity.Trip
+	for rows.Next() {
+		trip, err := r.scanOne(rows)
+		if err != nil {
+			return nil, err
+		}
+		trips = append(trips, trip)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, domainerrors.Internal("trip: rows iteration failed").WithMeta("error", err.Error())
+	}
+	return trips, nil
+}
+
 // ─── private helpers ──────────────────────────────────────────────────────────
 
 type rowScanner interface {

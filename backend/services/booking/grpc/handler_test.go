@@ -91,6 +91,21 @@ func (s *stubTrip) PayTrip(_ context.Context, tripID, _ string) (*app.TripInfo, 
 	return t, nil
 }
 
+func (s *stubTrip) MarkDriverArrived(_ context.Context, tripID string) error {
+	if t, ok := s.trips[tripID]; ok {
+		t.Status = "driver_arrived"
+	}
+	return nil
+}
+
+func (s *stubTrip) ListByRider(_ context.Context, _ string) ([]app.TripSummary, error) {
+	return nil, nil
+}
+
+func (s *stubTrip) ListByDriver(_ context.Context, _ string) ([]app.TripSummary, error) {
+	return nil, nil
+}
+
 type stubDispatch struct {
 	jobs       map[string]*app.DispatchInfo
 	acceptErr  error
@@ -165,12 +180,15 @@ func newHandler(trip *stubTrip, dispatch *stubDispatch, pricing *stubPricing) *b
 		app.NewBookRideUseCase(trip, dispatch),
 		app.NewAcceptDispatchOfferUseCase(dispatch),
 		app.NewRejectDispatchOfferUseCase(dispatch),
+		app.NewArriveAtPickupUseCase(trip),
 		app.NewStartTripUseCase(trip),
 		app.NewFinishTripUseCase(pricing, trip),
 		app.NewGetBookingDetailsUseCase(trip, dispatch),
 		app.NewGetDriverCurrentOfferUseCase(dispatch, trip),
 		app.NewCancelRideUseCase(trip),
 		app.NewPayRideUseCase(trip),
+		app.NewListRiderTripsUseCase(trip),
+		app.NewListDriverTripsUseCase(trip),
 	)
 }
 
@@ -400,12 +418,15 @@ func newHandlerWithOfferDispatch(trip *stubTrip, dispatch app.DispatchClient, pr
 		app.NewBookRideUseCase(trip, dispatch),
 		app.NewAcceptDispatchOfferUseCase(dispatch),
 		app.NewRejectDispatchOfferUseCase(dispatch),
+		app.NewArriveAtPickupUseCase(trip),
 		app.NewStartTripUseCase(trip),
 		app.NewFinishTripUseCase(pricing, trip),
 		app.NewGetBookingDetailsUseCase(trip, dispatch),
 		app.NewGetDriverCurrentOfferUseCase(dispatch, trip),
 		app.NewCancelRideUseCase(trip),
 		app.NewPayRideUseCase(trip),
+		app.NewListRiderTripsUseCase(trip),
+		app.NewListDriverTripsUseCase(trip),
 	)
 }
 

@@ -79,6 +79,7 @@ class AppRouter {
                   builder: (context, state) => ProfilePage(
                     authState: authState,
                     tokenStorage: tokenStorage,
+                    apiClient: apiClient,
                   ),
                 ),
               ],

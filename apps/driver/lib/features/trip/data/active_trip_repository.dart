@@ -20,7 +20,9 @@ class ActiveTrip {
   final String fareCurrency;
 
   bool get isActive =>
-      status == 'driver_assigned' || status == 'in_progress';
+      status == 'driver_assigned' ||
+      status == 'driver_arrived' ||
+      status == 'in_progress';
 
   bool get isAwaitingPayment =>
       status == 'payment_pending' || status == 'payment_success';
@@ -71,6 +73,10 @@ class ActiveTripRepository {
       finalFare: (data['final_fare'] as num?)?.toInt() ?? 0,
       fareCurrency: data['currency'] as String? ?? '',
     );
+  }
+
+  Future<void> arriveAtPickup(String tripId) async {
+    await _client.post('/api/v1/rides/$tripId/arrive');
   }
 
   Future<void> startTrip(String tripId) async {

@@ -16,12 +16,15 @@ type BookingClient interface {
 	BookRide(ctx context.Context, in *bookingpb.BookRideRequest, opts ...grpc.CallOption) (*bookingpb.BookRideResponse, error)
 	AcceptDispatchOffer(ctx context.Context, in *bookingpb.AcceptDispatchOfferRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error)
 	RejectDispatchOffer(ctx context.Context, in *bookingpb.RejectDispatchOfferRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error)
+	ArriveAtPickup(ctx context.Context, in *bookingpb.StartTripRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error)
 	StartTrip(ctx context.Context, in *bookingpb.StartTripRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error)
 	FinishTrip(ctx context.Context, in *bookingpb.FinishTripRequest, opts ...grpc.CallOption) (*bookingpb.FinishedTripResponse, error)
 	GetBookingDetails(ctx context.Context, in *bookingpb.GetBookingDetailsRequest, opts ...grpc.CallOption) (*bookingpb.BookingDetailsResponse, error)
 	GetDriverCurrentOffer(ctx context.Context, in *bookingpb.GetDriverCurrentOfferRequest, opts ...grpc.CallOption) (*bookingpb.GetDriverCurrentOfferResponse, error)
 	CancelRide(ctx context.Context, in *bookingpb.CancelRideRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error)
 	PayRide(ctx context.Context, in *bookingpb.StartTripRequest, opts ...grpc.CallOption) (*bookingpb.FinishedTripResponse, error)
+	ListRiderTrips(ctx context.Context, in *bookingpb.ListTripsRequest, opts ...grpc.CallOption) (*bookingpb.TripListResponse, error)
+	ListDriverTrips(ctx context.Context, in *bookingpb.ListTripsRequest, opts ...grpc.CallOption) (*bookingpb.TripListResponse, error)
 }
 
 // BookingHandler exposes booking operations over HTTP.
@@ -282,6 +285,113 @@ func (h *BookingHandler) PayRide(w http.ResponseWriter, r *http.Request) {
 		"final_fare": resp.GetFinalFare(),
 		"currency":   resp.GetCurrency(),
 	})
+}
+
+// ─── POST /api/v1/rides/{tripID}/arrive ──────────────────────────────────────
+
+func (h *BookingHandler) ArriveAtPickup(w http.ResponseWriter, r *http.Request) {
+	tripID := r.PathValue("tripID")
+	if tripID == "" {
+		writeBadRequest(w, "trip_id is required")
+		return
+	}
+	resp, err := h.client.ArriveAtPickup(r.Context(), &bookingpb.StartTripRequest{
+		TripId: tripID,
+	})
+	if err != nil {
+		writeGRPCError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{
+		"trip_id": resp.GetTripId(),
+		"status":  resp.GetStatus(),
+	})
+}
+
+// ─── GET /api/v1/rider/trips ──────────────────────────────────────────────────
+
+func (h *BookingHandler) ListRiderTrips(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.ClaimsFromContext(r.Context())
+	if !ok {
+		writeBadRequest(w, "missing auth claims")
+		return
+	}
+	resp, err := h.client.ListRiderTrips(r.Context(), &bookingpb.ListTripsRequest{
+		PartyId: claims.UserID,
+	})
+	if err != nil {
+		writeGRPCError(w, err)
+		return
+	}
+	type tripItem struct {
+		TripID         string `json:"trip_id"`
+		Status         string `json:"status"`
+		PickupAddress  string `json:"pickup_address"`
+		DropoffAddress string `json:"dropoff_address"`
+		FinalFare      int64  `json:"final_fare"`
+		Currency       string `json:"currency"`
+		CreatedAt      string `json:"created_at"`
+	}
+	items := make([]tripItem, len(resp.GetTrips()))
+	for i, t := range resp.GetTrips() {
+		var createdAt string
+		if ts := t.GetCreatedAt(); ts != nil {
+			createdAt = ts.AsTime().UTC().Format("2006-01-02T15:04:05Z")
+		}
+		items[i] = tripItem{
+			TripID:         t.GetTripId(),
+			Status:         t.GetStatus(),
+			PickupAddress:  t.GetPickupAddress(),
+			DropoffAddress: t.GetDropoffAddress(),
+			FinalFare:      t.GetFinalFare(),
+			Currency:       t.GetCurrency(),
+			CreatedAt:      createdAt,
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"trips": items})
+}
+
+// ─── GET /api/v1/driver/trips ─────────────────────────────────────────────────
+
+func (h *BookingHandler) ListDriverTrips(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.ClaimsFromContext(r.Context())
+	if !ok {
+		writeBadRequest(w, "missing auth claims")
+		return
+	}
+	resp, err := h.client.ListDriverTrips(r.Context(), &bookingpb.ListTripsRequest{
+		PartyId: claims.UserID,
+	})
+	if err != nil {
+		writeGRPCError(w, err)
+		return
+	}
+	type tripItem struct {
+		TripID         string `json:"trip_id"`
+		Status         string `json:"status"`
+		PickupAddress  string `json:"pickup_address"`
+		DropoffAddress string `json:"dropoff_address"`
+		FinalFare      int64  `json:"final_fare"`
+		Currency       string `json:"currency"`
+		CreatedAt      string `json:"created_at"`
+	}
+	items := make([]tripItem, len(resp.GetTrips()))
+	for i, t := range resp.GetTrips() {
+		var createdAt string
+		if ts := t.GetCreatedAt(); ts != nil {
+			createdAt = ts.AsTime().UTC().Format("2006-01-02T15:04:05Z")
+		}
+		items[i] = tripItem{
+			TripID:         t.GetTripId(),
+			Status:         t.GetStatus(),
+			PickupAddress:  t.GetPickupAddress(),
+			DropoffAddress: t.GetDropoffAddress(),
+			FinalFare:      t.GetFinalFare(),
+			Currency:       t.GetCurrency(),
+			CreatedAt:      createdAt,
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"trips": items})
 }
 
 // ─── GET /api/v1/driver/current-offer ────────────────────────────────────────

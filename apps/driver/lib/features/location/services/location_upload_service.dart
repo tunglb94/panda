@@ -23,7 +23,7 @@ class LocationUploadService {
   final Duration uploadInterval;
 
   final _engine = LocationEngine(
-    config: const LocationEngineConfig(distanceFilter: 10),
+    config: const LocationEngineConfig(distanceFilter: 5),
   );
   final _statusCtrl = StreamController<UploadStatus>.broadcast();
 
@@ -34,6 +34,10 @@ class LocationUploadService {
 
   Stream<UploadStatus> get statusStream => _statusCtrl.stream;
   UploadStatus get status => _status;
+
+  /// GPS location stream from the underlying engine. Suitable for passing to
+  /// [TripMetricsEngine] so no second GPS listener is required.
+  Stream<LocationUpdate> get locationStream => _engine.locationStream;
 
   bool get isRunning => _locationSub != null;
 

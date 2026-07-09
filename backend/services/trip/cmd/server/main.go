@@ -33,10 +33,13 @@ func register(srv *sharedgrpc.Server, ready *server.ReadinessTracker) {
 		app.NewCreateTripUseCase(tripRepo),
 		app.NewCancelTripUseCase(tripRepo),
 		app.NewGetTripUseCase(tripRepo),
+		app.NewMarkDriverArrivedUseCase(tripRepo),
 		app.NewStartTripUseCase(tripRepo),
 		app.NewCompleteTripUseCase(tripRepo),
 		app.NewInitiatePaymentUseCase(tripRepo),
 		app.NewPayTripUseCase(tripRepo),
+		app.NewListTripsByRiderUseCase(tripRepo),
+		app.NewListTripsByDriverUseCase(tripRepo),
 	)
 	trippb.RegisterTripServiceServer(srv.Inner(), handler)
 }

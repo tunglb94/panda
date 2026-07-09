@@ -27,6 +27,7 @@ class MockTripCatalog {
         RiderTripStatus.driverArriving => const Duration(minutes: 2),
         RiderTripStatus.inProgress => const Duration(minutes: 12),
         RiderTripStatus.completed => Duration.zero,
+        RiderTripStatus.cancelled => Duration.zero,
       };
 
   static String estimatedArrivalLabel(Duration eta) {

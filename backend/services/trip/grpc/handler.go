@@ -17,13 +17,16 @@ import (
 // Handler implements trippb.TripServiceServer.
 type Handler struct {
 	trippb.UnimplementedTripServiceServer
-	createTrip      *app.CreateTripUseCase
-	cancelTrip      *app.CancelTripUseCase
-	getTrip         *app.GetTripUseCase
-	startTrip       *app.StartTripUseCase
-	completeTrip    *app.CompleteTripUseCase
-	initiatePayment *app.InitiatePaymentUseCase
-	payTrip         *app.PayTripUseCase
+	createTrip         *app.CreateTripUseCase
+	cancelTrip         *app.CancelTripUseCase
+	getTrip            *app.GetTripUseCase
+	markDriverArrived  *app.MarkDriverArrivedUseCase
+	startTrip          *app.StartTripUseCase
+	completeTrip       *app.CompleteTripUseCase
+	initiatePayment    *app.InitiatePaymentUseCase
+	payTrip            *app.PayTripUseCase
+	listTripsByRider   *app.ListTripsByRiderUseCase
+	listTripsByDriver  *app.ListTripsByDriverUseCase
 }
 
 // NewHandler wires all trip use cases into a gRPC handler.
@@ -31,10 +34,13 @@ func NewHandler(
 	createTrip *app.CreateTripUseCase,
 	cancelTrip *app.CancelTripUseCase,
 	getTrip *app.GetTripUseCase,
+	markDriverArrived *app.MarkDriverArrivedUseCase,
 	startTrip *app.StartTripUseCase,
 	completeTrip *app.CompleteTripUseCase,
 	initiatePayment *app.InitiatePaymentUseCase,
 	payTrip *app.PayTripUseCase,
+	listTripsByRider *app.ListTripsByRiderUseCase,
+	listTripsByDriver *app.ListTripsByDriverUseCase,
 ) *Handler {
 	if createTrip == nil {
 		panic("trip grpc: CreateTripUseCase must not be nil")
@@ -44,6 +50,9 @@ func NewHandler(
 	}
 	if getTrip == nil {
 		panic("trip grpc: GetTripUseCase must not be nil")
+	}
+	if markDriverArrived == nil {
+		panic("trip grpc: MarkDriverArrivedUseCase must not be nil")
 	}
 	if startTrip == nil {
 		panic("trip grpc: StartTripUseCase must not be nil")
@@ -57,14 +66,23 @@ func NewHandler(
 	if payTrip == nil {
 		panic("trip grpc: PayTripUseCase must not be nil")
 	}
+	if listTripsByRider == nil {
+		panic("trip grpc: ListTripsByRiderUseCase must not be nil")
+	}
+	if listTripsByDriver == nil {
+		panic("trip grpc: ListTripsByDriverUseCase must not be nil")
+	}
 	return &Handler{
-		createTrip:      createTrip,
-		cancelTrip:      cancelTrip,
-		getTrip:         getTrip,
-		startTrip:       startTrip,
-		completeTrip:    completeTrip,
-		initiatePayment: initiatePayment,
-		payTrip:         payTrip,
+		createTrip:        createTrip,
+		cancelTrip:        cancelTrip,
+		getTrip:           getTrip,
+		markDriverArrived: markDriverArrived,
+		startTrip:         startTrip,
+		completeTrip:      completeTrip,
+		initiatePayment:   initiatePayment,
+		payTrip:           payTrip,
+		listTripsByRider:  listTripsByRider,
+		listTripsByDriver: listTripsByDriver,
 	}
 }
 
@@ -111,6 +129,18 @@ func (h *Handler) GetTrip(ctx context.Context, req *trippb.GetTripRequest) (*tri
 		return nil, status.Error(codes.InvalidArgument, "trip_id is required")
 	}
 	trip, err := h.getTrip.Execute(ctx, req.GetTripId())
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	return &trippb.TripResponse{Trip: toProto(trip)}, nil
+}
+
+// MarkDriverArrived implements TripServiceServer.MarkDriverArrived.
+func (h *Handler) MarkDriverArrived(ctx context.Context, req *trippb.GetTripRequest) (*trippb.TripResponse, error) {
+	if req.GetTripId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "trip_id is required")
+	}
+	trip, err := h.markDriverArrived.Execute(ctx, req.GetTripId())
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
@@ -174,6 +204,38 @@ func (h *Handler) PayTrip(ctx context.Context, req *trippb.CancelTripRequest) (*
 		return nil, toGRPCError(err)
 	}
 	return &trippb.TripResponse{Trip: toProto(trip)}, nil
+}
+
+// ListTripsByRider implements TripServiceServer.ListTripsByRider.
+func (h *Handler) ListTripsByRider(ctx context.Context, req *trippb.ListTripsRequest) (*trippb.TripsResponse, error) {
+	if req.GetPartyId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "party_id (rider_id) is required")
+	}
+	trips, err := h.listTripsByRider.Execute(ctx, req.GetPartyId())
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	protos := make([]*trippb.TripProto, len(trips))
+	for i, t := range trips {
+		protos[i] = toProto(t)
+	}
+	return &trippb.TripsResponse{Trips: protos}, nil
+}
+
+// ListTripsByDriver implements TripServiceServer.ListTripsByDriver.
+func (h *Handler) ListTripsByDriver(ctx context.Context, req *trippb.ListTripsRequest) (*trippb.TripsResponse, error) {
+	if req.GetPartyId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "party_id (driver_id) is required")
+	}
+	trips, err := h.listTripsByDriver.Execute(ctx, req.GetPartyId())
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	protos := make([]*trippb.TripProto, len(trips))
+	for i, t := range trips {
+		protos[i] = toProto(t)
+	}
+	return &trippb.TripsResponse{Trips: protos}, nil
 }
 
 // ─── private helpers ──────────────────────────────────────────────────────────

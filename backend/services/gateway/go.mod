@@ -7,6 +7,7 @@ require (
 	github.com/fairride/dispatch v0.0.0
 	github.com/fairride/driver v0.0.0
 	github.com/fairride/identity v0.0.0
+	github.com/fairride/review v0.0.0
 	github.com/fairride/shared v0.0.0
 	github.com/rs/zerolog v1.33.0
 	google.golang.org/grpc v1.64.0
@@ -34,6 +35,7 @@ replace (
 	github.com/fairride/driver => ../../services/driver
 	github.com/fairride/identity => ../../services/identity
 	github.com/fairride/pricing => ../../services/pricing
+	github.com/fairride/review => ../../services/review
 	github.com/fairride/shared => ../../shared
 	github.com/fairride/trip => ../../services/trip
 )

@@ -18,4 +18,8 @@ type TripRepository interface {
 	// FindByRiderID returns all trips for the rider, ordered by created_at DESC.
 	// Returns an empty slice (not an error) when none exist.
 	FindByRiderID(ctx context.Context, riderID string) ([]*entity.Trip, error)
+
+	// FindByDriverID returns all trips for the driver, ordered by created_at DESC.
+	// Returns an empty slice (not an error) when none exist.
+	FindByDriverID(ctx context.Context, driverID string) ([]*entity.Trip, error)
 }

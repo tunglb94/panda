@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package review.v1;
+
+option go_package = "github.com/fairride/review/grpc/reviewpb";
+
+import "google/protobuf/timestamp.proto";
+
+// ReviewService stores and retrieves post-trip ratings.
+// Each trip may have at most two ratings: one from the rider (rating the driver)
+// and one from the driver (rating the rider). Ratings are immutable once submitted.
+service ReviewService {
+  // SubmitRating records a post-trip rating. Returns AlreadyExists if a rating
+  // for this trip/role combination already exists.
+  rpc SubmitRating(SubmitRatingRequest) returns (RatingProto);
+
+  // GetTripRating returns the rating for a trip/role combination.
+  // Returns NotFound if no rating has been submitted yet.
+  rpc GetTripRating(GetRatingRequest) returns (RatingProto);
+}
+
+// ─── Requests ────────────────────────────────────────────────────────────────
+
+message SubmitRatingRequest {
+  string trip_id  = 1;
+  string rater_id = 2; // user ID of who is rating
+  string ratee_id = 3; // user ID of who is being rated
+  string role     = 4; // "rider" (rider rates driver) | "driver" (driver rates rider)
+  int32  stars    = 5; // 1–5
+  string comment  = 6; // optional
+}
+
+message GetRatingRequest {
+  string trip_id = 1;
+  string role    = 2; // "rider" | "driver"
+}
+
+// ─── Response ────────────────────────────────────────────────────────────────
+
+message RatingProto {
+  string rating_id = 1;
+  string trip_id   = 2;
+  string rater_id  = 3;
+  string ratee_id  = 4;
+  string role      = 5;
+  int32  stars     = 6;
+  string comment   = 7;
+  google.protobuf.Timestamp created_at = 8;
+}

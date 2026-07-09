@@ -10,6 +10,7 @@ import (
 	driverentity "github.com/fairride/driver/domain/entity"
 	identityentity "github.com/fairride/identity/domain/entity"
 	"github.com/fairride/identity/infrastructure/jwt"
+	domainerrors "github.com/fairride/shared/errors"
 )
 
 // userFinder abstracts identity.UserRepository for unit-testability.
@@ -83,5 +84,49 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		"access_token": token,
 		"driver_id":    driver.DriverID,
 		"user_id":      user.ID,
+	})
+}
+
+// RiderLogin handles POST /api/v1/auth/rider/login.
+// Looks up the user by phone, verifies they hold the Rider user type, and issues
+// a JWT whose sub is the user's ID. No driver profile is required.
+func (h *AuthHandler) RiderLogin(w http.ResponseWriter, r *http.Request) {
+	if h.users == nil {
+		writeJSON(w, http.StatusServiceUnavailable,
+			errorResponse{Error: "authentication service not configured"})
+		return
+	}
+
+	var req loginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeBadRequest(w, "invalid request body")
+		return
+	}
+	req.Phone = strings.TrimSpace(req.Phone)
+	if req.Phone == "" {
+		writeBadRequest(w, "phone is required")
+		return
+	}
+
+	user, err := h.users.FindByPhone(r.Context(), req.Phone)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	if user.Type != identityentity.TypeRider {
+		writeDomainError(w, domainerrors.NotFound("rider not found"))
+		return
+	}
+
+	token, err := h.tokenSvc.GenerateAccessToken(user.ID, string(user.Type), user.RoleID, time.Now())
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"access_token": token,
+		"rider_id":     user.ID,
 	})
 }

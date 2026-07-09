@@ -43,6 +43,24 @@ service BookingService {
   // GetDriverCurrentOffer returns the current pending trip offer for a driver.
   // Returns has_offer=false (not an error) when no active offer exists.
   rpc GetDriverCurrentOffer(GetDriverCurrentOfferRequest) returns (GetDriverCurrentOfferResponse);
+
+  // CancelRide is called by the rider to cancel an active trip.
+  // Delegates to the Trip service; trip transitions to cancelled.
+  rpc CancelRide(CancelRideRequest) returns (BookingActionResponse);
+
+  // ArriveAtPickup is called by the driver when they reach the pickup location.
+  // Trip transitions from driver_assigned to driver_arrived.
+  rpc ArriveAtPickup(StartTripRequest) returns (BookingActionResponse);
+
+  // PayRide is called after trip completion to process payment.
+  // Trip transitions from payment_pending to settled.
+  rpc PayRide(StartTripRequest) returns (FinishedTripResponse);
+
+  // ListRiderTrips returns all trips for a rider, newest first.
+  rpc ListRiderTrips(ListTripsRequest) returns (TripListResponse);
+
+  // ListDriverTrips returns all trips for a driver, newest first.
+  rpc ListDriverTrips(ListTripsRequest) returns (TripListResponse);
 }
 
 // ─── Requests ────────────────────────────────────────────────────────────────
@@ -78,6 +96,11 @@ message FinishTripRequest {
 
 message GetBookingDetailsRequest {
   string trip_id = 1;
+}
+
+message CancelRideRequest {
+  string trip_id  = 1;
+  string rider_id = 2;
 }
 
 // ─── Responses ───────────────────────────────────────────────────────────────
@@ -124,4 +147,22 @@ message GetDriverCurrentOfferResponse {
   string pickup_address   = 3;
   string dropoff_address  = 4;
   google.protobuf.Timestamp offer_expires_at = 5;
+}
+
+message ListTripsRequest {
+  string party_id = 1; // rider_id or driver_id
+}
+
+message TripSummaryProto {
+  string trip_id         = 1;
+  string status          = 2;
+  string pickup_address  = 3;
+  string dropoff_address = 4;
+  int64  final_fare      = 5;
+  string currency        = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message TripListResponse {
+  repeated TripSummaryProto trips = 1;
 }

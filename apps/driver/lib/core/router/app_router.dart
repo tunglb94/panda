@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/earnings/presentation/pages/earnings_page.dart';
+import '../../features/location/services/location_upload_service.dart';
 import '../../features/map/presentation/pages/map_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
@@ -26,6 +27,7 @@ abstract final class AppRouter {
     required AuthState authState,
     required TokenStorage tokenStorage,
     required ApiClient apiClient,
+    required LocationUploadService uploadService,
   }) {
     return GoRouter(
       initialLocation: AppRoutes.home,
@@ -57,6 +59,7 @@ abstract final class AppRouter {
                     authState: authState,
                     tokenStorage: tokenStorage,
                     apiClient: apiClient,
+                    uploadService: uploadService,
                   ),
                 ),
               ],
@@ -65,7 +68,10 @@ abstract final class AppRouter {
               routes: [
                 GoRoute(
                   path: AppRoutes.trips,
-                  builder: (context, state) => TripPage(apiClient: apiClient),
+                  builder: (context, state) => TripPage(
+                    apiClient: apiClient,
+                    locationStream: uploadService.locationStream,
+                  ),
                 ),
               ],
             ),
@@ -89,7 +95,7 @@ abstract final class AppRouter {
               routes: [
                 GoRoute(
                   path: AppRoutes.profile,
-                  builder: (context, state) => const ProfilePage(),
+                  builder: (context, state) => ProfilePage(apiClient: apiClient),
                 ),
               ],
             ),

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:rider/core/network/api_client.dart';
+import 'package:rider/core/storage/trip_storage.dart';
+import 'package:rider/features/booking/data/booking_repository.dart';
 import 'package:rider/features/map/domain/models/trip_selection.dart';
 import 'package:rider/features/trip/presentation/pages/trip_lifecycle_page.dart';
 
@@ -20,14 +23,18 @@ import 'vehicle_selector.dart';
 /// choice, fare preview, payment method, promo code, and the Book Ride CTA.
 ///
 /// Reused by both `BookingPage` (full-page, bottom-nav entry) and
-/// `BookingBottomSheet` (modal, invoked from the Map's confirmed selection)
-/// so both entry points share one implementation. All data is mock — see
-/// `docs/project/MVP_DEVELOPMENT_PLAN.md` §2.1/§2.2 for what still needs
-/// real backend wiring (Roadmap stages R2/R4/R6).
+/// `BookingBottomSheet` (modal, invoked from the Map's confirmed selection).
 class BookingFormBody extends StatefulWidget {
-  const BookingFormBody({super.key, required this.tripSelection});
+  const BookingFormBody({
+    super.key,
+    required this.tripSelection,
+    required this.apiClient,
+    this.onDriverAssigned,
+  });
 
   final TripSelection tripSelection;
+  final ApiClient apiClient;
+  final void Function(String driverId)? onDriverAssigned;
 
   @override
   State<BookingFormBody> createState() => _BookingFormBodyState();
@@ -37,6 +44,7 @@ class _BookingFormBodyState extends State<BookingFormBody> {
   VehicleCategory _selectedCategory = VehicleCategory.car;
   PaymentMethod _selectedPayment = MockBookingCatalog.paymentMethods.first;
   PromoResult _promo = PromoResult.none;
+  String? _bookingError;
 
   late final double _distanceKm;
   late final double _durationMin;
@@ -62,27 +70,36 @@ class _BookingFormBodyState extends State<BookingFormBody> {
       );
 
   Future<void> _handleBookRide() async {
-    // Mock submission only — no API call. Real submission wiring is
-    // MVP_DEVELOPMENT_PLAN.md Rider App Roadmap stage R4.
-    final fareAtBooking = _fare;
-    await Future.delayed(const Duration(milliseconds: 1200));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Mock ride requested — tracking your trip (UI only, not wired to '
-          'the backend; see MVP roadmap R4).',
+    setState(() => _bookingError = null);
+
+    try {
+      final repo = BookingRepository(widget.apiClient);
+      final result = await repo.bookRide(widget.tripSelection);
+
+      await TripStorage().saveActiveTripId(result.tripId);
+
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => TripLifecyclePage(
+            tripId: result.tripId,
+            tripSelection: widget.tripSelection,
+            apiClient: widget.apiClient,
+            onDriverAssigned: widget.onDriverAssigned,
+          ),
         ),
-      ),
-    );
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => TripLifecyclePage(
-          tripSelection: widget.tripSelection,
-          fare: fareAtBooking,
-        ),
-      ),
-    );
+      );
+      // Trip ended (completed or cancelled) — clear the persisted trip.
+      await TripStorage().clearActiveTripId();
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _bookingError = e.message);
+      rethrow; // signal failure to BookRideButton so it resets to idle
+    } catch (_) {
+      if (mounted) {
+        setState(() => _bookingError = 'Booking failed. Please try again.');
+      }
+      rethrow;
+    }
   }
 
   @override
@@ -132,6 +149,15 @@ class _BookingFormBodyState extends State<BookingFormBody> {
         PromoCodeEntry(
           onApplied: (result) => setState(() => _promo = result),
         ),
+        if (_bookingError != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            _bookingError!,
+            style: TextStyle(
+                color: Theme.of(context).colorScheme.error, fontSize: 13),
+            textAlign: TextAlign.center,
+          ),
+        ],
         const SizedBox(height: 20),
         SizedBox(
           width: double.infinity,
