@@ -35,6 +35,8 @@ func register(srv *sharedgrpc.Server, ready *server.ReadinessTracker) {
 		app.NewGetTripUseCase(tripRepo),
 		app.NewStartTripUseCase(tripRepo),
 		app.NewCompleteTripUseCase(tripRepo),
+		app.NewInitiatePaymentUseCase(tripRepo),
+		app.NewPayTripUseCase(tripRepo),
 	)
 	trippb.RegisterTripServiceServer(srv.Inner(), handler)
 }

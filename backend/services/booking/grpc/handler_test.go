@@ -75,6 +75,22 @@ func (s *stubTrip) CancelTrip(_ context.Context, tripID, _ string) error {
 	return nil
 }
 
+func (s *stubTrip) InitiatePayment(_ context.Context, tripID string) error {
+	if t, ok := s.trips[tripID]; ok {
+		t.Status = "payment_pending"
+	}
+	return nil
+}
+
+func (s *stubTrip) PayTrip(_ context.Context, tripID, _ string) (*app.TripInfo, error) {
+	t, ok := s.trips[tripID]
+	if !ok {
+		return nil, errors.New("not found")
+	}
+	t.Status = "settled"
+	return t, nil
+}
+
 type stubDispatch struct {
 	jobs       map[string]*app.DispatchInfo
 	acceptErr  error
@@ -153,6 +169,8 @@ func newHandler(trip *stubTrip, dispatch *stubDispatch, pricing *stubPricing) *b
 		app.NewFinishTripUseCase(pricing, trip),
 		app.NewGetBookingDetailsUseCase(trip, dispatch),
 		app.NewGetDriverCurrentOfferUseCase(dispatch, trip),
+		app.NewCancelRideUseCase(trip),
+		app.NewPayRideUseCase(trip),
 	)
 }
 
@@ -299,8 +317,8 @@ func TestFinishTrip_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if resp.GetStatus() != "completed" {
-		t.Errorf("status = %q, want completed", resp.GetStatus())
+	if resp.GetStatus() != "payment_pending" {
+		t.Errorf("status = %q, want payment_pending", resp.GetStatus())
 	}
 	if resp.GetFinalFare() != 325 {
 		t.Errorf("final_fare = %d, want 325", resp.GetFinalFare())
@@ -386,6 +404,8 @@ func newHandlerWithOfferDispatch(trip *stubTrip, dispatch app.DispatchClient, pr
 		app.NewFinishTripUseCase(pricing, trip),
 		app.NewGetBookingDetailsUseCase(trip, dispatch),
 		app.NewGetDriverCurrentOfferUseCase(dispatch, trip),
+		app.NewCancelRideUseCase(trip),
+		app.NewPayRideUseCase(trip),
 	)
 }
 

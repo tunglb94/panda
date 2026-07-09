@@ -30,6 +30,7 @@ type stubBookingClient struct {
 	finishTrip            func(ctx context.Context, in *bookingpb.FinishTripRequest, opts ...grpc.CallOption) (*bookingpb.FinishedTripResponse, error)
 	getBookingDetails     func(ctx context.Context, in *bookingpb.GetBookingDetailsRequest, opts ...grpc.CallOption) (*bookingpb.BookingDetailsResponse, error)
 	getDriverCurrentOffer func(ctx context.Context, in *bookingpb.GetDriverCurrentOfferRequest, opts ...grpc.CallOption) (*bookingpb.GetDriverCurrentOfferResponse, error)
+	cancelRide            func(ctx context.Context, in *bookingpb.CancelRideRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error)
 }
 
 func (s *stubBookingClient) BookRide(ctx context.Context, in *bookingpb.BookRideRequest, opts ...grpc.CallOption) (*bookingpb.BookRideResponse, error) {
@@ -55,6 +56,16 @@ func (s *stubBookingClient) GetDriverCurrentOffer(ctx context.Context, in *booki
 		return s.getDriverCurrentOffer(ctx, in, opts...)
 	}
 	return &bookingpb.GetDriverCurrentOfferResponse{HasOffer: false}, nil
+}
+func (s *stubBookingClient) CancelRide(ctx context.Context, in *bookingpb.CancelRideRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error) {
+	if s.cancelRide != nil {
+		return s.cancelRide(ctx, in, opts...)
+	}
+	return &bookingpb.BookingActionResponse{TripId: in.GetTripId(), Status: "cancelled"}, nil
+}
+
+func (s *stubBookingClient) PayRide(ctx context.Context, in *bookingpb.StartTripRequest, opts ...grpc.CallOption) (*bookingpb.FinishedTripResponse, error) {
+	return &bookingpb.FinishedTripResponse{TripId: in.GetTripId(), Status: "settled"}, nil
 }
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
@@ -449,5 +460,65 @@ func TestGetDriverOffer_MissingClaims(t *testing.T) {
 	h.GetDriverOffer(w, req)
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400", w.Code)
+	}
+}
+
+// ─── CancelRide ───────────────────────────────────────────────────────────────
+
+func TestCancelRide_Success(t *testing.T) {
+	stub := &stubBookingClient{
+		cancelRide: func(_ context.Context, in *bookingpb.CancelRideRequest, _ ...grpc.CallOption) (*bookingpb.BookingActionResponse, error) {
+			if in.GetTripId() != "trip-1" {
+				return nil, status.Error(codes.NotFound, "trip not found")
+			}
+			return &bookingpb.BookingActionResponse{TripId: "trip-1", Status: "cancelled"}, nil
+		},
+	}
+	h := handlers.NewBookingHandler(stub)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/rides/trip-1/cancel", nil)
+	req.SetPathValue("tripID", "trip-1")
+	req = withClaims(req, "rider-1", "rider")
+	w := httptest.NewRecorder()
+
+	h.CancelRide(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d — body: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["status"] != "cancelled" {
+		t.Errorf("status = %q, want cancelled", resp["status"])
+	}
+}
+
+func TestCancelRide_MissingTripID(t *testing.T) {
+	h := handlers.NewBookingHandler(&stubBookingClient{})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/rides//cancel", nil)
+	req = withClaims(req, "rider-1", "rider")
+	w := httptest.NewRecorder()
+	h.CancelRide(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("want 400, got %d", w.Code)
+	}
+}
+
+func TestCancelRide_GRPCError(t *testing.T) {
+	stub := &stubBookingClient{
+		cancelRide: func(_ context.Context, _ *bookingpb.CancelRideRequest, _ ...grpc.CallOption) (*bookingpb.BookingActionResponse, error) {
+			return nil, status.Error(codes.Internal, "trip service down")
+		},
+	}
+	h := handlers.NewBookingHandler(stub)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/rides/trip-1/cancel", nil)
+	req.SetPathValue("tripID", "trip-1")
+	req = withClaims(req, "rider-1", "rider")
+	w := httptest.NewRecorder()
+	h.CancelRide(w, req)
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("want 500, got %d", w.Code)
 	}
 }

@@ -26,6 +26,9 @@ const (
 	BookingService_FinishTrip_FullMethodName            = "/booking.v1.BookingService/FinishTrip"
 	BookingService_GetBookingDetails_FullMethodName     = "/booking.v1.BookingService/GetBookingDetails"
 	BookingService_GetDriverCurrentOffer_FullMethodName = "/booking.v1.BookingService/GetDriverCurrentOffer"
+	BookingService_CancelRide_FullMethodName            = "/booking.v1.BookingService/CancelRide"
+	// Phase B1: payment RPC method name added manually.
+	BookingService_PayRide_FullMethodName = "/booking.v1.BookingService/PayRide"
 )
 
 // BookingServiceClient is the client API for BookingService service.
@@ -52,6 +55,12 @@ type BookingServiceClient interface {
 	// GetDriverCurrentOffer returns the current pending trip offer for a driver.
 	// Returns has_offer=false (not an error) when no active offer exists.
 	GetDriverCurrentOffer(ctx context.Context, in *GetDriverCurrentOfferRequest, opts ...grpc.CallOption) (*GetDriverCurrentOfferResponse, error)
+	// CancelRide is called by the rider to cancel an active trip.
+	// Delegates to the Trip service; trip transitions to cancelled.
+	CancelRide(ctx context.Context, in *CancelRideRequest, opts ...grpc.CallOption) (*BookingActionResponse, error)
+	// PayRide is called by the rider to pay for a completed trip.
+	// Uses StartTripRequest (TripId only); returns FinishedTripResponse.
+	PayRide(ctx context.Context, in *StartTripRequest, opts ...grpc.CallOption) (*FinishedTripResponse, error)
 }
 
 type bookingServiceClient struct {
@@ -125,6 +134,24 @@ func (c *bookingServiceClient) GetDriverCurrentOffer(ctx context.Context, in *Ge
 	return out, nil
 }
 
+func (c *bookingServiceClient) CancelRide(ctx context.Context, in *CancelRideRequest, opts ...grpc.CallOption) (*BookingActionResponse, error) {
+	out := new(BookingActionResponse)
+	err := c.cc.Invoke(ctx, BookingService_CancelRide_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *bookingServiceClient) PayRide(ctx context.Context, in *StartTripRequest, opts ...grpc.CallOption) (*FinishedTripResponse, error) {
+	out := new(FinishedTripResponse)
+	err := c.cc.Invoke(ctx, BookingService_PayRide_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BookingServiceServer is the server API for BookingService service.
 // All implementations must embed UnimplementedBookingServiceServer
 // for forward compatibility
@@ -149,6 +176,11 @@ type BookingServiceServer interface {
 	// GetDriverCurrentOffer returns the current pending trip offer for a driver.
 	// Returns has_offer=false (not an error) when no active offer exists.
 	GetDriverCurrentOffer(context.Context, *GetDriverCurrentOfferRequest) (*GetDriverCurrentOfferResponse, error)
+	// CancelRide is called by the rider to cancel an active trip.
+	// Delegates to the Trip service; trip transitions to cancelled.
+	CancelRide(context.Context, *CancelRideRequest) (*BookingActionResponse, error)
+	// PayRide is called by the rider to pay for a trip in payment_pending status.
+	PayRide(context.Context, *StartTripRequest) (*FinishedTripResponse, error)
 	mustEmbedUnimplementedBookingServiceServer()
 }
 
@@ -176,6 +208,12 @@ func (UnimplementedBookingServiceServer) GetBookingDetails(context.Context, *Get
 }
 func (UnimplementedBookingServiceServer) GetDriverCurrentOffer(context.Context, *GetDriverCurrentOfferRequest) (*GetDriverCurrentOfferResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetDriverCurrentOffer not implemented")
+}
+func (UnimplementedBookingServiceServer) CancelRide(context.Context, *CancelRideRequest) (*BookingActionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CancelRide not implemented")
+}
+func (UnimplementedBookingServiceServer) PayRide(context.Context, *StartTripRequest) (*FinishedTripResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PayRide not implemented")
 }
 func (UnimplementedBookingServiceServer) mustEmbedUnimplementedBookingServiceServer() {}
 
@@ -316,6 +354,42 @@ func _BookingService_GetDriverCurrentOffer_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BookingService_CancelRide_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelRideRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BookingServiceServer).CancelRide(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BookingService_CancelRide_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BookingServiceServer).CancelRide(ctx, req.(*CancelRideRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BookingService_PayRide_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartTripRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BookingServiceServer).PayRide(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BookingService_PayRide_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BookingServiceServer).PayRide(ctx, req.(*StartTripRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // BookingService_ServiceDesc is the grpc.ServiceDesc for BookingService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -350,6 +424,14 @@ var BookingService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetDriverCurrentOffer",
 			Handler:    _BookingService_GetDriverCurrentOffer_Handler,
+		},
+		{
+			MethodName: "CancelRide",
+			Handler:    _BookingService_CancelRide_Handler,
+		},
+		{
+			MethodName: "PayRide",
+			Handler:    _BookingService_PayRide_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

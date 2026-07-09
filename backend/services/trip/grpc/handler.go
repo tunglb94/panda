@@ -17,20 +17,24 @@ import (
 // Handler implements trippb.TripServiceServer.
 type Handler struct {
 	trippb.UnimplementedTripServiceServer
-	createTrip   *app.CreateTripUseCase
-	cancelTrip   *app.CancelTripUseCase
-	getTrip      *app.GetTripUseCase
-	startTrip    *app.StartTripUseCase
-	completeTrip *app.CompleteTripUseCase
+	createTrip      *app.CreateTripUseCase
+	cancelTrip      *app.CancelTripUseCase
+	getTrip         *app.GetTripUseCase
+	startTrip       *app.StartTripUseCase
+	completeTrip    *app.CompleteTripUseCase
+	initiatePayment *app.InitiatePaymentUseCase
+	payTrip         *app.PayTripUseCase
 }
 
-// NewHandler wires all five trip use cases into a gRPC handler.
+// NewHandler wires all trip use cases into a gRPC handler.
 func NewHandler(
 	createTrip *app.CreateTripUseCase,
 	cancelTrip *app.CancelTripUseCase,
 	getTrip *app.GetTripUseCase,
 	startTrip *app.StartTripUseCase,
 	completeTrip *app.CompleteTripUseCase,
+	initiatePayment *app.InitiatePaymentUseCase,
+	payTrip *app.PayTripUseCase,
 ) *Handler {
 	if createTrip == nil {
 		panic("trip grpc: CreateTripUseCase must not be nil")
@@ -47,12 +51,20 @@ func NewHandler(
 	if completeTrip == nil {
 		panic("trip grpc: CompleteTripUseCase must not be nil")
 	}
+	if initiatePayment == nil {
+		panic("trip grpc: InitiatePaymentUseCase must not be nil")
+	}
+	if payTrip == nil {
+		panic("trip grpc: PayTripUseCase must not be nil")
+	}
 	return &Handler{
-		createTrip:   createTrip,
-		cancelTrip:   cancelTrip,
-		getTrip:      getTrip,
-		startTrip:    startTrip,
-		completeTrip: completeTrip,
+		createTrip:      createTrip,
+		cancelTrip:      cancelTrip,
+		getTrip:         getTrip,
+		startTrip:       startTrip,
+		completeTrip:    completeTrip,
+		initiatePayment: initiatePayment,
+		payTrip:         payTrip,
 	}
 }
 
@@ -129,6 +141,34 @@ func (h *Handler) CompleteTrip(ctx context.Context, req *trippb.CompleteTripRequ
 		TripID:         req.GetTripId(),
 		FinalFareTotal: req.GetFinalFareTotal(),
 		FareCurrency:   req.GetFareCurrency(),
+	})
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	return &trippb.TripResponse{Trip: toProto(trip)}, nil
+}
+
+// InitiatePayment implements TripServiceServer.InitiatePayment.
+func (h *Handler) InitiatePayment(ctx context.Context, req *trippb.GetTripRequest) (*trippb.TripResponse, error) {
+	if req.GetTripId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "trip_id is required")
+	}
+	trip, err := h.initiatePayment.Execute(ctx, req.GetTripId())
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	return &trippb.TripResponse{Trip: toProto(trip)}, nil
+}
+
+// PayTrip implements TripServiceServer.PayTrip.
+// req.TripId = trip ID, req.Reason = payment method ("cash"|"wallet").
+func (h *Handler) PayTrip(ctx context.Context, req *trippb.CancelTripRequest) (*trippb.TripResponse, error) {
+	if req.GetTripId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "trip_id is required")
+	}
+	trip, err := h.payTrip.Execute(ctx, app.PayTripInput{
+		TripID:        req.GetTripId(),
+		PaymentMethod: req.GetReason(),
 	})
 	if err != nil {
 		return nil, toGRPCError(err)

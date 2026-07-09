@@ -31,15 +31,16 @@ func (r *TripRepository) Save(ctx context.Context, trip *entity.Trip) error {
 		INSERT INTO trips (
 			trip_id, rider_id, driver_id, status,
 			pickup_address, dropoff_address, cancellation_reason,
-			final_fare_total, fare_currency,
+			final_fare_total, fare_currency, payment_method,
 			created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 		ON CONFLICT (trip_id) DO UPDATE SET
 			driver_id           = EXCLUDED.driver_id,
 			status              = EXCLUDED.status,
 			cancellation_reason = EXCLUDED.cancellation_reason,
 			final_fare_total    = EXCLUDED.final_fare_total,
 			fare_currency       = EXCLUDED.fare_currency,
+			payment_method      = EXCLUDED.payment_method,
 			updated_at          = EXCLUDED.updated_at`
 
 	_, err := r.pool.Exec(ctx, q,
@@ -52,6 +53,7 @@ func (r *TripRepository) Save(ctx context.Context, trip *entity.Trip) error {
 		trip.CancellationReason,
 		trip.FinalFareTotal,
 		trip.FareCurrency,
+		trip.PaymentMethod,
 		trip.CreatedAt.UTC(),
 		trip.UpdatedAt.UTC(),
 	)
@@ -66,7 +68,7 @@ func (r *TripRepository) FindByID(ctx context.Context, tripID string) (*entity.T
 	const q = `
 		SELECT trip_id, rider_id, driver_id, status,
 		       pickup_address, dropoff_address, cancellation_reason,
-		       final_fare_total, fare_currency,
+		       final_fare_total, fare_currency, payment_method,
 		       created_at, updated_at
 		FROM trips
 		WHERE trip_id = $1`
@@ -79,7 +81,7 @@ func (r *TripRepository) FindByRiderID(ctx context.Context, riderID string) ([]*
 	const q = `
 		SELECT trip_id, rider_id, driver_id, status,
 		       pickup_address, dropoff_address, cancellation_reason,
-		       final_fare_total, fare_currency,
+		       final_fare_total, fare_currency, payment_method,
 		       created_at, updated_at
 		FROM trips
 		WHERE rider_id = $1
@@ -115,14 +117,14 @@ func (r *TripRepository) scanOne(row rowScanner) (*entity.Trip, error) {
 	var (
 		tripID, riderID, driverID, status            string
 		pickupAddress, dropoffAddress, cancellation string
-		fareCurrency                                string
+		fareCurrency, paymentMethod                 string
 		finalFareTotal                              int64
 		createdAt, updatedAt                        time.Time
 	)
 	err := row.Scan(
 		&tripID, &riderID, &driverID, &status,
 		&pickupAddress, &dropoffAddress, &cancellation,
-		&finalFareTotal, &fareCurrency,
+		&finalFareTotal, &fareCurrency, &paymentMethod,
 		&createdAt, &updatedAt,
 	)
 	if err != nil {
@@ -135,7 +137,7 @@ func (r *TripRepository) scanOne(row rowScanner) (*entity.Trip, error) {
 		tripID, riderID, driverID,
 		entity.TripStatus(status),
 		pickupAddress, dropoffAddress, cancellation,
-		finalFareTotal, fareCurrency,
+		finalFareTotal, fareCurrency, paymentMethod,
 		createdAt.UTC(), updatedAt.UTC(),
 	), nil
 }

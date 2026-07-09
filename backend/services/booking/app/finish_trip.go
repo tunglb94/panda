@@ -17,7 +17,7 @@ type FinishTripInput struct {
 // FinishedTripResult holds the fare and final trip state.
 type FinishedTripResult struct {
 	TripID      string
-	Status      string // "completed"
+	Status      string // "payment_pending" after B1
 	FinalFare   int64
 	Currency    string
 	VehicleType string
@@ -60,8 +60,11 @@ func (uc *FinishTripUseCase) Execute(ctx context.Context, in FinishTripInput) (*
 	if err != nil {
 		return nil, err
 	}
-	tripInfo, err := uc.trip.CompleteTrip(ctx, in.TripID, fare.Total, fare.CurrencyCode)
+	_, err = uc.trip.CompleteTrip(ctx, in.TripID, fare.Total, fare.CurrencyCode)
 	if err != nil {
+		return nil, err
+	}
+	if err := uc.trip.InitiatePayment(ctx, in.TripID); err != nil {
 		return nil, err
 	}
 
@@ -70,8 +73,8 @@ func (uc *FinishTripUseCase) Execute(ctx context.Context, in FinishTripInput) (*
 	}
 
 	return &FinishedTripResult{
-		TripID:      tripInfo.TripID,
-		Status:      tripInfo.Status,
+		TripID:      in.TripID,
+		Status:      "payment_pending",
 		FinalFare:   fare.Total,
 		Currency:    fare.CurrencyCode,
 		VehicleType: in.VehicleType,

@@ -42,6 +42,10 @@ type TripClient interface {
 	GetTrip(ctx context.Context, tripID string) (*TripInfo, error)
 	// CancelTrip cancels a trip, used for saga compensation when downstream steps fail.
 	CancelTrip(ctx context.Context, tripID, reason string) error
+	// InitiatePayment transitions a completed trip to payment_pending.
+	InitiatePayment(ctx context.Context, tripID string) error
+	// PayTrip processes mock payment and transitions payment_pending → settled.
+	PayTrip(ctx context.Context, tripID, paymentMethod string) (*TripInfo, error)
 }
 
 // DriverOfferInfo is the active pending offer directed at a driver.

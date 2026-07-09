@@ -103,7 +103,7 @@ func TestCreateTrip_EmptyPickup(t *testing.T) {
 
 func makeTrip(repo *stubRepo, tripID, riderID string, status entity.TripStatus) *entity.Trip {
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	trip := entity.ReconstituteTrip(tripID, riderID, "", status, "pickup", "dropoff", "", 0, "", now, now)
+	trip := entity.ReconstituteTrip(tripID, riderID, "", status, "pickup", "dropoff", "", 0, "", "", now, now)
 	_ = repo.Save(context.Background(), trip)
 	return trip
 }
@@ -268,6 +268,96 @@ func TestCompleteTrip_NotFound(t *testing.T) {
 		FinalFareTotal: 100,
 		FareCurrency:   "USD",
 	})
+	if !errors.IsCode(err, errors.CodeNotFound) {
+		t.Errorf("expected NotFound, got %v", err)
+	}
+}
+
+// ─── InitiatePayment ──────────────────────────────────────────────────────────
+
+func TestInitiatePayment_FromCompleted(t *testing.T) {
+	repo := newStubRepo()
+	makeTrip(repo, "t1", "r1", entity.StatusCompleted)
+
+	uc := app.NewInitiatePaymentUseCase(repo)
+	trip, err := uc.Execute(context.Background(), "t1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if trip.Status != entity.StatusPaymentPending {
+		t.Errorf("Status = %q, want payment_pending", trip.Status)
+	}
+}
+
+func TestInitiatePayment_FromInProgressFails(t *testing.T) {
+	repo := newStubRepo()
+	makeTrip(repo, "t1", "r1", entity.StatusInProgress)
+
+	uc := app.NewInitiatePaymentUseCase(repo)
+	_, err := uc.Execute(context.Background(), "t1")
+	if !errors.IsCode(err, errors.CodePreconditionFailed) {
+		t.Errorf("expected PreconditionFailed, got %v", err)
+	}
+}
+
+func TestInitiatePayment_NotFound(t *testing.T) {
+	uc := app.NewInitiatePaymentUseCase(newStubRepo())
+	_, err := uc.Execute(context.Background(), "missing")
+	if !errors.IsCode(err, errors.CodeNotFound) {
+		t.Errorf("expected NotFound, got %v", err)
+	}
+}
+
+// ─── PayTrip ──────────────────────────────────────────────────────────────────
+
+func TestPayTrip_FromPaymentPending(t *testing.T) {
+	repo := newStubRepo()
+	makeTrip(repo, "t1", "r1", entity.StatusPaymentPending)
+
+	uc := app.NewPayTripUseCase(repo)
+	trip, err := uc.Execute(context.Background(), app.PayTripInput{
+		TripID:        "t1",
+		PaymentMethod: "cash",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if trip.Status != entity.StatusSettled {
+		t.Errorf("Status = %q, want settled", trip.Status)
+	}
+	if trip.PaymentMethod != "cash" {
+		t.Errorf("PaymentMethod = %q, want cash", trip.PaymentMethod)
+	}
+}
+
+func TestPayTrip_DefaultsToCache(t *testing.T) {
+	repo := newStubRepo()
+	makeTrip(repo, "t1", "r1", entity.StatusPaymentPending)
+
+	uc := app.NewPayTripUseCase(repo)
+	trip, err := uc.Execute(context.Background(), app.PayTripInput{TripID: "t1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if trip.PaymentMethod != "cash" {
+		t.Errorf("PaymentMethod = %q, want cash (default)", trip.PaymentMethod)
+	}
+}
+
+func TestPayTrip_FromCompletedFails(t *testing.T) {
+	repo := newStubRepo()
+	makeTrip(repo, "t1", "r1", entity.StatusCompleted)
+
+	uc := app.NewPayTripUseCase(repo)
+	_, err := uc.Execute(context.Background(), app.PayTripInput{TripID: "t1", PaymentMethod: "cash"})
+	if !errors.IsCode(err, errors.CodePreconditionFailed) {
+		t.Errorf("expected PreconditionFailed, got %v", err)
+	}
+}
+
+func TestPayTrip_NotFound(t *testing.T) {
+	uc := app.NewPayTripUseCase(newStubRepo())
+	_, err := uc.Execute(context.Background(), app.PayTripInput{TripID: "missing", PaymentMethod: "cash"})
 	if !errors.IsCode(err, errors.CodeNotFound) {
 		t.Errorf("expected NotFound, got %v", err)
 	}

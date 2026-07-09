@@ -90,6 +90,8 @@ func register(srv *sharedgrpc.Server, ready *server.ReadinessTracker) {
 		finishTrip,
 		app.NewGetBookingDetailsUseCase(tripAdapter, dispatchAdapter),
 		app.NewGetDriverCurrentOfferUseCase(dispatchAdapter, tripAdapter),
+		app.NewCancelRideUseCase(tripAdapter),
+		app.NewPayRideUseCase(tripAdapter),
 	)
 	bookingpb.RegisterBookingServiceServer(srv.Inner(), handler)
 }

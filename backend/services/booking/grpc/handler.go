@@ -22,9 +22,11 @@ type Handler struct {
 	finishTrip     *app.FinishTripUseCase
 	getDetails     *app.GetBookingDetailsUseCase
 	getDriverOffer *app.GetDriverCurrentOfferUseCase
+	cancelRide     *app.CancelRideUseCase
+	payRide        *app.PayRideUseCase
 }
 
-// NewHandler wires all seven booking use cases into a gRPC handler.
+// NewHandler wires all booking use cases into a gRPC handler.
 func NewHandler(
 	bookRide *app.BookRideUseCase,
 	acceptOffer *app.AcceptDispatchOfferUseCase,
@@ -33,6 +35,8 @@ func NewHandler(
 	finishTrip *app.FinishTripUseCase,
 	getDetails *app.GetBookingDetailsUseCase,
 	getDriverOffer *app.GetDriverCurrentOfferUseCase,
+	cancelRide *app.CancelRideUseCase,
+	payRide *app.PayRideUseCase,
 ) *Handler {
 	return &Handler{
 		bookRide:       bookRide,
@@ -42,6 +46,8 @@ func NewHandler(
 		finishTrip:     finishTrip,
 		getDetails:     getDetails,
 		getDriverOffer: getDriverOffer,
+		cancelRide:     cancelRide,
+		payRide:        payRide,
 	}
 }
 
@@ -155,6 +161,34 @@ func (h *Handler) GetBookingDetails(ctx context.Context, req *bookingpb.GetBooki
 		DispatchStatus: details.DispatchStatus,
 		FinalFare:      details.FinalFare,
 		Currency:       details.Currency,
+	}, nil
+}
+
+// CancelRide implements BookingServiceServer.CancelRide.
+func (h *Handler) CancelRide(ctx context.Context, req *bookingpb.CancelRideRequest) (*bookingpb.BookingActionResponse, error) {
+	if req.GetTripId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "trip_id is required")
+	}
+	if err := h.cancelRide.Execute(ctx, req.GetTripId()); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &bookingpb.BookingActionResponse{TripId: req.GetTripId(), Status: "cancelled"}, nil
+}
+
+// PayRide implements BookingServiceServer.PayRide.
+func (h *Handler) PayRide(ctx context.Context, req *bookingpb.StartTripRequest) (*bookingpb.FinishedTripResponse, error) {
+	if req.GetTripId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "trip_id is required")
+	}
+	result, err := h.payRide.Execute(ctx, app.PayRideInput{TripID: req.GetTripId()})
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &bookingpb.FinishedTripResponse{
+		TripId:    result.TripID,
+		Status:    result.Status,
+		FinalFare: result.FinalFare,
+		Currency:  result.Currency,
 	}, nil
 }
 

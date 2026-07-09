@@ -20,6 +20,8 @@ type BookingClient interface {
 	FinishTrip(ctx context.Context, in *bookingpb.FinishTripRequest, opts ...grpc.CallOption) (*bookingpb.FinishedTripResponse, error)
 	GetBookingDetails(ctx context.Context, in *bookingpb.GetBookingDetailsRequest, opts ...grpc.CallOption) (*bookingpb.BookingDetailsResponse, error)
 	GetDriverCurrentOffer(ctx context.Context, in *bookingpb.GetDriverCurrentOfferRequest, opts ...grpc.CallOption) (*bookingpb.GetDriverCurrentOfferResponse, error)
+	CancelRide(ctx context.Context, in *bookingpb.CancelRideRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error)
+	PayRide(ctx context.Context, in *bookingpb.StartTripRequest, opts ...grpc.CallOption) (*bookingpb.FinishedTripResponse, error)
 }
 
 // BookingHandler exposes booking operations over HTTP.
@@ -220,6 +222,65 @@ func (h *BookingHandler) FinishTrip(w http.ResponseWriter, r *http.Request) {
 		"vehicle_type": resp.GetVehicleType(),
 		"distance_km":  resp.GetDistanceKm(),
 		"duration_min": resp.GetDurationMin(),
+	})
+}
+
+// ─── POST /api/v1/rides/{tripID}/cancel ──────────────────────────────────────
+
+func (h *BookingHandler) CancelRide(w http.ResponseWriter, r *http.Request) {
+	tripID := r.PathValue("tripID")
+	if tripID == "" {
+		writeBadRequest(w, "trip_id is required")
+		return
+	}
+	claims, ok := middleware.ClaimsFromContext(r.Context())
+	if !ok {
+		writeBadRequest(w, "missing auth claims")
+		return
+	}
+	resp, err := h.client.CancelRide(r.Context(), &bookingpb.CancelRideRequest{
+		TripId:  tripID,
+		RiderId: claims.UserID,
+	})
+	if err != nil {
+		writeGRPCError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{
+		"trip_id": resp.GetTripId(),
+		"status":  resp.GetStatus(),
+	})
+}
+
+// ─── POST /api/v1/rides/{tripID}/pay ─────────────────────────────────────────
+
+type payRideRequest struct {
+	PaymentMethod string `json:"payment_method"`
+}
+
+func (h *BookingHandler) PayRide(w http.ResponseWriter, r *http.Request) {
+	tripID := r.PathValue("tripID")
+	if tripID == "" {
+		writeBadRequest(w, "trip_id is required")
+		return
+	}
+	var req payRideRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeBadRequest(w, "invalid request body")
+		return
+	}
+	resp, err := h.client.PayRide(r.Context(), &bookingpb.StartTripRequest{
+		TripId: tripID,
+	})
+	if err != nil {
+		writeGRPCError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"trip_id":    resp.GetTripId(),
+		"status":     resp.GetStatus(),
+		"final_fare": resp.GetFinalFare(),
+		"currency":   resp.GetCurrency(),
 	})
 }
 

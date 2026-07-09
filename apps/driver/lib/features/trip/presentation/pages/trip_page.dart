@@ -2,7 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/location/location_engine.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/trip_metrics/trip_metrics.dart';
+import '../../../../core/trip_metrics/trip_metrics_engine.dart';
 import '../../data/active_trip_repository.dart';
 import '../../data/trip_offer_repository.dart';
 
@@ -12,14 +15,20 @@ enum _PageState {
   offerAvailable,
   acting,
   activeTrip,
+  awaitingPayment,
   completed,
   error,
 }
 
 class TripPage extends StatefulWidget {
-  const TripPage({super.key, required this.apiClient});
+  const TripPage({
+    super.key,
+    required this.apiClient,
+    required this.locationStream,
+  });
 
   final ApiClient apiClient;
+  final Stream<LocationUpdate> locationStream;
 
   @override
   State<TripPage> createState() => _TripPageState();
@@ -28,6 +37,7 @@ class TripPage extends StatefulWidget {
 class _TripPageState extends State<TripPage> {
   late final TripOfferRepository _offerRepo;
   late final ActiveTripRepository _activeTripRepo;
+  late final TripMetricsEngine _metricsEngine;
 
   _PageState _state = _PageState.initializing;
   TripOffer? _offer;
@@ -35,9 +45,11 @@ class _TripPageState extends State<TripPage> {
   String? _errorMessage;
   int _countdownSeconds = 0;
   bool _hasArrived = false;
+  TripMetrics? _finalMetrics;
 
   Timer? _pollTimer;
   Timer? _countdownTimer;
+  Timer? _paymentPollTimer;
   bool _isPollingActive = false;
 
   @override
@@ -45,6 +57,7 @@ class _TripPageState extends State<TripPage> {
     super.initState();
     _offerRepo = TripOfferRepository(apiClient: widget.apiClient);
     _activeTripRepo = ActiveTripRepository(apiClient: widget.apiClient);
+    _metricsEngine = TripMetricsEngine(locationStream: widget.locationStream);
     _initialize();
   }
 
@@ -52,6 +65,8 @@ class _TripPageState extends State<TripPage> {
   void dispose() {
     _pollTimer?.cancel();
     _countdownTimer?.cancel();
+    _paymentPollTimer?.cancel();
+    _metricsEngine.reset();
     super.dispose();
   }
 
@@ -73,7 +88,15 @@ class _TripPageState extends State<TripPage> {
           });
           return;
         }
-        // Trip completed or cancelled on backend — clear and fall through.
+        if (trip.isAwaitingPayment) {
+          setState(() {
+            _state = _PageState.awaitingPayment;
+            _activeTrip = trip;
+          });
+          _startPaymentPolling();
+          return;
+        }
+        // Trip completed, settled, or cancelled on backend — clear and fall through.
         await _activeTripRepo.clearActiveTripId();
       } on ApiException catch (e) {
         if (!mounted) return;
@@ -110,6 +133,7 @@ class _TripPageState extends State<TripPage> {
     if (_isPollingActive) return;
     if (_state == _PageState.acting ||
         _state == _PageState.activeTrip ||
+        _state == _PageState.awaitingPayment ||
         _state == _PageState.completed ||
         _state == _PageState.initializing) return;
 
@@ -145,6 +169,42 @@ class _TripPageState extends State<TripPage> {
       }
     } finally {
       _isPollingActive = false;
+    }
+  }
+
+  // ─── Payment polling ─────────────────────────────────────────────────────────
+
+  void _startPaymentPolling() {
+    _paymentPollTimer?.cancel();
+    _paymentPollTimer =
+        Timer.periodic(const Duration(seconds: 3), (_) => _paymentPoll());
+  }
+
+  Future<void> _paymentPoll() async {
+    final trip = _activeTrip;
+    if (trip == null) return;
+    try {
+      final updated = await _activeTripRepo.fetchTrip(trip.tripId);
+      if (!mounted) return;
+      if (updated.status == 'settled') {
+        _paymentPollTimer?.cancel();
+        _paymentPollTimer = null;
+        await _activeTripRepo.clearActiveTripId();
+        if (!mounted) return;
+        setState(() {
+          _state = _PageState.completed;
+          _activeTrip = updated;
+        });
+        Future.delayed(const Duration(seconds: 4), () {
+          if (mounted && _state == _PageState.completed) {
+            _startPolling();
+          }
+        });
+      } else {
+        setState(() => _activeTrip = updated);
+      }
+    } on ApiException catch (_) {
+      // Ignore transient poll errors; rider may still be paying.
     }
   }
 
@@ -236,6 +296,7 @@ class _TripPageState extends State<TripPage> {
     try {
       await _activeTripRepo.startTrip(trip.tripId);
       if (!mounted) return;
+      _metricsEngine.start();
       setState(() {
         _state = _PageState.activeTrip;
         _activeTrip = trip.copyWith(status: 'in_progress');
@@ -253,23 +314,27 @@ class _TripPageState extends State<TripPage> {
     final trip = _activeTrip;
     if (trip == null) return;
     setState(() => _state = _PageState.acting);
+    // Capture metrics once; if the API call fails and driver retries, reuse
+    // the same snapshot rather than calling finish() a second time.
+    _finalMetrics ??= _metricsEngine.finish();
+    final metrics = _finalMetrics!;
     try {
-      final completed = await _activeTripRepo.finishTrip(
+      final result = await _activeTripRepo.finishTrip(
         tripId: trip.tripId,
         pickupAddress: trip.pickupAddress,
         dropoffAddress: trip.dropoffAddress,
+        distanceKm: metrics.distanceKm,
+        durationMin: metrics.durationMinutes,
       );
-      await _activeTripRepo.clearActiveTripId();
+      _metricsEngine.reset();
+      _finalMetrics = null;
+      // Active trip ID is kept in storage until the rider pays (status = settled).
       if (!mounted) return;
       setState(() {
-        _state = _PageState.completed;
-        _activeTrip = completed;
+        _state = _PageState.awaitingPayment;
+        _activeTrip = result;
       });
-      Future.delayed(const Duration(seconds: 4), () {
-        if (mounted && _state == _PageState.completed) {
-          _startPolling();
-        }
-      });
+      _startPaymentPolling();
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -291,6 +356,7 @@ class _TripPageState extends State<TripPage> {
 
   String _appBarTitle() {
     if (_state == _PageState.activeTrip) return 'Active Trip';
+    if (_state == _PageState.awaitingPayment) return 'Awaiting Payment';
     if (_state == _PageState.completed) return 'Trip Completed';
     return 'Trip Offers';
   }
@@ -314,6 +380,7 @@ class _TripPageState extends State<TripPage> {
           onStartTrip: _onStartTrip,
           onFinishTrip: _onFinishTrip,
         ),
+      _PageState.awaitingPayment => _AwaitingPaymentCard(trip: _activeTrip!),
       _PageState.completed => _TripCompletedCard(trip: _activeTrip!),
       _PageState.error => _ErrorView(
           message: _errorMessage ?? 'An error occurred',
@@ -667,6 +734,106 @@ class _ActionButton extends StatelessWidget {
       ),
       child: const Text('I\'ve Arrived at Pickup'),
     );
+  }
+}
+
+class _AwaitingPaymentCard extends StatelessWidget {
+  const _AwaitingPaymentCard({required this.trip});
+
+  final ActiveTrip trip;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          const SizedBox(height: 24),
+          SizedBox(
+            width: 64,
+            height: 64,
+            child: CircularProgressIndicator(
+              strokeWidth: 5,
+              color: cs.primary,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Waiting for Payment',
+            style: theme.textTheme.headlineSmall
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'The rider is completing payment.',
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 24),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _AddressRow(
+                    icon: Icons.location_on,
+                    color: cs.primary,
+                    label: 'Pickup',
+                    address: trip.pickupAddress,
+                  ),
+                  const SizedBox(height: 12),
+                  _AddressRow(
+                    icon: Icons.flag,
+                    color: cs.error,
+                    label: 'Destination',
+                    address: trip.dropoffAddress,
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Divider(),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Your earnings',
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                      Text(
+                        _fareLabel(trip),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: cs.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'You will automatically return to the offer queue once paid.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _fareLabel(ActiveTrip trip) {
+    if (trip.finalFare > 0 && trip.fareCurrency.isNotEmpty) {
+      final amount = trip.finalFare / 100;
+      return '${trip.fareCurrency} ${amount.toStringAsFixed(2)}';
+    }
+    return '—';
   }
 }
 

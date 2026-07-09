@@ -80,6 +80,24 @@ func (s *stubTrip) CancelTrip(_ context.Context, tripID, _ string) error {
 	return nil
 }
 
+func (s *stubTrip) InitiatePayment(_ context.Context, tripID string) error {
+	t, ok := s.trips[tripID]
+	if !ok {
+		return errors.New("trip not found")
+	}
+	t.Status = "payment_pending"
+	return nil
+}
+
+func (s *stubTrip) PayTrip(_ context.Context, tripID, method string) (*app.TripInfo, error) {
+	t, ok := s.trips[tripID]
+	if !ok {
+		return nil, errors.New("trip not found")
+	}
+	t.Status = "settled"
+	return t, nil
+}
+
 type stubDispatch struct {
 	jobs       map[string]*app.DispatchInfo
 	acceptErr  error
@@ -306,8 +324,8 @@ func TestFinishTrip_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Status != "completed" {
-		t.Errorf("status = %q, want completed", result.Status)
+	if result.Status != "payment_pending" {
+		t.Errorf("status = %q, want payment_pending", result.Status)
 	}
 	if result.FinalFare != 325 {
 		t.Errorf("FinalFare = %d, want 325", result.FinalFare)
@@ -463,7 +481,7 @@ func TestFullBookingFlow(t *testing.T) {
 		t.Errorf("step 4: status = %q, want in_progress", ti.Status)
 	}
 
-	// Step 5: Driver finishes the trip
+	// Step 5: Driver finishes the trip (fare calculated, trip → payment_pending)
 	finishUC := app.NewFinishTripUseCase(pricingClient, tripClient)
 	result, err := finishUC.Execute(ctx, app.FinishTripInput{
 		TripID:      tripID,
@@ -474,24 +492,37 @@ func TestFullBookingFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("step 5 FinishTrip: %v", err)
 	}
-	if result.Status != "completed" {
-		t.Errorf("step 5: status = %q, want completed", result.Status)
+	if result.Status != "payment_pending" {
+		t.Errorf("step 5: status = %q, want payment_pending", result.Status)
 	}
 	if result.FinalFare != 325 {
 		t.Errorf("step 5: FinalFare = %d, want 325", result.FinalFare)
 	}
 
-	// Step 6: Verify final booking details
+	// Step 6: Rider pays (payment_pending → settled)
+	payUC := app.NewPayRideUseCase(tripClient)
+	payResult, err := payUC.Execute(ctx, app.PayRideInput{
+		TripID:        tripID,
+		PaymentMethod: "cash",
+	})
+	if err != nil {
+		t.Fatalf("step 6 PayRide: %v", err)
+	}
+	if payResult.Status != "settled" {
+		t.Errorf("step 6: status = %q, want settled", payResult.Status)
+	}
+
+	// Step 7: Verify final booking details
 	getUC := app.NewGetBookingDetailsUseCase(tripClient, dispatchClient)
 	details, err := getUC.Execute(ctx, tripID)
 	if err != nil {
-		t.Fatalf("step 6 GetBookingDetails: %v", err)
+		t.Fatalf("step 7 GetBookingDetails: %v", err)
 	}
-	if details.TripStatus != "completed" {
-		t.Errorf("step 6: TripStatus = %q, want completed", details.TripStatus)
+	if details.TripStatus != "settled" {
+		t.Errorf("step 7: TripStatus = %q, want settled", details.TripStatus)
 	}
 	if details.FinalFare != 325 {
-		t.Errorf("step 6: FinalFare = %d, want 325", details.FinalFare)
+		t.Errorf("step 7: FinalFare = %d, want 325", details.FinalFare)
 	}
 }
 
@@ -580,5 +611,54 @@ func TestFinishTrip_DuplicateIdempotentRequest(t *testing.T) {
 	// Second finish with same tripID must return AlreadyExists.
 	if _, err := uc.Execute(context.Background(), in); err == nil {
 		t.Fatal("second call: expected AlreadyExists error, got nil")
+	}
+}
+
+// ─── PayRide ─────────────────────────────────────────────────────────────────
+
+func TestPayRide_Success(t *testing.T) {
+	trip := newStubTrip()
+	trip.trips["t1"] = &app.TripInfo{TripID: "t1", Status: "payment_pending", FinalFareTotal: 325, FareCurrency: "USD"}
+
+	uc := app.NewPayRideUseCase(trip)
+	result, err := uc.Execute(context.Background(), app.PayRideInput{
+		TripID:        "t1",
+		PaymentMethod: "cash",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Status != "settled" {
+		t.Errorf("status = %q, want settled", result.Status)
+	}
+}
+
+func TestPayRide_DefaultsMethodToCash(t *testing.T) {
+	trip := newStubTrip()
+	trip.trips["t1"] = &app.TripInfo{TripID: "t1", Status: "payment_pending"}
+
+	uc := app.NewPayRideUseCase(trip)
+	result, err := uc.Execute(context.Background(), app.PayRideInput{TripID: "t1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Status != "settled" {
+		t.Errorf("status = %q, want settled", result.Status)
+	}
+}
+
+func TestPayRide_EmptyTripID(t *testing.T) {
+	uc := app.NewPayRideUseCase(newStubTrip())
+	_, err := uc.Execute(context.Background(), app.PayRideInput{})
+	if err == nil {
+		t.Fatal("expected error for empty trip_id")
+	}
+}
+
+func TestPayRide_TripNotFound(t *testing.T) {
+	uc := app.NewPayRideUseCase(newStubTrip())
+	_, err := uc.Execute(context.Background(), app.PayRideInput{TripID: "missing", PaymentMethod: "cash"})
+	if err == nil {
+		t.Fatal("expected error for missing trip")
 	}
 }

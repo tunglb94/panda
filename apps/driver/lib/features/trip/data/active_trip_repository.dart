@@ -22,6 +22,9 @@ class ActiveTrip {
   bool get isActive =>
       status == 'driver_assigned' || status == 'in_progress';
 
+  bool get isAwaitingPayment =>
+      status == 'payment_pending' || status == 'payment_success';
+
   ActiveTrip copyWith({
     String? status,
     int? finalFare,
@@ -74,19 +77,19 @@ class ActiveTripRepository {
     await _client.post('/api/v1/rides/$tripId/start');
   }
 
-  // Sends minimum-fare defaults for distance/duration since GPS tracking is
-  // not implemented in this phase. vehicle_type defaults to "car".
   Future<ActiveTrip> finishTrip({
     required String tripId,
     required String pickupAddress,
     required String dropoffAddress,
+    required double distanceKm,
+    required double durationMin,
   }) async {
     final data = await _client.post(
       '/api/v1/rides/$tripId/finish',
       body: {
         'vehicle_type': 'car',
-        'distance_km': 0.0,
-        'duration_min': 0.0,
+        'distance_km': distanceKm,
+        'duration_min': durationMin,
       },
     );
     return ActiveTrip(

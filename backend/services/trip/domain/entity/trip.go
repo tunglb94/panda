@@ -18,6 +18,9 @@ const (
 	StatusInProgress     TripStatus = "in_progress"
 	StatusCompleted      TripStatus = "completed"
 	StatusCancelled      TripStatus = "cancelled"
+	StatusPaymentPending TripStatus = "payment_pending"
+	StatusPaymentSuccess TripStatus = "payment_success"
+	StatusSettled        TripStatus = "settled"
 )
 
 // cancellableStatuses are the statuses from which a trip may be cancelled.
@@ -32,6 +35,7 @@ var cancellableStatuses = map[TripStatus]bool{
 // DriverID is empty until a driver is assigned.
 // CancellationReason is empty unless the trip is Cancelled.
 // FinalFareTotal and FareCurrency are set when the trip is Completed.
+// PaymentMethod is set when the rider pays (e.g. "cash", "wallet").
 type Trip struct {
 	TripID             string
 	RiderID            string
@@ -42,6 +46,7 @@ type Trip struct {
 	CancellationReason string
 	FinalFareTotal     int64  // 0 until Completed; smallest currency unit
 	FareCurrency       string // e.g. "USD"; empty until Completed
+	PaymentMethod      string // empty until paid
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 }
@@ -78,6 +83,7 @@ func ReconstituteTrip(
 	status TripStatus,
 	pickupAddress, dropoffAddress, cancellationReason string,
 	finalFareTotal int64, fareCurrency string,
+	paymentMethod string,
 	createdAt, updatedAt time.Time,
 ) *Trip {
 	return &Trip{
@@ -90,6 +96,7 @@ func ReconstituteTrip(
 		CancellationReason: cancellationReason,
 		FinalFareTotal:     finalFareTotal,
 		FareCurrency:       fareCurrency,
+		PaymentMethod:      paymentMethod,
 		CreatedAt:          createdAt,
 		UpdatedAt:          updatedAt,
 	}
@@ -133,6 +140,38 @@ func (t *Trip) Complete(finalFareTotal int64, fareCurrency string, now time.Time
 	t.Status = StatusCompleted
 	t.FinalFareTotal = finalFareTotal
 	t.FareCurrency = fareCurrency
+	t.UpdatedAt = now
+	return nil
+}
+
+// InitiatePayment transitions the trip from Completed to PaymentPending.
+// Called immediately after Complete so the rider is prompted to pay.
+func (t *Trip) InitiatePayment(now time.Time) error {
+	if t.Status != StatusCompleted {
+		return errors.PreconditionFailed("payment cannot be initiated from status: " + string(t.Status))
+	}
+	t.Status = StatusPaymentPending
+	t.UpdatedAt = now
+	return nil
+}
+
+// MarkPaid transitions the trip from PaymentPending to PaymentSuccess.
+func (t *Trip) MarkPaid(method string, now time.Time) error {
+	if t.Status != StatusPaymentPending {
+		return errors.PreconditionFailed("trip cannot be marked paid from status: " + string(t.Status))
+	}
+	t.Status = StatusPaymentSuccess
+	t.PaymentMethod = method
+	t.UpdatedAt = now
+	return nil
+}
+
+// Settle transitions the trip from PaymentSuccess to Settled.
+func (t *Trip) Settle(now time.Time) error {
+	if t.Status != StatusPaymentSuccess {
+		return errors.PreconditionFailed("trip cannot be settled from status: " + string(t.Status))
+	}
+	t.Status = StatusSettled
 	t.UpdatedAt = now
 	return nil
 }

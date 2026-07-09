@@ -58,11 +58,13 @@ func newHandler(repo *stubRepo) *tripgrpc.Handler {
 		app.NewGetTripUseCase(repo),
 		app.NewStartTripUseCase(repo),
 		app.NewCompleteTripUseCase(repo),
+		app.NewInitiatePaymentUseCase(repo),
+		app.NewPayTripUseCase(repo),
 	)
 }
 
 func seedTrip(repo *stubRepo, tripID, riderID string, st entity.TripStatus) *entity.Trip {
-	trip := entity.ReconstituteTrip(tripID, riderID, "", st, "pickup", "dropoff", "", 0, "", testNow, testNow)
+	trip := entity.ReconstituteTrip(tripID, riderID, "", st, "pickup", "dropoff", "", 0, "", "", testNow, testNow)
 	_ = repo.Save(context.Background(), trip)
 	return trip
 }

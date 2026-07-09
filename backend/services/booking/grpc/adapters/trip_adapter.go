@@ -60,6 +60,19 @@ func (a *TripAdapter) CancelTrip(ctx context.Context, tripID, reason string) err
 	return err
 }
 
+func (a *TripAdapter) InitiatePayment(ctx context.Context, tripID string) error {
+	_, err := a.client.InitiatePayment(ctx, &trippb.GetTripRequest{TripId: tripID})
+	return err
+}
+
+func (a *TripAdapter) PayTrip(ctx context.Context, tripID, paymentMethod string) (*app.TripInfo, error) {
+	resp, err := a.client.PayTrip(ctx, &trippb.CancelTripRequest{TripId: tripID, Reason: paymentMethod})
+	if err != nil {
+		return nil, err
+	}
+	return protoToTripInfo(resp.GetTrip()), nil
+}
+
 func protoToTripInfo(t *trippb.TripProto) *app.TripInfo {
 	if t == nil {
 		return nil

@@ -18,6 +18,12 @@ import (
 // Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
+// Phase B1: payment RPC method name constants added manually.
+const (
+	TripService_InitiatePayment_FullMethodName = "/trip.v1.TripService/InitiatePayment"
+	TripService_PayTrip_FullMethodName         = "/trip.v1.TripService/PayTrip"
+)
+
 const (
 	TripService_CreateTrip_FullMethodName   = "/trip.v1.TripService/CreateTrip"
 	TripService_CancelTrip_FullMethodName   = "/trip.v1.TripService/CancelTrip"
@@ -41,6 +47,10 @@ type TripServiceClient interface {
 	// CompleteTrip transitions a trip from InProgress to Completed and records the fare.
 	// The caller is responsible for computing the fare before calling this RPC.
 	CompleteTrip(ctx context.Context, in *CompleteTripRequest, opts ...grpc.CallOption) (*TripResponse, error)
+	// InitiatePayment transitions a completed trip to payment_pending.
+	InitiatePayment(ctx context.Context, in *GetTripRequest, opts ...grpc.CallOption) (*TripResponse, error)
+	// PayTrip processes mock payment: payment_pending → settled.
+	PayTrip(ctx context.Context, in *CancelTripRequest, opts ...grpc.CallOption) (*TripResponse, error)
 }
 
 type tripServiceClient struct {
@@ -96,6 +106,24 @@ func (c *tripServiceClient) CompleteTrip(ctx context.Context, in *CompleteTripRe
 	return out, nil
 }
 
+func (c *tripServiceClient) InitiatePayment(ctx context.Context, in *GetTripRequest, opts ...grpc.CallOption) (*TripResponse, error) {
+	out := new(TripResponse)
+	err := c.cc.Invoke(ctx, TripService_InitiatePayment_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tripServiceClient) PayTrip(ctx context.Context, in *CancelTripRequest, opts ...grpc.CallOption) (*TripResponse, error) {
+	out := new(TripResponse)
+	err := c.cc.Invoke(ctx, TripService_PayTrip_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TripServiceServer is the server API for TripService service.
 // All implementations must embed UnimplementedTripServiceServer
 // for forward compatibility
@@ -111,6 +139,11 @@ type TripServiceServer interface {
 	// CompleteTrip transitions a trip from InProgress to Completed and records the fare.
 	// The caller is responsible for computing the fare before calling this RPC.
 	CompleteTrip(context.Context, *CompleteTripRequest) (*TripResponse, error)
+	// InitiatePayment transitions a completed trip to payment_pending.
+	InitiatePayment(context.Context, *GetTripRequest) (*TripResponse, error)
+	// PayTrip processes mock payment: payment_pending → payment_success → settled.
+	// Uses CancelTripRequest: TripId = trip ID, Reason = payment method ("cash"|"wallet").
+	PayTrip(context.Context, *CancelTripRequest) (*TripResponse, error)
 	mustEmbedUnimplementedTripServiceServer()
 }
 
@@ -132,6 +165,12 @@ func (UnimplementedTripServiceServer) StartTrip(context.Context, *StartTripReque
 }
 func (UnimplementedTripServiceServer) CompleteTrip(context.Context, *CompleteTripRequest) (*TripResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CompleteTrip not implemented")
+}
+func (UnimplementedTripServiceServer) InitiatePayment(context.Context, *GetTripRequest) (*TripResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InitiatePayment not implemented")
+}
+func (UnimplementedTripServiceServer) PayTrip(context.Context, *CancelTripRequest) (*TripResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PayTrip not implemented")
 }
 func (UnimplementedTripServiceServer) mustEmbedUnimplementedTripServiceServer() {}
 
@@ -236,6 +275,42 @@ func _TripService_CompleteTrip_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TripService_InitiatePayment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTripRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TripServiceServer).InitiatePayment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TripService_InitiatePayment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TripServiceServer).InitiatePayment(ctx, req.(*GetTripRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TripService_PayTrip_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelTripRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TripServiceServer).PayTrip(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TripService_PayTrip_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TripServiceServer).PayTrip(ctx, req.(*CancelTripRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TripService_ServiceDesc is the grpc.ServiceDesc for TripService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -262,6 +337,14 @@ var TripService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CompleteTrip",
 			Handler:    _TripService_CompleteTrip_Handler,
+		},
+		{
+			MethodName: "InitiatePayment",
+			Handler:    _TripService_InitiatePayment_Handler,
+		},
+		{
+			MethodName: "PayTrip",
+			Handler:    _TripService_PayTrip_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -65,7 +65,7 @@ func TestNewTrip_EmptyDropoff(t *testing.T) {
 // ─── Cancel ──────────────────────────────────────────────────────────────────
 
 func tripAt(status entity.TripStatus) *entity.Trip {
-	return entity.ReconstituteTrip("t1", "r1", "", status, "pickup", "dropoff", "", 0, "", testNow, testNow)
+	return entity.ReconstituteTrip("t1", "r1", "", status, "pickup", "dropoff", "", 0, "", "", testNow, testNow)
 }
 
 func TestCancel_FromPending(t *testing.T) {
@@ -211,7 +211,7 @@ func TestComplete_FromCompletedFails(t *testing.T) {
 
 func TestReconstituteTrip_NoValidation(t *testing.T) {
 	// Should not panic or error even with empty fields
-	trip := entity.ReconstituteTrip("", "", "", entity.StatusCompleted, "", "", "some reason", 0, "", testNow, testNow)
+	trip := entity.ReconstituteTrip("", "", "", entity.StatusCompleted, "", "", "some reason", 0, "", "", testNow, testNow)
 	if trip == nil {
 		t.Fatal("expected non-nil trip")
 	}

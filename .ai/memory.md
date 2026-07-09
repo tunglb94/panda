@@ -2,7 +2,8 @@
 Last updated: 2026-07-09 by Principal Engineer AI
 
 ## Current Phase
-Phase 34 — Map Matching Engine (COMPLETE — flutter analyze + flutter test pending on home machine)
+Phase B1 — Mock Payment Flow (COMPLETE — backend tests + flutter analyze pending on home machine)
+Previous: Phase 34 — Map Matching Engine (COMPLETE — flutter analyze + flutter test pending on home machine)
 Previous: Phase 33 — Route Progress Engine (COMPLETE — flutter analyze pending on home machine)
 Previous: Phase 32 — Route Engine & Map Matching Foundation (COMPLETE — flutter analyze pending on home machine)
 Previous: Phase 31 — Production Location Engine Foundation (COMPLETE — flutter analyze pending on home machine)
@@ -2069,6 +2070,95 @@ Provider-independent, pure-Dart engine that projects each raw GPS fix onto the a
 - `flutter test` — PENDING (home machine)
 
 ---
+
+## Phase B1 — Mock Payment Flow (COMPLETE — backend tests + flutter analyze pending)
+
+Extended the trip lifecycle with `payment_pending → payment_success → settled` states after `completed`.
+
+### State machine extension
+`completed → payment_pending → payment_success → settled`
+`isTerminal` changed from `completed || cancelled` to `settled || cancelled` (rider app).
+
+### Backend changes
+
+**Trip domain (`services/trip/domain/entity/trip.go`):**
+- Added 3 new status constants: `StatusPaymentPending`, `StatusPaymentSuccess`, `StatusSettled`
+- Added `PaymentMethod string` field to `Trip` struct
+- Updated `ReconstituteTrip` signature: inserted `paymentMethod string` param before `createdAt`
+- Added domain methods: `InitiatePayment(now)`, `MarkPaid(method, now)`, `Settle(now)`
+
+**Trip infrastructure (`services/trip/infrastructure/postgres/trip_repository.go`):**
+- Added `payment_method` column to all Save/Find queries
+
+**Trip use cases:**
+- `app/initiate_payment.go` (NEW) — `completed → payment_pending`
+- `app/pay_trip.go` (NEW) — `payment_pending → payment_success → settled` (two saves)
+
+**Trip gRPC (`services/trip/grpc/trippb/trip_grpc.pb.go` — manual extension):**
+- Added `InitiatePayment(GetTripRequest → TripResponse)` and `PayTrip(CancelTripRequest → TripResponse)` RPCs
+- Reused existing proto message types to avoid `protoimpl` complexity
+
+**Trip gRPC handler (`services/trip/grpc/handler.go`):**
+- Added 2 use case fields; `NewHandler` now takes 7 params
+- Added `InitiatePayment` and `PayTrip` handler methods
+
+**Booking `TripClient` interface (`services/booking/app/clients.go`):**
+- Added `InitiatePayment(ctx, tripID)` and `PayTrip(ctx, tripID, paymentMethod)` methods
+
+**Booking `FinishTripUseCase` (`services/booking/app/finish_trip.go`):**
+- After `CompleteTrip`, calls `trip.InitiatePayment(ctx, tripID)`
+- Returns `Status: "payment_pending"` (hardcoded) instead of `completed`
+
+**Booking `PayRideUseCase` (`services/booking/app/pay_ride.go` — NEW):**
+- `PayRideInput{TripID, PaymentMethod}` → `PayRideResult{TripID, Status, FinalFare, Currency}`
+- Defaults `PaymentMethod` to `"cash"` if empty; delegates to `trip.PayTrip`
+
+**Booking gRPC (`services/booking/grpc/bookingpb/booking_grpc.pb.go` — manual extension):**
+- Added `PayRide(StartTripRequest → FinishedTripResponse)` RPC
+
+**Booking gRPC handler (`services/booking/grpc/handler.go`):**
+- Added `payRide` field; `NewHandler` now takes 9 params
+
+**Gateway (`services/gateway/http/handlers/booking_handler.go`):**
+- Added `PayRide` to `BookingClient` interface and HTTP handler
+
+**Gateway router (`services/gateway/http/router.go`):**
+- Added `POST /api/v1/rides/{tripID}/pay` route (JWT-auth)
+
+**PostgreSQL schema:** `payment_method TEXT DEFAULT ''` column added (all trip queries updated).
+
+### Test files updated (compile fixes)
+- `trip/app/app_test.go` — added 7 new payment use-case tests; fixed `ReconstituteTrip` calls (+`""` paymentMethod)
+- `trip/domain/entity/trip_test.go` — fixed `ReconstituteTrip` calls
+- `trip/infrastructure/postgres/trip_repository_test.go` — fixed `ReconstituteTrip` calls
+- `trip/grpc/handler_test.go` — fixed `newHandler` (5→7 params), fixed `seedTrip`
+- `booking/app/app_test.go` — added `InitiatePayment`/`PayTrip` stubs; 4 new tests; `TestFinishTrip_Success` expects `"payment_pending"` (was `"completed"`); `TestFullBookingFlow` step 5→6
+- `booking/grpc/handler_test.go` — added stubs, updated `newHandler` (8→9 params)
+- `gateway/http/handlers/booking_handler_test.go` — added `PayRide` stub
+
+### Flutter changes
+
+**Rider App:**
+- `rider_trip_status.dart` — added `paymentPending`, `paymentSuccess`, `settled` enum values; all extension handlers; `isTerminal` = `settled || cancelled`
+- `trip_repository.dart` — added `payRide(tripId, {paymentMethod})` → `POST /api/v1/rides/{tripId}/pay`
+- `trip_lifecycle_page.dart` — added `_isPaying` flag, `_pay(method)` async method, payment cases in `_mapStatus`, new `_buildCurrentView` cases (`_PaymentPendingView`, `_PaymentSuccessView`); `_PaymentPendingView` and `_PaymentSuccessView` are private widgets in same file
+
+**Driver App:**
+- `active_trip_repository.dart` — added `isAwaitingPayment` getter (`payment_pending || payment_success`)
+- `trip_page.dart`:
+  - Added `awaitingPayment` to `_PageState` enum
+  - Added `_paymentPollTimer` field + cleanup in `dispose()`
+  - `_initialize()` resumes `awaitingPayment` state if stored trip has `isAwaitingPayment` status
+  - `_poll()` guard: skips `awaitingPayment` state
+  - Added `_startPaymentPolling()` + `_paymentPoll()`: polls every 3s; on `settled` → clear stored trip ID, go to `completed`, after 4s → `_startPolling()`
+  - `_onFinishTrip()`: transitions to `awaitingPayment` (not `completed`); does NOT clear stored trip ID; starts payment polling
+  - `_appBarTitle()`: returns `'Awaiting Payment'` for `awaitingPayment` state
+  - `_buildBody()`: added `awaitingPayment → _AwaitingPaymentCard`
+  - Added `_AwaitingPaymentCard` widget: spinner + "Waiting for Payment" + trip addresses + earnings + "automatically return" message
+
+### Verification
+- Backend: compile + tests PENDING on home machine (gRPC manual extension, schema change)
+- Flutter: `flutter analyze` PENDING on home machine
 
 ## Notes
 - Implementation mode began 2026-07-01. Documentation phase paused.

@@ -26,6 +26,7 @@ func NewRouter(
 
 	// Auth — no JWT required (issues the token).
 	mux.HandleFunc("POST /api/v1/auth/login", ah.Login)
+	mux.HandleFunc("POST /api/v1/auth/rider/login", ah.RiderLogin)
 
 	// Driver availability — auth required.
 	auth := authMiddleware
@@ -46,6 +47,8 @@ func NewRouter(
 	mux.Handle("POST /api/v1/rides/{tripID}/reject", auth(http.HandlerFunc(bh.RejectDispatchOffer)))
 	mux.Handle("POST /api/v1/rides/{tripID}/start", auth(http.HandlerFunc(bh.StartTrip)))
 	mux.Handle("POST /api/v1/rides/{tripID}/finish", auth(http.HandlerFunc(bh.FinishTrip)))
+	mux.Handle("POST /api/v1/rides/{tripID}/pay", auth(http.HandlerFunc(bh.PayRide)))
+	mux.Handle("POST /api/v1/rides/{tripID}/cancel", auth(http.HandlerFunc(bh.CancelRide)))
 
 	// Driver trip offer — auth required (driver polls this endpoint).
 	mux.Handle("GET /api/v1/driver/current-offer", auth(http.HandlerFunc(bh.GetDriverOffer)))
