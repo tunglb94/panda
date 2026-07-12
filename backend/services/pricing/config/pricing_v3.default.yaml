@@ -1,0 +1,112 @@
+# Panda Pricing V3 — default configuration.
+#
+# Source of every number:
+#   - distance_tiers, waiting/traffic rates, airport fees: docs/business/PRICING_V3_DESIGN.md Phần 4/5/7
+#   - car minimum_fare: REVERTED to BRB v1.0 §2.2.4 (25,000 VND), not the V3
+#     Design's 30,000 — docs/business/PRICING_V3_REVIEW.md Phần 3 (W1) / Phần 5
+#     / Phần 13 mục 1 found the 30,000 minimum made a 1km Car trip 23% MORE
+#     expensive than the market average, directly contradicting the sprint
+#     goal ("giá đủ rẻ để khách chuyển từ Grab/Be/Xanh"). Reverting to BRB's
+#     own already-approved Standard minimum fixes this without inventing a
+#     new, unapproved number.
+#   - commission: P0-3 (implementation instruction, narrower than
+#     PRICING_V3_REVIEW.md Phần 6.2's full-ladder proposal) — ONLY Bronze
+#     changes, 20% → 16%, "Launch only". Silver/Gold/Platinum/Diamond are
+#     UNCHANGED from BRB §7.1 (18%/16%/14%/12%). This intentionally leaves
+#     Bronze and Gold at the same 16% rate — an accepted, explicitly scoped
+#     side effect of "sửa Bronze, không sửa tier khác", not an oversight.
+#   - van minimum_fare: P0-1 — reverted to BRB v1.0 §2.2.4 XL (40,000 VND),
+#     not the V3 Design's 48,000, for the same reason as car above: the
+#     48,000 floor made a 1km Van trip ~6% more expensive than the market
+#     average (a smaller gap than car's +23%, but P0-1 requires zero cases
+#     of 1km being pricier than market, not just car's case).
+#   - vat_rate: ASSUMPTION per docs/business/MARKET_PRICING_RESEARCH.md — BRB
+#     defines no per-trip VAT rule; CFO must confirm before production use.
+#   - bike/xl waiting_fee_per_minute: ASSUMPTION (BRB §2.2.9 only specifies a
+#     Standard-class rate; scaled proportionally to base rates here) — flagged
+#     for the same CPO sign-off PRICING_V3_DESIGN.md already requires for the
+#     motorcycle fare ratio.
+#
+# distance_tiers: FromKM inclusive, ToKM exclusive. to_km: 0 means "open-ended,
+# no upper bound" (must be the LAST tier — config.Load rejects any other shape).
+
+currency_code: VND
+vat_rate: 0.10
+
+commission:
+  bronze: 0.16   # P0-3: 20% -> 16%, Launch only
+  silver: 0.18   # unchanged (BRB §7.1)
+  gold: 0.16     # unchanged (BRB §7.1)
+  platinum: 0.14 # unchanged (BRB §7.1)
+  diamond: 0.12  # unchanged (BRB §7.1)
+
+# last_tier_min_ratio: config.Load rejects a config whose last (open-ended)
+# distance tier rate is below this fraction of the first tier's rate, for
+# every vehicle class — docs/business/PRICING_V3_REVIEW.md Phần 2/13 mục 2
+# flagged an unbounded-taper distance tier as a real risk (fare gap vs market
+# widens without limit on very long trips). This is a STRUCTURAL guardrail,
+# not a specific long-haul price (choosing the "correct" long-distance rate
+# is a CFO/CPO commercial decision this config loader cannot make on its
+# own) — it only prevents a future config edit from setting the last tier
+# unreasonably low.
+last_tier_min_ratio: 0.35
+
+vehicles:
+  car:
+    base_fare: 13000
+    minimum_fare: 25000 # BRB §2.2.4 Standard (reverted — see header note)
+    booking_fee: 3000
+    traffic_time_per_minute: 540
+    waiting_fee_per_minute: 500
+    waiting_grace_minutes: 3
+    distance_tiers:
+      - {from_km: 0,  to_km: 2,  rate_per_km: 9500}
+      - {from_km: 2,  to_km: 5,  rate_per_km: 8600}
+      - {from_km: 5,  to_km: 10, rate_per_km: 7800}
+      - {from_km: 10, to_km: 20, rate_per_km: 7000}
+      - {from_km: 20, to_km: 40, rate_per_km: 6200}
+      - {from_km: 40, to_km: 60, rate_per_km: 5400}
+      - {from_km: 60, to_km: 0,  rate_per_km: 4600}
+
+  motorcycle:
+    base_fare: 2500
+    minimum_fare: 9000
+    booking_fee: 1000
+    traffic_time_per_minute: 230
+    waiting_fee_per_minute: 300
+    waiting_grace_minutes: 3
+    distance_tiers:
+      - {from_km: 0,  to_km: 2,  rate_per_km: 4200}
+      - {from_km: 2,  to_km: 5,  rate_per_km: 3700}
+      - {from_km: 5,  to_km: 10, rate_per_km: 3300}
+      - {from_km: 10, to_km: 20, rate_per_km: 3000}
+      - {from_km: 20, to_km: 40, rate_per_km: 2700}
+      - {from_km: 40, to_km: 60, rate_per_km: 2400}
+      - {from_km: 60, to_km: 0,  rate_per_km: 2100}
+
+  van:
+    base_fare: 22000
+    minimum_fare: 40000 # BRB §2.2.4 XL (reverted — see header note, P0-1)
+    booking_fee: 3000
+    traffic_time_per_minute: 700
+    waiting_fee_per_minute: 650
+    waiting_grace_minutes: 3
+    distance_tiers:
+      - {from_km: 0,  to_km: 2,  rate_per_km: 12500}
+      - {from_km: 2,  to_km: 5,  rate_per_km: 11300}
+      - {from_km: 5,  to_km: 10, rate_per_km: 10200}
+      - {from_km: 10, to_km: 20, rate_per_km: 9100}
+      - {from_km: 20, to_km: 40, rate_per_km: 8100}
+      - {from_km: 40, to_km: 60, rate_per_km: 7000}
+      - {from_km: 60, to_km: 0,  rate_per_km: 6000}
+
+airport:
+  pickup_fee:
+    car: 15000
+    van: 20000
+    # motorcycle: deliberately absent — docs/business/PRICING_V3_DESIGN.md
+    # Phần 7 / MARKET_PRICING_RESEARCH.md Phần 1.3: no airport surcharge for
+    # bike, matching observed market behaviour.
+  dropoff_fee:
+    car: 5000
+    van: 7000

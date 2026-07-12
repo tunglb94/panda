@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:rider/features/booking/presentation/widgets/trip_point_cards.dart';
 import 'package:rider/features/map/domain/models/trip_selection.dart';
+import 'package:rider/shared/widgets/mascot_image.dart';
 
 import '../../domain/models/rider_trip_status.dart';
 import '../widgets/cancel_ride_button.dart';
@@ -48,7 +49,6 @@ class _SearchingDriverViewState extends State<SearchingDriverView>
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
     const status = RiderTripStatus.searchingDriver;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -57,7 +57,7 @@ class _SearchingDriverViewState extends State<SearchingDriverView>
           address: widget.tripSelection.pickupAddress,
           coordinate: widget.tripSelection.pickup,
         ),
-        const SizedBox(height: 8),
+        const RouteConnector(),
         DestinationCard(
           address: widget.tripSelection.destinationAddress,
           coordinate: widget.tripSelection.destination,
@@ -69,16 +69,17 @@ class _SearchingDriverViewState extends State<SearchingDriverView>
         const SizedBox(height: 32),
         Center(
           child: ScaleTransition(
-            scale: Tween(begin: 0.9, end: 1.1).animate(
+            scale: Tween(begin: 0.94, end: 1.06).animate(
               CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
             ),
-            child: Container(
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                color: primary.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.local_taxi, size: 40, color: primary),
+            // Reuses the existing pulse AnimationController rather than
+            // adding a second animated element next to it — one cohesive
+            // "waiting" motion instead of two competing ones.
+            child: const MascotImage(
+              asset: 'mascot_waiting.png',
+              size: MascotSize.large,
+              animation: MascotAnimation.none,
+              semanticLabel: 'Đang tìm tài xế gần bạn',
             ),
           ),
         ),

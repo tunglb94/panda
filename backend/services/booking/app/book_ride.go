@@ -7,6 +7,12 @@ import (
 )
 
 // BookRideInput is the input to BookRideUseCase.
+//
+// TripType is "ride" (default; empty also means ride) or "delivery" —
+// Delivery V1 Phase 2 (docs/business/DELIVERY_V1_DESIGN.md). Ride and
+// Delivery bookings share this single input struct and the single
+// Execute pipeline below; the Pickup*Contact*/Receiver*/Package* fields
+// are only read when TripType == "delivery".
 type BookRideInput struct {
 	RiderID        string
 	PickupAddress  string
@@ -16,12 +22,31 @@ type BookRideInput struct {
 	// IdempotencyKey deduplicates retried requests when non-empty.
 	// Callers that do not need idempotency may leave this blank.
 	IdempotencyKey string
+
+	TripType string
+
+	// ServiceType is one of the Vehicle/Service Catalog's 4 tiers
+	// (bike/bike_plus/car/car_xl) or empty (no service-type filter) —
+	// forwarded to Dispatch so RequestDispatch can match the rider's
+	// chosen tier against a driver's reported ServiceType.
+	ServiceType string
+
+	PickupContactName  string
+	PickupContactPhone string
+	ReceiverName       string
+	ReceiverPhone      string
+	PackageNote        string
+	PackageValue       int64
+	PackageWeightKg    float64
 }
 
 // BookRideResult holds the outcome of a BookRide call.
 type BookRideResult struct {
 	TripID string
 	Status string // "searching"
+	// DeliveryID is set only when the booking was a Delivery
+	// (TripType == "delivery"); empty for Ride bookings.
+	DeliveryID string
 }
 
 // BookRideUseCase creates a trip and immediately requests dispatch.
@@ -55,12 +80,25 @@ func (uc *BookRideUseCase) Execute(ctx context.Context, in BookRideInput) (*Book
 		}
 	}
 
-	tripID, err := uc.trip.CreateTrip(ctx, in.RiderID, in.PickupAddress, in.DropoffAddress)
+	created, err := uc.trip.CreateTrip(ctx, CreateTripParams{
+		RiderID:            in.RiderID,
+		PickupAddress:      in.PickupAddress,
+		DropoffAddress:     in.DropoffAddress,
+		TripType:           in.TripType,
+		PickupContactName:  in.PickupContactName,
+		PickupContactPhone: in.PickupContactPhone,
+		ReceiverName:       in.ReceiverName,
+		ReceiverPhone:      in.ReceiverPhone,
+		PackageNote:        in.PackageNote,
+		PackageValue:       in.PackageValue,
+		PackageWeightKg:    in.PackageWeightKg,
+	})
 	if err != nil {
 		return nil, err
 	}
+	tripID := created.TripID
 
-	if err := uc.dispatch.RequestDispatch(ctx, tripID, in.RiderID, in.PickupLat, in.PickupLon); err != nil {
+	if err := uc.dispatch.RequestDispatch(ctx, tripID, in.RiderID, in.TripType, in.ServiceType, in.PickupLat, in.PickupLon); err != nil {
 		// Compensate: cancel the trip so it doesn't stay orphaned in 'pending' state.
 		// Best-effort — if cancellation also fails the trip will be GC'd by a background
 		// reconciler; we still surface the original dispatch error to the caller.
@@ -72,5 +110,5 @@ func (uc *BookRideUseCase) Execute(ctx context.Context, in BookRideInput) (*Book
 		_ = uc.idem.Record(ctx, in.IdempotencyKey) // best-effort; duplicate inserts are no-ops
 	}
 
-	return &BookRideResult{TripID: tripID, Status: "searching"}, nil
+	return &BookRideResult{TripID: tripID, Status: "searching", DeliveryID: created.DeliveryID}, nil
 }

@@ -5,9 +5,9 @@ enum BuildModeKind { debug, profile, release }
 
 extension BuildModeKindX on BuildModeKind {
   String get label => switch (this) {
-        BuildModeKind.debug => 'Debug',
-        BuildModeKind.profile => 'Profile',
-        BuildModeKind.release => 'Release',
+        BuildModeKind.debug => 'Gỡ lỗi',
+        BuildModeKind.profile => 'Hiệu năng',
+        BuildModeKind.release => 'Phát hành',
       };
 }
 

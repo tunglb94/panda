@@ -1,0 +1,964 @@
+{
+  "cells": [
+    {
+      "zone": "cbd",
+      "hour": 0,
+      "count": 2045
+    },
+    {
+      "zone": "cbd",
+      "hour": 1,
+      "count": 1991
+    },
+    {
+      "zone": "cbd",
+      "hour": 2,
+      "count": 1999
+    },
+    {
+      "zone": "cbd",
+      "hour": 3,
+      "count": 2081
+    },
+    {
+      "zone": "cbd",
+      "hour": 4,
+      "count": 1970
+    },
+    {
+      "zone": "cbd",
+      "hour": 5,
+      "count": 2067
+    },
+    {
+      "zone": "cbd",
+      "hour": 6,
+      "count": 2110
+    },
+    {
+      "zone": "cbd",
+      "hour": 7,
+      "count": 3685
+    },
+    {
+      "zone": "cbd",
+      "hour": 8,
+      "count": 3818
+    },
+    {
+      "zone": "cbd",
+      "hour": 9,
+      "count": 2122
+    },
+    {
+      "zone": "cbd",
+      "hour": 10,
+      "count": 2164
+    },
+    {
+      "zone": "cbd",
+      "hour": 11,
+      "count": 2749
+    },
+    {
+      "zone": "cbd",
+      "hour": 12,
+      "count": 2783
+    },
+    {
+      "zone": "cbd",
+      "hour": 13,
+      "count": 2104
+    },
+    {
+      "zone": "cbd",
+      "hour": 14,
+      "count": 2065
+    },
+    {
+      "zone": "cbd",
+      "hour": 15,
+      "count": 2134
+    },
+    {
+      "zone": "cbd",
+      "hour": 16,
+      "count": 2145
+    },
+    {
+      "zone": "cbd",
+      "hour": 17,
+      "count": 3824
+    },
+    {
+      "zone": "cbd",
+      "hour": 18,
+      "count": 3836
+    },
+    {
+      "zone": "cbd",
+      "hour": 19,
+      "count": 3653
+    },
+    {
+      "zone": "cbd",
+      "hour": 20,
+      "count": 2050
+    },
+    {
+      "zone": "cbd",
+      "hour": 21,
+      "count": 2023
+    },
+    {
+      "zone": "cbd",
+      "hour": 22,
+      "count": 2084
+    },
+    {
+      "zone": "cbd",
+      "hour": 23,
+      "count": 1987
+    },
+    {
+      "zone": "residential",
+      "hour": 0,
+      "count": 1527
+    },
+    {
+      "zone": "residential",
+      "hour": 1,
+      "count": 1480
+    },
+    {
+      "zone": "residential",
+      "hour": 2,
+      "count": 1472
+    },
+    {
+      "zone": "residential",
+      "hour": 3,
+      "count": 1453
+    },
+    {
+      "zone": "residential",
+      "hour": 4,
+      "count": 1534
+    },
+    {
+      "zone": "residential",
+      "hour": 5,
+      "count": 1460
+    },
+    {
+      "zone": "residential",
+      "hour": 6,
+      "count": 1466
+    },
+    {
+      "zone": "residential",
+      "hour": 7,
+      "count": 2651
+    },
+    {
+      "zone": "residential",
+      "hour": 8,
+      "count": 2627
+    },
+    {
+      "zone": "residential",
+      "hour": 9,
+      "count": 1484
+    },
+    {
+      "zone": "residential",
+      "hour": 10,
+      "count": 1495
+    },
+    {
+      "zone": "residential",
+      "hour": 11,
+      "count": 1777
+    },
+    {
+      "zone": "residential",
+      "hour": 12,
+      "count": 1854
+    },
+    {
+      "zone": "residential",
+      "hour": 13,
+      "count": 1451
+    },
+    {
+      "zone": "residential",
+      "hour": 14,
+      "count": 1439
+    },
+    {
+      "zone": "residential",
+      "hour": 15,
+      "count": 1476
+    },
+    {
+      "zone": "residential",
+      "hour": 16,
+      "count": 1480
+    },
+    {
+      "zone": "residential",
+      "hour": 17,
+      "count": 2714
+    },
+    {
+      "zone": "residential",
+      "hour": 18,
+      "count": 2691
+    },
+    {
+      "zone": "residential",
+      "hour": 19,
+      "count": 2763
+    },
+    {
+      "zone": "residential",
+      "hour": 20,
+      "count": 1491
+    },
+    {
+      "zone": "residential",
+      "hour": 21,
+      "count": 1557
+    },
+    {
+      "zone": "residential",
+      "hour": 22,
+      "count": 1477
+    },
+    {
+      "zone": "residential",
+      "hour": 23,
+      "count": 1529
+    },
+    {
+      "zone": "industrial",
+      "hour": 0,
+      "count": 973
+    },
+    {
+      "zone": "industrial",
+      "hour": 1,
+      "count": 985
+    },
+    {
+      "zone": "industrial",
+      "hour": 2,
+      "count": 973
+    },
+    {
+      "zone": "industrial",
+      "hour": 3,
+      "count": 986
+    },
+    {
+      "zone": "industrial",
+      "hour": 4,
+      "count": 998
+    },
+    {
+      "zone": "industrial",
+      "hour": 5,
+      "count": 947
+    },
+    {
+      "zone": "industrial",
+      "hour": 6,
+      "count": 975
+    },
+    {
+      "zone": "industrial",
+      "hour": 7,
+      "count": 1758
+    },
+    {
+      "zone": "industrial",
+      "hour": 8,
+      "count": 1853
+    },
+    {
+      "zone": "industrial",
+      "hour": 9,
+      "count": 988
+    },
+    {
+      "zone": "industrial",
+      "hour": 10,
+      "count": 992
+    },
+    {
+      "zone": "industrial",
+      "hour": 11,
+      "count": 1346
+    },
+    {
+      "zone": "industrial",
+      "hour": 12,
+      "count": 1307
+    },
+    {
+      "zone": "industrial",
+      "hour": 13,
+      "count": 1043
+    },
+    {
+      "zone": "industrial",
+      "hour": 14,
+      "count": 987
+    },
+    {
+      "zone": "industrial",
+      "hour": 15,
+      "count": 1003
+    },
+    {
+      "zone": "industrial",
+      "hour": 16,
+      "count": 992
+    },
+    {
+      "zone": "industrial",
+      "hour": 17,
+      "count": 1867
+    },
+    {
+      "zone": "industrial",
+      "hour": 18,
+      "count": 1773
+    },
+    {
+      "zone": "industrial",
+      "hour": 19,
+      "count": 1761
+    },
+    {
+      "zone": "industrial",
+      "hour": 20,
+      "count": 979
+    },
+    {
+      "zone": "industrial",
+      "hour": 21,
+      "count": 981
+    },
+    {
+      "zone": "industrial",
+      "hour": 22,
+      "count": 1006
+    },
+    {
+      "zone": "industrial",
+      "hour": 23,
+      "count": 985
+    },
+    {
+      "zone": "airport",
+      "hour": 0,
+      "count": 760
+    },
+    {
+      "zone": "airport",
+      "hour": 1,
+      "count": 803
+    },
+    {
+      "zone": "airport",
+      "hour": 2,
+      "count": 700
+    },
+    {
+      "zone": "airport",
+      "hour": 3,
+      "count": 776
+    },
+    {
+      "zone": "airport",
+      "hour": 4,
+      "count": 721
+    },
+    {
+      "zone": "airport",
+      "hour": 5,
+      "count": 754
+    },
+    {
+      "zone": "airport",
+      "hour": 6,
+      "count": 721
+    },
+    {
+      "zone": "airport",
+      "hour": 7,
+      "count": 1317
+    },
+    {
+      "zone": "airport",
+      "hour": 8,
+      "count": 1331
+    },
+    {
+      "zone": "airport",
+      "hour": 9,
+      "count": 728
+    },
+    {
+      "zone": "airport",
+      "hour": 10,
+      "count": 745
+    },
+    {
+      "zone": "airport",
+      "hour": 11,
+      "count": 930
+    },
+    {
+      "zone": "airport",
+      "hour": 12,
+      "count": 941
+    },
+    {
+      "zone": "airport",
+      "hour": 13,
+      "count": 707
+    },
+    {
+      "zone": "airport",
+      "hour": 14,
+      "count": 712
+    },
+    {
+      "zone": "airport",
+      "hour": 15,
+      "count": 726
+    },
+    {
+      "zone": "airport",
+      "hour": 16,
+      "count": 733
+    },
+    {
+      "zone": "airport",
+      "hour": 17,
+      "count": 1277
+    },
+    {
+      "zone": "airport",
+      "hour": 18,
+      "count": 1242
+    },
+    {
+      "zone": "airport",
+      "hour": 19,
+      "count": 1292
+    },
+    {
+      "zone": "airport",
+      "hour": 20,
+      "count": 751
+    },
+    {
+      "zone": "airport",
+      "hour": 21,
+      "count": 753
+    },
+    {
+      "zone": "airport",
+      "hour": 22,
+      "count": 674
+    },
+    {
+      "zone": "airport",
+      "hour": 23,
+      "count": 740
+    },
+    {
+      "zone": "bus_station",
+      "hour": 0,
+      "count": 1094
+    },
+    {
+      "zone": "bus_station",
+      "hour": 1,
+      "count": 1062
+    },
+    {
+      "zone": "bus_station",
+      "hour": 2,
+      "count": 1087
+    },
+    {
+      "zone": "bus_station",
+      "hour": 3,
+      "count": 1038
+    },
+    {
+      "zone": "bus_station",
+      "hour": 4,
+      "count": 1086
+    },
+    {
+      "zone": "bus_station",
+      "hour": 5,
+      "count": 1051
+    },
+    {
+      "zone": "bus_station",
+      "hour": 6,
+      "count": 1040
+    },
+    {
+      "zone": "bus_station",
+      "hour": 7,
+      "count": 1886
+    },
+    {
+      "zone": "bus_station",
+      "hour": 8,
+      "count": 1880
+    },
+    {
+      "zone": "bus_station",
+      "hour": 9,
+      "count": 1063
+    },
+    {
+      "zone": "bus_station",
+      "hour": 10,
+      "count": 1132
+    },
+    {
+      "zone": "bus_station",
+      "hour": 11,
+      "count": 1334
+    },
+    {
+      "zone": "bus_station",
+      "hour": 12,
+      "count": 1327
+    },
+    {
+      "zone": "bus_station",
+      "hour": 13,
+      "count": 1050
+    },
+    {
+      "zone": "bus_station",
+      "hour": 14,
+      "count": 1096
+    },
+    {
+      "zone": "bus_station",
+      "hour": 15,
+      "count": 1053
+    },
+    {
+      "zone": "bus_station",
+      "hour": 16,
+      "count": 1092
+    },
+    {
+      "zone": "bus_station",
+      "hour": 17,
+      "count": 1911
+    },
+    {
+      "zone": "bus_station",
+      "hour": 18,
+      "count": 1872
+    },
+    {
+      "zone": "bus_station",
+      "hour": 19,
+      "count": 1935
+    },
+    {
+      "zone": "bus_station",
+      "hour": 20,
+      "count": 1038
+    },
+    {
+      "zone": "bus_station",
+      "hour": 21,
+      "count": 1102
+    },
+    {
+      "zone": "bus_station",
+      "hour": 22,
+      "count": 1101
+    },
+    {
+      "zone": "bus_station",
+      "hour": 23,
+      "count": 1092
+    },
+    {
+      "zone": "hospital",
+      "hour": 0,
+      "count": 915
+    },
+    {
+      "zone": "hospital",
+      "hour": 1,
+      "count": 902
+    },
+    {
+      "zone": "hospital",
+      "hour": 2,
+      "count": 842
+    },
+    {
+      "zone": "hospital",
+      "hour": 3,
+      "count": 857
+    },
+    {
+      "zone": "hospital",
+      "hour": 4,
+      "count": 866
+    },
+    {
+      "zone": "hospital",
+      "hour": 5,
+      "count": 904
+    },
+    {
+      "zone": "hospital",
+      "hour": 6,
+      "count": 878
+    },
+    {
+      "zone": "hospital",
+      "hour": 7,
+      "count": 1542
+    },
+    {
+      "zone": "hospital",
+      "hour": 8,
+      "count": 1562
+    },
+    {
+      "zone": "hospital",
+      "hour": 9,
+      "count": 850
+    },
+    {
+      "zone": "hospital",
+      "hour": 10,
+      "count": 873
+    },
+    {
+      "zone": "hospital",
+      "hour": 11,
+      "count": 1136
+    },
+    {
+      "zone": "hospital",
+      "hour": 12,
+      "count": 1115
+    },
+    {
+      "zone": "hospital",
+      "hour": 13,
+      "count": 928
+    },
+    {
+      "zone": "hospital",
+      "hour": 14,
+      "count": 922
+    },
+    {
+      "zone": "hospital",
+      "hour": 15,
+      "count": 917
+    },
+    {
+      "zone": "hospital",
+      "hour": 16,
+      "count": 915
+    },
+    {
+      "zone": "hospital",
+      "hour": 17,
+      "count": 1564
+    },
+    {
+      "zone": "hospital",
+      "hour": 18,
+      "count": 1589
+    },
+    {
+      "zone": "hospital",
+      "hour": 19,
+      "count": 1541
+    },
+    {
+      "zone": "hospital",
+      "hour": 20,
+      "count": 894
+    },
+    {
+      "zone": "hospital",
+      "hour": 21,
+      "count": 892
+    },
+    {
+      "zone": "hospital",
+      "hour": 22,
+      "count": 839
+    },
+    {
+      "zone": "hospital",
+      "hour": 23,
+      "count": 855
+    },
+    {
+      "zone": "school",
+      "hour": 0,
+      "count": 1189
+    },
+    {
+      "zone": "school",
+      "hour": 1,
+      "count": 1119
+    },
+    {
+      "zone": "school",
+      "hour": 2,
+      "count": 1198
+    },
+    {
+      "zone": "school",
+      "hour": 3,
+      "count": 1169
+    },
+    {
+      "zone": "school",
+      "hour": 4,
+      "count": 1156
+    },
+    {
+      "zone": "school",
+      "hour": 5,
+      "count": 1206
+    },
+    {
+      "zone": "school",
+      "hour": 6,
+      "count": 1136
+    },
+    {
+      "zone": "school",
+      "hour": 7,
+      "count": 2117
+    },
+    {
+      "zone": "school",
+      "hour": 8,
+      "count": 2028
+    },
+    {
+      "zone": "school",
+      "hour": 9,
+      "count": 1130
+    },
+    {
+      "zone": "school",
+      "hour": 10,
+      "count": 1121
+    },
+    {
+      "zone": "school",
+      "hour": 11,
+      "count": 1460
+    },
+    {
+      "zone": "school",
+      "hour": 12,
+      "count": 1472
+    },
+    {
+      "zone": "school",
+      "hour": 13,
+      "count": 1130
+    },
+    {
+      "zone": "school",
+      "hour": 14,
+      "count": 1164
+    },
+    {
+      "zone": "school",
+      "hour": 15,
+      "count": 1143
+    },
+    {
+      "zone": "school",
+      "hour": 16,
+      "count": 1132
+    },
+    {
+      "zone": "school",
+      "hour": 17,
+      "count": 2114
+    },
+    {
+      "zone": "school",
+      "hour": 18,
+      "count": 2075
+    },
+    {
+      "zone": "school",
+      "hour": 19,
+      "count": 2027
+    },
+    {
+      "zone": "school",
+      "hour": 20,
+      "count": 1225
+    },
+    {
+      "zone": "school",
+      "hour": 21,
+      "count": 1156
+    },
+    {
+      "zone": "school",
+      "hour": 22,
+      "count": 1189
+    },
+    {
+      "zone": "school",
+      "hour": 23,
+      "count": 1112
+    },
+    {
+      "zone": "entertainment",
+      "hour": 0,
+      "count": 1480
+    },
+    {
+      "zone": "entertainment",
+      "hour": 1,
+      "count": 1507
+    },
+    {
+      "zone": "entertainment",
+      "hour": 2,
+      "count": 1516
+    },
+    {
+      "zone": "entertainment",
+      "hour": 3,
+      "count": 1427
+    },
+    {
+      "zone": "entertainment",
+      "hour": 4,
+      "count": 1395
+    },
+    {
+      "zone": "entertainment",
+      "hour": 5,
+      "count": 1493
+    },
+    {
+      "zone": "entertainment",
+      "hour": 6,
+      "count": 1411
+    },
+    {
+      "zone": "entertainment",
+      "hour": 7,
+      "count": 2536
+    },
+    {
+      "zone": "entertainment",
+      "hour": 8,
+      "count": 2557
+    },
+    {
+      "zone": "entertainment",
+      "hour": 9,
+      "count": 1388
+    },
+    {
+      "zone": "entertainment",
+      "hour": 10,
+      "count": 1414
+    },
+    {
+      "zone": "entertainment",
+      "hour": 11,
+      "count": 1801
+    },
+    {
+      "zone": "entertainment",
+      "hour": 12,
+      "count": 1751
+    },
+    {
+      "zone": "entertainment",
+      "hour": 13,
+      "count": 1467
+    },
+    {
+      "zone": "entertainment",
+      "hour": 14,
+      "count": 1435
+    },
+    {
+      "zone": "entertainment",
+      "hour": 15,
+      "count": 1435
+    },
+    {
+      "zone": "entertainment",
+      "hour": 16,
+      "count": 1407
+    },
+    {
+      "zone": "entertainment",
+      "hour": 17,
+      "count": 2509
+    },
+    {
+      "zone": "entertainment",
+      "hour": 18,
+      "count": 2461
+    },
+    {
+      "zone": "entertainment",
+      "hour": 19,
+      "count": 2489
+    },
+    {
+      "zone": "entertainment",
+      "hour": 20,
+      "count": 1427
+    },
+    {
+      "zone": "entertainment",
+      "hour": 21,
+      "count": 1415
+    },
+    {
+      "zone": "entertainment",
+      "hour": 22,
+      "count": 1376
+    },
+    {
+      "zone": "entertainment",
+      "hour": 23,
+      "count": 1384
+    }
+  ]
+}

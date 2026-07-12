@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	domainerrors "github.com/fairride/shared/errors"
 	"github.com/fairride/dispatch/app"
 	"github.com/fairride/dispatch/domain/entity"
 	"github.com/fairride/dispatch/domain/repository"
+	domainerrors "github.com/fairride/shared/errors"
 )
 
 var testNow = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
@@ -65,27 +65,52 @@ func (r *stubJobRepo) FindCurrentOfferForDriver(_ context.Context, driverID stri
 }
 
 // stubLocationRepo simulates a geo store with configurable active drivers.
+// rideEnabled/deliveryEnabled default to true/false per driver (matching
+// migration 008's DB defaults / the production Redis repository's
+// backward-compat fallback) unless a test explicitly overrides them via the
+// rideEnabled/deliveryEnabled maps.
 type stubLocationRepo struct {
-	nearby  []string           // IDs in distance order (nearest first)
-	active  map[string]bool    // which IDs respond as active
-	updated map[string][2]float64 // driverID → [lat, lon]
+	nearby          []string              // IDs in distance order (nearest first)
+	active          map[string]bool       // which IDs respond as active
+	updated         map[string][2]float64 // driverID → [lat, lon]
+	serviceTypes    map[string]entity.ServiceType
+	rideEnabled     map[string]bool
+	deliveryEnabled map[string]bool
 }
 
 var _ repository.DriverLocationRepository = (*stubLocationRepo)(nil)
 
 func newStubLocationRepo(nearby []string, active map[string]bool) *stubLocationRepo {
-	return &stubLocationRepo{nearby: nearby, active: active, updated: make(map[string][2]float64)}
+	return &stubLocationRepo{
+		nearby: nearby, active: active, updated: make(map[string][2]float64),
+		serviceTypes:    make(map[string]entity.ServiceType),
+		rideEnabled:     make(map[string]bool),
+		deliveryEnabled: make(map[string]bool),
+	}
 }
 
-func (r *stubLocationRepo) UpdateLocation(_ context.Context, driverID string, lat, lon float64) error {
+func (r *stubLocationRepo) UpdateLocation(_ context.Context, driverID string, lat, lon float64, serviceType entity.ServiceType, rideEnabled, deliveryEnabled bool) error {
 	r.updated[driverID] = [2]float64{lat, lon}
+	if serviceType != "" {
+		r.serviceTypes[driverID] = serviceType
+	}
+	r.rideEnabled[driverID] = rideEnabled
+	r.deliveryEnabled[driverID] = deliveryEnabled
 	return nil
 }
 
 func (r *stubLocationRepo) FindNearby(_ context.Context, _, _ float64, _ float64, _ int) ([]*entity.NearbyDriver, error) {
 	var out []*entity.NearbyDriver
 	for _, id := range r.nearby {
-		out = append(out, &entity.NearbyDriver{DriverID: id})
+		ride, ok := r.rideEnabled[id]
+		if !ok {
+			ride = true // migration 008 default
+		}
+		delivery := r.deliveryEnabled[id] // migration 008 default is false, matches Go zero value
+		out = append(out, &entity.NearbyDriver{
+			DriverID: id, ServiceType: r.serviceTypes[id],
+			RideEnabled: ride, DeliveryEnabled: delivery,
+		})
 	}
 	return out, nil
 }
@@ -188,8 +213,8 @@ func TestRequestDispatch_OffersNearestDriver(t *testing.T) {
 	uc := app.NewRequestDispatchUseCase(jobs, locs, &stubTransactor{jobs: jobs, trips: trips})
 
 	job, err := uc.Execute(context.Background(), app.RequestDispatchInput{
-		TripID:  "trip1",
-		RiderID: "rider1",
+		TripID:    "trip1",
+		RiderID:   "rider1",
 		PickupLat: 10.0,
 		PickupLon: 106.0,
 	})
@@ -239,6 +264,242 @@ func TestRequestDispatch_SkipsInactiveDrivers(t *testing.T) {
 	}
 	if job.CurrentDriverID != "d2" {
 		t.Errorf("CurrentDriverID = %q, want d2 (first active)", job.CurrentDriverID)
+	}
+}
+
+// ─── RequestDispatch — Delivery (Delivery V1 Phase 3, docs/business/DELIVERY_V1_DESIGN.md) ──
+
+func TestRequestDispatch_RideDispatchPass(t *testing.T) {
+	// TripType left at its zero value — literal "Ride giữ nguyên" check:
+	// same outcome, same fields, as before Delivery was introduced.
+	jobs := newStubJobRepo()
+	locs := newStubLocationRepo([]string{"d1", "d2"}, allActive("d1", "d2"))
+	trips := newStubTripUpdater()
+	uc := app.NewRequestDispatchUseCase(jobs, locs, &stubTransactor{jobs: jobs, trips: trips})
+
+	job, err := uc.Execute(context.Background(), app.RequestDispatchInput{
+		TripID: "trip1", RiderID: "rider1", PickupLat: 10.0, PickupLon: 106.0,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if job.TripType != entity.TripTypeRide {
+		t.Errorf("TripType = %q, want ride", job.TripType)
+	}
+	if job.Status != entity.JobStatusSearching || job.CurrentDriverID != "d1" {
+		t.Errorf("job = %+v, want searching/d1 (nearest, unchanged matching algorithm)", job)
+	}
+}
+
+func TestRequestDispatch_DeliveryDispatchPass(t *testing.T) {
+	jobs := newStubJobRepo()
+	locs := newStubLocationRepo([]string{"d1", "d2"}, allActive("d1", "d2"))
+	// Vehicle/Service Catalog refactor: offerNextDriver now filters
+	// candidates by service type AND by delivery capability, so both
+	// candidates must report the matching type + opt-in for "nearest wins"
+	// to still hold here.
+	locs.serviceTypes["d1"] = entity.ServiceTypeBike
+	locs.serviceTypes["d2"] = entity.ServiceTypeBike
+	locs.deliveryEnabled["d1"] = true
+	locs.deliveryEnabled["d2"] = true
+	trips := newStubTripUpdater()
+	uc := app.NewRequestDispatchUseCase(jobs, locs, &stubTransactor{jobs: jobs, trips: trips})
+
+	job, err := uc.Execute(context.Background(), app.RequestDispatchInput{
+		TripID: "trip1", RiderID: "rider1", PickupLat: 10.0, PickupLon: 106.0,
+		TripType:    entity.TripTypeDelivery,
+		ServiceType: entity.ServiceTypeBike,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if job.TripType != entity.TripTypeDelivery {
+		t.Errorf("TripType = %q, want delivery", job.TripType)
+	}
+	if job.ServiceType != entity.ServiceTypeBike {
+		t.Errorf("ServiceType = %q, want bike", job.ServiceType)
+	}
+	// Same distance-ordering algorithm as Ride: nearest active,
+	// delivery-enabled driver reporting a matching service type wins.
+	if job.Status != entity.JobStatusSearching || job.CurrentDriverID != "d1" {
+		t.Errorf("job = %+v, want searching/d1 (nearest, matching service type)", job)
+	}
+	if len(trips.searchingTrips) == 0 {
+		t.Error("expected SetSearching to be called, same as Ride")
+	}
+}
+
+// TestRequestDispatch_Delivery_ServiceTypeMismatchExcludesDriver locks in
+// the catalog's core Dispatch requirement: a candidate whose reported
+// service type doesn't match the job's is never offered the trip, even if
+// it is the nearest (or only) candidate.
+func TestRequestDispatch_Delivery_ServiceTypeMismatchExcludesDriver(t *testing.T) {
+	jobs := newStubJobRepo()
+	locs := newStubLocationRepo([]string{"d1"}, allActive("d1"))
+	locs.serviceTypes["d1"] = entity.ServiceTypeCar // job wants bike
+	locs.deliveryEnabled["d1"] = true
+	trips := newStubTripUpdater()
+	uc := app.NewRequestDispatchUseCase(jobs, locs, &stubTransactor{jobs: jobs, trips: trips})
+
+	job, err := uc.Execute(context.Background(), app.RequestDispatchInput{
+		TripID: "trip1", RiderID: "rider1", PickupLat: 10.0, PickupLon: 106.0,
+		TripType:    entity.TripTypeDelivery,
+		ServiceType: entity.ServiceTypeBike,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if job.Status != entity.JobStatusFailed {
+		t.Errorf("job.Status = %q, want failed (only candidate has a mismatched service type)", job.Status)
+	}
+}
+
+// TestRequestDispatch_Delivery_CapabilityNotEnabledExcludesDriver locks in
+// the second half of matching: even a service-type match is not enough for
+// a Delivery job if the candidate hasn't opted into DeliveryEnabled.
+func TestRequestDispatch_Delivery_CapabilityNotEnabledExcludesDriver(t *testing.T) {
+	jobs := newStubJobRepo()
+	locs := newStubLocationRepo([]string{"d1"}, allActive("d1"))
+	locs.serviceTypes["d1"] = entity.ServiceTypeBike
+	// deliveryEnabled left unset -> defaults to false (migration 008).
+	trips := newStubTripUpdater()
+	uc := app.NewRequestDispatchUseCase(jobs, locs, &stubTransactor{jobs: jobs, trips: trips})
+
+	job, err := uc.Execute(context.Background(), app.RequestDispatchInput{
+		TripID: "trip1", RiderID: "rider1", PickupLat: 10.0, PickupLon: 106.0,
+		TripType:    entity.TripTypeDelivery,
+		ServiceType: entity.ServiceTypeBike,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if job.Status != entity.JobStatusFailed {
+		t.Errorf("job.Status = %q, want failed (candidate never opted into delivery)", job.Status)
+	}
+}
+
+// TestRequestDispatch_Ride_EmptyServiceType_MatchesAnyCandidate locks in
+// backward compatibility: a Ride request that omits ServiceType (every
+// caller written before this catalog existed) is unaffected by the new
+// filtering — nearest active driver wins regardless of reported service
+// type, and RideEnabled defaults to true so no capability opt-in is needed.
+func TestRequestDispatch_Ride_EmptyServiceType_MatchesAnyCandidate(t *testing.T) {
+	jobs := newStubJobRepo()
+	locs := newStubLocationRepo([]string{"d1"}, allActive("d1"))
+	locs.serviceTypes["d1"] = entity.ServiceTypeCarXL // deliberately NOT set on the request
+	trips := newStubTripUpdater()
+	uc := app.NewRequestDispatchUseCase(jobs, locs, &stubTransactor{jobs: jobs, trips: trips})
+
+	job, err := uc.Execute(context.Background(), app.RequestDispatchInput{
+		TripID: "trip1", RiderID: "rider1", PickupLat: 10.0, PickupLon: 106.0,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if job.Status != entity.JobStatusSearching || job.CurrentDriverID != "d1" {
+		t.Errorf("job = %+v, want searching/d1 (no service_type on request -> unfiltered)", job)
+	}
+}
+
+func TestRequestDispatch_UnsupportedServiceTypeFails(t *testing.T) {
+	jobs := newStubJobRepo()
+	locs := newStubLocationRepo([]string{"d1"}, allActive("d1"))
+	trips := newStubTripUpdater()
+	uc := app.NewRequestDispatchUseCase(jobs, locs, &stubTransactor{jobs: jobs, trips: trips})
+
+	_, err := uc.Execute(context.Background(), app.RequestDispatchInput{
+		TripID: "trip1", RiderID: "rider1", PickupLat: 10.0, PickupLon: 106.0,
+		ServiceType: entity.ServiceType("bicycle"),
+	})
+	if !domainerrors.IsCode(err, domainerrors.CodeInvalidArgument) {
+		t.Errorf("expected InvalidArgument for unsupported service type, got %v", err)
+	}
+	// No job or trip-searching side effect must have happened.
+	if len(jobs.jobs) != 0 {
+		t.Errorf("expected no dispatch job to be created, found %d", len(jobs.jobs))
+	}
+	if len(trips.searchingTrips) != 0 {
+		t.Error("expected SetSearching to never be called for a rejected service type")
+	}
+}
+
+// TestRequestDispatch_AllSupportedServiceTypesPass locks in the single,
+// shared 4-value allow-list applying identically to Ride and Delivery.
+func TestRequestDispatch_AllSupportedServiceTypesPass(t *testing.T) {
+	for _, tripType := range []entity.TripType{entity.TripTypeRide, entity.TripTypeDelivery} {
+		for _, st := range []entity.ServiceType{
+			entity.ServiceTypeBike, entity.ServiceTypeBikePlus, entity.ServiceTypeCar, entity.ServiceTypeCarXL,
+		} {
+			t.Run(string(tripType)+"/"+string(st), func(t *testing.T) {
+				jobs := newStubJobRepo()
+				locs := newStubLocationRepo([]string{"d1"}, allActive("d1"))
+				locs.serviceTypes["d1"] = st
+				locs.deliveryEnabled["d1"] = true
+				trips := newStubTripUpdater()
+				uc := app.NewRequestDispatchUseCase(jobs, locs, &stubTransactor{jobs: jobs, trips: trips})
+
+				_, err := uc.Execute(context.Background(), app.RequestDispatchInput{
+					TripID: "trip1", RiderID: "rider1", PickupLat: 10.0, PickupLon: 106.0,
+					TripType: tripType, ServiceType: st,
+				})
+				if err != nil {
+					t.Errorf("service type %q should be supported for %q, got error: %v", st, tripType, err)
+				}
+			})
+		}
+	}
+}
+
+func TestRequestDispatch_Delivery_EmptyServiceTypeIsNotRejected(t *testing.T) {
+	// An omitted ServiceType must not block dispatch (though see the
+	// capability test above — the candidate must still opt into delivery).
+	jobs := newStubJobRepo()
+	locs := newStubLocationRepo([]string{"d1"}, allActive("d1"))
+	locs.deliveryEnabled["d1"] = true
+	trips := newStubTripUpdater()
+	uc := app.NewRequestDispatchUseCase(jobs, locs, &stubTransactor{jobs: jobs, trips: trips})
+
+	job, err := uc.Execute(context.Background(), app.RequestDispatchInput{
+		TripID: "trip1", RiderID: "rider1", PickupLat: 10.0, PickupLon: 106.0,
+		TripType: entity.TripTypeDelivery,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if job.TripType != entity.TripTypeDelivery {
+		t.Errorf("TripType = %q, want delivery", job.TripType)
+	}
+}
+
+// TestRequestDispatch_BackwardCompatibility verifies that a RequestDispatchInput
+// built exactly as it was before Delivery V1 Phase 3 (no TripType/ServiceType
+// fields set at all) produces byte-for-byte the same outcome as before.
+func TestRequestDispatch_BackwardCompatibility(t *testing.T) {
+	jobs := newStubJobRepo()
+	locs := newStubLocationRepo([]string{"d1", "d2", "d3"}, allActive("d1", "d2", "d3"))
+	trips := newStubTripUpdater()
+	uc := app.NewRequestDispatchUseCase(jobs, locs, &stubTransactor{jobs: jobs, trips: trips})
+
+	job, err := uc.Execute(context.Background(), app.RequestDispatchInput{
+		TripID:    "trip1",
+		RiderID:   "rider1",
+		PickupLat: 10.0,
+		PickupLon: 106.0,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if job.Status != entity.JobStatusSearching {
+		t.Errorf("Status = %q, want searching", job.Status)
+	}
+	if job.CurrentDriverID != "d1" {
+		t.Errorf("CurrentDriverID = %q, want d1 (nearest)", job.CurrentDriverID)
+	}
+	if job.ServiceType != "" {
+		t.Errorf("ServiceType = %q, want empty (never set by legacy callers)", job.ServiceType)
+	}
+	if len(trips.searchingTrips) == 0 {
+		t.Error("expected SetSearching to be called")
 	}
 }
 
@@ -467,7 +728,7 @@ func TestRejectTrip_WrongDriver(t *testing.T) {
 func TestUpdateDriverLocation_Valid(t *testing.T) {
 	locs := newStubLocationRepo(nil, nil)
 	uc := app.NewUpdateDriverLocationUseCase(locs)
-	if err := uc.Execute(context.Background(), "d1", 10.0, 106.0); err != nil {
+	if err := uc.Execute(context.Background(), "d1", 10.0, 106.0, "", true, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if coord, ok := locs.updated["d1"]; !ok || coord[0] != 10.0 || coord[1] != 106.0 {
@@ -477,9 +738,23 @@ func TestUpdateDriverLocation_Valid(t *testing.T) {
 
 func TestUpdateDriverLocation_EmptyDriverID(t *testing.T) {
 	uc := app.NewUpdateDriverLocationUseCase(newStubLocationRepo(nil, nil))
-	err := uc.Execute(context.Background(), "", 10.0, 106.0)
+	err := uc.Execute(context.Background(), "", 10.0, 106.0, "", true, false)
 	if !domainerrors.IsCode(err, domainerrors.CodeInvalidArgument) {
 		t.Errorf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestUpdateDriverLocation_WithServiceTypeAndCapability(t *testing.T) {
+	locs := newStubLocationRepo(nil, nil)
+	uc := app.NewUpdateDriverLocationUseCase(locs)
+	if err := uc.Execute(context.Background(), "d1", 10.0, 106.0, entity.ServiceTypeBikePlus, true, true); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := locs.serviceTypes["d1"]; got != entity.ServiceTypeBikePlus {
+		t.Errorf("service type not recorded: got %q, want %q", got, entity.ServiceTypeBikePlus)
+	}
+	if !locs.rideEnabled["d1"] || !locs.deliveryEnabled["d1"] {
+		t.Errorf("capability not recorded: ride=%v delivery=%v", locs.rideEnabled["d1"], locs.deliveryEnabled["d1"])
 	}
 }
 

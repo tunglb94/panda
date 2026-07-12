@@ -4,12 +4,19 @@ class DriverProfile {
     required this.vehicleModel,
     required this.vehicleColor,
     required this.plateNumber,
+    this.verificationStatus = '',
   });
 
   final String vehicleBrand;
   final String vehicleModel;
   final String vehicleColor;
   final String plateNumber;
+
+  /// Raw backend verification status (e.g. "verified", "pending"). Empty
+  /// while loading or if the backend omitted it.
+  final String verificationStatus;
+
+  bool get isVerified => verificationStatus.toLowerCase() == 'verified';
 
   String get vehicleDisplay {
     final brand = vehicleBrand.trim();
@@ -21,7 +28,7 @@ class DriverProfile {
 
   static const DriverProfile loading = DriverProfile(
     vehicleBrand: '',
-    vehicleModel: 'Loading…',
+    vehicleModel: 'Đang tải…',
     vehicleColor: '',
     plateNumber: '—',
   );

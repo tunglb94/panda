@@ -19,43 +19,43 @@ enum RiderTripStatus {
 
 extension RiderTripStatusX on RiderTripStatus {
   String get label => switch (this) {
-        RiderTripStatus.searchingDriver => 'Searching Driver',
-        RiderTripStatus.driverAssigned => 'Driver Assigned',
-        RiderTripStatus.driverArriving => 'Driver Arriving',
-        RiderTripStatus.inProgress => 'Trip In Progress',
-        RiderTripStatus.completed => 'Trip Completed',
-        RiderTripStatus.cancelled => 'Trip Cancelled',
-        RiderTripStatus.paymentPending => 'Payment Pending',
-        RiderTripStatus.paymentSuccess => 'Payment Successful',
-        RiderTripStatus.settled => 'Trip Settled',
+        RiderTripStatus.searchingDriver => 'Đang tìm tài xế',
+        RiderTripStatus.driverAssigned => 'Đã tìm thấy tài xế',
+        RiderTripStatus.driverArriving => 'Tài xế đang đến',
+        RiderTripStatus.inProgress => 'Đang trong chuyến đi',
+        RiderTripStatus.completed => 'Chuyến đi hoàn tất',
+        RiderTripStatus.cancelled => 'Chuyến đi đã hủy',
+        RiderTripStatus.paymentPending => 'Đang chờ thanh toán',
+        RiderTripStatus.paymentSuccess => 'Thanh toán thành công',
+        RiderTripStatus.settled => 'Hoàn tất chuyến đi',
       };
 
   /// Short label used under the trip progress indicator.
   String get shortLabel => switch (this) {
-        RiderTripStatus.searchingDriver => 'Search',
-        RiderTripStatus.driverAssigned => 'Assigned',
-        RiderTripStatus.driverArriving => 'Arriving',
-        RiderTripStatus.inProgress => 'In trip',
-        RiderTripStatus.completed => 'Done',
-        RiderTripStatus.cancelled => 'Cancelled',
-        RiderTripStatus.paymentPending => 'Pay',
-        RiderTripStatus.paymentSuccess => 'Paid',
-        RiderTripStatus.settled => 'Settled',
+        RiderTripStatus.searchingDriver => 'Tìm xe',
+        RiderTripStatus.driverAssigned => 'Đã ghép',
+        RiderTripStatus.driverArriving => 'Đang đến',
+        RiderTripStatus.inProgress => 'Đang đi',
+        RiderTripStatus.completed => 'Xong',
+        RiderTripStatus.cancelled => 'Đã hủy',
+        RiderTripStatus.paymentPending => 'Thanh toán',
+        RiderTripStatus.paymentSuccess => 'Đã trả',
+        RiderTripStatus.settled => 'Hoàn tất',
       };
 
   String get statusMessage => switch (this) {
         RiderTripStatus.searchingDriver =>
-          'Looking for a nearby driver for you…',
+          'Đang tìm tài xế gần bạn…',
         RiderTripStatus.driverAssigned =>
-          'A driver has been assigned to your trip.',
+          'Đã tìm thấy tài xế cho chuyến đi của bạn.',
         RiderTripStatus.driverArriving =>
-          'Your driver is arriving at the pickup point.',
-        RiderTripStatus.inProgress => 'You are on your way to the destination.',
-        RiderTripStatus.completed => 'You have arrived. Trip completed.',
-        RiderTripStatus.cancelled => 'Your trip was cancelled.',
-        RiderTripStatus.paymentPending => 'Please pay to complete your trip.',
-        RiderTripStatus.paymentSuccess => 'Payment received. Settling…',
-        RiderTripStatus.settled => 'Trip settled. Thank you!',
+          'Tài xế đang đến điểm đón.',
+        RiderTripStatus.inProgress => 'Bạn đang trên đường đến điểm đến.',
+        RiderTripStatus.completed => 'Bạn đã đến nơi. Chuyến đi hoàn tất.',
+        RiderTripStatus.cancelled => 'Chuyến đi của bạn đã bị hủy.',
+        RiderTripStatus.paymentPending => 'Vui lòng thanh toán để hoàn tất chuyến đi.',
+        RiderTripStatus.paymentSuccess => 'Đã nhận thanh toán. Đang xử lý…',
+        RiderTripStatus.settled => 'Chuyến đi đã hoàn tất. Cảm ơn bạn!',
       };
 
   IconData get icon => switch (this) {

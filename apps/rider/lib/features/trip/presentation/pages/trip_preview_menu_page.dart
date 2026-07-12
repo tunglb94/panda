@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:rider/core/network/api_client.dart';
+
 import '../../domain/models/rider_trip_status.dart';
 import 'trip_state_preview_page.dart';
 
@@ -7,12 +9,14 @@ import 'trip_state_preview_page.dart';
 /// independently during development, without waiting for the mock
 /// lifecycle timer in `TripLifecyclePage` to reach it.
 class TripPreviewMenuPage extends StatelessWidget {
-  const TripPreviewMenuPage({super.key});
+  const TripPreviewMenuPage({super.key, required this.apiClient});
+
+  final ApiClient apiClient;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Trip UI Preview (dev)')),
+      appBar: AppBar(title: const Text('Xem trước giao diện chuyến đi (dev)')),
       body: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: RiderTripStatus.values.length,
@@ -27,7 +31,7 @@ class TripPreviewMenuPage extends StatelessWidget {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => TripStatePreviewPage(status: status),
+                  builder: (_) => TripStatePreviewPage(status: status, apiClient: apiClient),
                 ),
               ),
             ),

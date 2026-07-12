@@ -16,13 +16,13 @@ class TripCancelledView extends StatelessWidget {
         Icon(Icons.cancel_outlined, size: 72, color: colorScheme.error),
         const SizedBox(height: 16),
         Text(
-          'Trip Cancelled',
+          'Chuyến đi đã hủy',
           style: Theme.of(context).textTheme.headlineSmall,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
         Text(
-          'Your trip was cancelled.',
+          'Chuyến đi của bạn đã bị hủy.',
           style: Theme.of(context)
               .textTheme
               .bodyMedium
@@ -30,7 +30,7 @@ class TripCancelledView extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 40),
-        FilledButton(onPressed: onDone, child: const Text('Done')),
+        FilledButton(onPressed: onDone, child: const Text('Xong')),
       ],
     );
   }

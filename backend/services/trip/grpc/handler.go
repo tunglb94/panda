@@ -8,25 +8,31 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	domainerrors "github.com/fairride/shared/errors"
 	"github.com/fairride/trip/app"
 	"github.com/fairride/trip/domain/entity"
 	"github.com/fairride/trip/grpc/trippb"
-	domainerrors "github.com/fairride/shared/errors"
 )
 
 // Handler implements trippb.TripServiceServer.
 type Handler struct {
 	trippb.UnimplementedTripServiceServer
-	createTrip         *app.CreateTripUseCase
-	cancelTrip         *app.CancelTripUseCase
-	getTrip            *app.GetTripUseCase
-	markDriverArrived  *app.MarkDriverArrivedUseCase
-	startTrip          *app.StartTripUseCase
-	completeTrip       *app.CompleteTripUseCase
-	initiatePayment    *app.InitiatePaymentUseCase
-	payTrip            *app.PayTripUseCase
-	listTripsByRider   *app.ListTripsByRiderUseCase
-	listTripsByDriver  *app.ListTripsByDriverUseCase
+	createTrip        *app.CreateTripUseCase
+	cancelTrip        *app.CancelTripUseCase
+	getTrip           *app.GetTripUseCase
+	markDriverArrived *app.MarkDriverArrivedUseCase
+	startTrip         *app.StartTripUseCase
+	completeTrip      *app.CompleteTripUseCase
+	initiatePayment   *app.InitiatePaymentUseCase
+	payTrip           *app.PayTripUseCase
+	listTripsByRider  *app.ListTripsByRiderUseCase
+	listTripsByDriver *app.ListTripsByDriverUseCase
+	// Delivery V1 Phase 4 (docs/business/DELIVERY_V1_DESIGN.md) — additive.
+	pickupParcel     *app.PickupParcelUseCase
+	startDelivery    *app.StartDeliveryUseCase
+	completeDelivery *app.CompleteDeliveryUseCase
+	// Production hardening P0-1 — additive.
+	acceptDelivery *app.AcceptDeliveryUseCase
 }
 
 // NewHandler wires all trip use cases into a gRPC handler.
@@ -41,6 +47,10 @@ func NewHandler(
 	payTrip *app.PayTripUseCase,
 	listTripsByRider *app.ListTripsByRiderUseCase,
 	listTripsByDriver *app.ListTripsByDriverUseCase,
+	pickupParcel *app.PickupParcelUseCase,
+	startDelivery *app.StartDeliveryUseCase,
+	completeDelivery *app.CompleteDeliveryUseCase,
+	acceptDelivery *app.AcceptDeliveryUseCase,
 ) *Handler {
 	if createTrip == nil {
 		panic("trip grpc: CreateTripUseCase must not be nil")
@@ -72,6 +82,18 @@ func NewHandler(
 	if listTripsByDriver == nil {
 		panic("trip grpc: ListTripsByDriverUseCase must not be nil")
 	}
+	if pickupParcel == nil {
+		panic("trip grpc: PickupParcelUseCase must not be nil")
+	}
+	if startDelivery == nil {
+		panic("trip grpc: StartDeliveryUseCase must not be nil")
+	}
+	if completeDelivery == nil {
+		panic("trip grpc: CompleteDeliveryUseCase must not be nil")
+	}
+	if acceptDelivery == nil {
+		panic("trip grpc: AcceptDeliveryUseCase must not be nil")
+	}
 	return &Handler{
 		createTrip:        createTrip,
 		cancelTrip:        cancelTrip,
@@ -83,6 +105,10 @@ func NewHandler(
 		payTrip:           payTrip,
 		listTripsByRider:  listTripsByRider,
 		listTripsByDriver: listTripsByDriver,
+		pickupParcel:      pickupParcel,
+		startDelivery:     startDelivery,
+		completeDelivery:  completeDelivery,
+		acceptDelivery:    acceptDelivery,
 	}
 }
 
@@ -97,10 +123,22 @@ func (h *Handler) CreateTrip(ctx context.Context, req *trippb.CreateTripRequest)
 	if req.GetDropoffAddress() == "" {
 		return nil, status.Error(codes.InvalidArgument, "dropoff_address is required")
 	}
+	tripType := entity.TripTypeRide
+	if req.GetTripType() == string(entity.TripTypeDelivery) {
+		tripType = entity.TripTypeDelivery
+	}
 	trip, err := h.createTrip.Execute(ctx, app.CreateTripInput{
-		RiderID:        req.GetRiderId(),
-		PickupAddress:  req.GetPickupAddress(),
-		DropoffAddress: req.GetDropoffAddress(),
+		RiderID:            req.GetRiderId(),
+		PickupAddress:      req.GetPickupAddress(),
+		DropoffAddress:     req.GetDropoffAddress(),
+		TripType:           tripType,
+		PickupContactName:  req.GetPickupContactName(),
+		PickupContactPhone: req.GetPickupContactPhone(),
+		ReceiverName:       req.GetReceiverName(),
+		ReceiverPhone:      req.GetReceiverPhone(),
+		PackageNote:        req.GetPackageNote(),
+		PackageValue:       req.GetPackageValue(),
+		PackageWeightKg:    req.GetPackageWeight(),
 	})
 	if err != nil {
 		return nil, toGRPCError(err)
@@ -238,6 +276,80 @@ func (h *Handler) ListTripsByDriver(ctx context.Context, req *trippb.ListTripsRe
 	return &trippb.TripsResponse{Trips: protos}, nil
 }
 
+// PickupParcel implements TripServiceServer.PickupParcel. Delivery V1
+// Phase 4 (docs/business/DELIVERY_V1_DESIGN.md) — returns InvalidArgument
+// for a Ride trip (via the use case's loadDeliveryTrip guard).
+func (h *Handler) PickupParcel(ctx context.Context, req *trippb.GetTripRequest) (*trippb.TripResponse, error) {
+	if req.GetTripId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "trip_id is required")
+	}
+	delivery, err := h.pickupParcel.Execute(ctx, app.PickupParcelInput{TripID: req.GetTripId()})
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	trip, err := h.getTrip.Execute(ctx, req.GetTripId())
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	return &trippb.TripResponse{Trip: toProtoWithDeliveryStatus(trip, delivery.Status)}, nil
+}
+
+// StartDelivery implements TripServiceServer.StartDelivery.
+func (h *Handler) StartDelivery(ctx context.Context, req *trippb.GetTripRequest) (*trippb.TripResponse, error) {
+	if req.GetTripId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "trip_id is required")
+	}
+	delivery, err := h.startDelivery.Execute(ctx, app.StartDeliveryInput{TripID: req.GetTripId()})
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	trip, err := h.getTrip.Execute(ctx, req.GetTripId())
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	return &trippb.TripResponse{Trip: toProtoWithDeliveryStatus(trip, delivery.Status)}, nil
+}
+
+// CompleteDelivery implements TripServiceServer.CompleteDelivery.
+func (h *Handler) CompleteDelivery(ctx context.Context, req *trippb.GetTripRequest) (*trippb.TripResponse, error) {
+	if req.GetTripId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "trip_id is required")
+	}
+	delivery, err := h.completeDelivery.Execute(ctx, app.CompleteDeliveryInput{TripID: req.GetTripId()})
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	trip, err := h.getTrip.Execute(ctx, req.GetTripId())
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	return &trippb.TripResponse{Trip: toProtoWithDeliveryStatus(trip, delivery.Status)}, nil
+}
+
+// AcceptDelivery implements TripServiceServer.AcceptDelivery. Production
+// hardening P0-1. Unlike PickupParcel/StartDelivery/CompleteDelivery, a
+// Ride trip is not an error here — Booking calls this unconditionally
+// after every accept, so a nil *entity.Delivery (nothing to do) falls back
+// to the trip's plain proto with delivery_status left at its empty zero
+// value, same as every non-delivery-lifecycle RPC.
+func (h *Handler) AcceptDelivery(ctx context.Context, req *trippb.GetTripRequest) (*trippb.TripResponse, error) {
+	if req.GetTripId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "trip_id is required")
+	}
+	delivery, err := h.acceptDelivery.Execute(ctx, app.AcceptDeliveryInput{TripID: req.GetTripId()})
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	trip, err := h.getTrip.Execute(ctx, req.GetTripId())
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	if delivery == nil {
+		return &trippb.TripResponse{Trip: toProto(trip)}, nil
+	}
+	return &trippb.TripResponse{Trip: toProtoWithDeliveryStatus(trip, delivery.Status)}, nil
+}
+
 // ─── private helpers ──────────────────────────────────────────────────────────
 
 func toProto(t *entity.Trip) *trippb.TripProto {
@@ -253,7 +365,21 @@ func toProto(t *entity.Trip) *trippb.TripProto {
 		UpdatedAt:          timestamppb.New(t.UpdatedAt),
 		FinalFareTotal:     t.FinalFareTotal,
 		FareCurrency:       t.FareCurrency,
+		TripType:           string(t.TripType),
+		DeliveryId:         t.DeliveryID,
 	}
+}
+
+// toProtoWithDeliveryStatus is toProto plus the given DeliveryStatus.
+// Delivery V1 Phase 4 — used only by the 3 new delivery-lifecycle RPCs,
+// which already have the just-mutated *entity.Delivery in hand; existing
+// RPCs (GetTrip, CreateTrip, ...) keep calling plain toProto unchanged and
+// leave delivery_status at its empty zero value, per
+// docs/business/DELIVERY_V1_DESIGN.md's additive-only principle.
+func toProtoWithDeliveryStatus(t *entity.Trip, deliveryStatus entity.DeliveryStatus) *trippb.TripProto {
+	p := toProto(t)
+	p.DeliveryStatus = string(deliveryStatus)
+	return p
 }
 
 func toGRPCError(err error) error {

@@ -2,12 +2,23 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../../core/auth/auth_state.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/storage/token_storage.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../shared/utils/currency_format.dart';
+import '../../../../shared/widgets/app_empty_state.dart';
+import '../../../../shared/widgets/app_loading_view.dart';
+import '../../../../shared/widgets/pressable_scale.dart';
 import '../../../home/data/availability_repository.dart';
 import '../../../location/services/location_upload_service.dart';
+import '../../../trip/data/active_trip_repository.dart';
+import '../../../trip/data/trip_offer_repository.dart';
+import '../widgets/home_status_panel.dart';
 
 // ─── Location state machine ───────────────────────────────────────────────────
 
@@ -21,6 +32,19 @@ enum _LocationStatus {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+/// The Driver app's Home screen — the single most-viewed surface in the
+/// app, so it gets the most design scrutiny of any screen.
+///
+/// Home mirrors the driver's live trip status (offline/online/searching/
+/// incoming offer/picking up/waiting/in trip/awaiting payment/completed) by
+/// *reading* the same `AvailabilityRepository`, `TripOfferRepository`, and
+/// `ActiveTripRepository` that the Trips tab already owns — no new
+/// endpoints, no new mutating calls. Accepting an offer and every trip
+/// action (arrive/start/finish/rate) still only happen on the Trips tab;
+/// Home's card is a live-updating preview with a single "Xem chi tiết" CTA
+/// that navigates there. This keeps exactly one place in the app able to
+/// mutate trip state, while making Home behave like a real dispatch home
+/// screen instead of a bare online/offline toggle.
 class MapPage extends StatefulWidget {
   const MapPage({
     super.key,
@@ -39,7 +63,7 @@ class MapPage extends StatefulWidget {
   State<MapPage> createState() => _MapPageState();
 }
 
-class _MapPageState extends State<MapPage> {
+class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   // — Location ——————————————————————————————————————————————————————————————————
   _LocationStatus _locationStatus = _LocationStatus.loading;
   LatLng? _position;
@@ -53,28 +77,45 @@ class _MapPageState extends State<MapPage> {
   bool _isToggling = false;
   String? _availError;
 
-  // — Location upload ——————————————————————————————————————————————————————————
-  UploadStatus _uploadStatus = UploadStatus.idle;
-  StreamSubscription<UploadStatus>? _uploadStatusSub;
+  // — Trip status mirror (read-only — see class doc) ——————————————————————————
+  late final TripOfferRepository _offerRepo;
+  late final ActiveTripRepository _activeTripRepo;
+  HomePhase _homePhase = HomePhase.offline;
+  String? _tripPickupAddress;
+  String? _tripDropoffAddress;
+  String? _tripFareLabel;
+  int? _offerCountdown;
+  bool _wasInActiveTrip = false;
+  Timer? _statusTimer;
+  Timer? _offerCountdownTimer;
 
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _availRepo = AvailabilityRepository(widget.apiClient);
-    _uploadStatusSub = widget.uploadService.statusStream.listen((s) {
-      if (mounted) setState(() => _uploadStatus = s);
-    });
+    _offerRepo = TripOfferRepository(apiClient: widget.apiClient);
+    _activeTripRepo = ActiveTripRepository(apiClient: widget.apiClient);
     _resolveLocation();
     _fetchAvailability();
   }
 
   @override
   void dispose() {
-    _uploadStatusSub?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _statusTimer?.cancel();
+    _offerCountdownTimer?.cancel();
     _mapController?.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _isOnline) {
+      _pollTripStatus();
+    }
   }
 
   // ─── Location ───────────────────────────────────────────────────────────────
@@ -122,13 +163,24 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
+  void _recenter() {
+    final pos = _position;
+    if (pos == null) return;
+    _mapController?.animateCamera(CameraUpdate.newLatLngZoom(pos, _defaultZoom));
+  }
+
   // ─── Availability ────────────────────────────────────────────────────────────
 
   Future<void> _fetchAvailability() async {
     try {
       final result = await _availRepo.getAvailability();
       if (mounted) setState(() => _isOnline = result.isOnline);
-      if (result.isOnline) unawaited(widget.uploadService.start());
+      if (result.isOnline) {
+        unawaited(widget.uploadService.start());
+        _startStatusPolling();
+      } else if (mounted) {
+        setState(() => _homePhase = HomePhase.offline);
+      }
     } catch (_) {
       // Non-fatal — default to offline
     } finally {
@@ -150,20 +202,120 @@ class _MapPageState extends State<MapPage> {
       setState(() => _isOnline = result.isOnline);
       if (result.isOnline) {
         unawaited(widget.uploadService.start());
+        _startStatusPolling();
       } else {
         widget.uploadService.stop();
+        _stopStatusPolling();
+        setState(() => _homePhase = HomePhase.offline);
       }
     } on ApiException catch (e) {
       if (mounted) setState(() => _availError = e.message);
     } catch (_) {
       if (mounted) {
         setState(
-            () => _availError = 'Could not update status. Please try again.');
+            () => _availError = 'Không thể cập nhật trạng thái. Vui lòng thử lại.');
       }
     } finally {
       if (mounted) setState(() => _isToggling = false);
     }
   }
+
+  // ─── Trip status mirror (read-only) ──────────────────────────────────────────
+
+  void _startStatusPolling() {
+    _statusTimer?.cancel();
+    _pollTripStatus();
+    // Lighter cadence than the Trips tab's 5s poll (this is a display
+    // mirror, not the flow that drives trip-critical timing).
+    _statusTimer = Timer.periodic(const Duration(seconds: 8), (_) => _pollTripStatus());
+  }
+
+  void _stopStatusPolling() {
+    _statusTimer?.cancel();
+    _statusTimer = null;
+    _offerCountdownTimer?.cancel();
+    _offerCountdownTimer = null;
+  }
+
+  Future<void> _pollTripStatus() async {
+    if (!_isOnline || !mounted) return;
+    try {
+      final storedId = await _activeTripRepo.getStoredTripId();
+      if (storedId != null) {
+        final trip = await _activeTripRepo.fetchTrip(storedId);
+        if (!mounted) return;
+        _wasInActiveTrip = true;
+        _offerCountdownTimer?.cancel();
+        setState(() {
+          _tripPickupAddress = trip.pickupAddress;
+          _tripDropoffAddress = trip.dropoffAddress;
+          _tripFareLabel = _fareLabel(trip.finalFare, trip.fareCurrency);
+          _homePhase = switch (trip.status) {
+            'driver_assigned' => HomePhase.pickingUp,
+            'driver_arrived' => HomePhase.waiting,
+            'in_progress' => HomePhase.inTrip,
+            'payment_pending' || 'payment_success' => HomePhase.awaitingPayment,
+            _ => HomePhase.online,
+          };
+        });
+        return;
+      }
+
+      // No active trip in storage right now.
+      if (_wasInActiveTrip) {
+        // We had one last poll and don't anymore — the Trips tab just
+        // settled it. Flash "Completed" briefly before returning to the
+        // normal online/searching state (see class doc for why this is a
+        // short client-side heuristic rather than a real observed state).
+        _wasInActiveTrip = false;
+        if (!mounted) return;
+        setState(() => _homePhase = HomePhase.completed);
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted && _homePhase == HomePhase.completed) {
+            setState(() => _homePhase = HomePhase.online);
+          }
+        });
+        return;
+      }
+
+      final offer = await _offerRepo.getCurrentOffer();
+      if (!mounted) return;
+      if (offer != null) {
+        setState(() {
+          _tripPickupAddress = offer.pickupAddress;
+          _tripDropoffAddress = offer.dropoffAddress;
+          _homePhase = HomePhase.incomingTrip;
+        });
+        _startOfferCountdown(offer.offerExpiresAt);
+      } else {
+        _offerCountdownTimer?.cancel();
+        setState(() => _homePhase = HomePhase.online);
+      }
+    } catch (_) {
+      // Non-fatal — keep the last known phase, retry next tick.
+    }
+  }
+
+  void _startOfferCountdown(DateTime expiresAt) {
+    _offerCountdownTimer?.cancel();
+    void tick() {
+      if (!mounted) return;
+      final remaining = expiresAt.difference(DateTime.now().toUtc()).inSeconds;
+      setState(() => _offerCountdown = remaining.clamp(0, 999));
+    }
+    tick();
+    _offerCountdownTimer = Timer.periodic(const Duration(seconds: 1), (_) => tick());
+  }
+
+  static String _fareLabel(int finalFare, String currency) {
+    if (finalFare > 0 && currency.isNotEmpty) {
+      return formatMoney(finalFare, currency);
+    }
+    return '—';
+  }
+
+  void _goToTrips() => context.go(AppRoutes.trips);
+  void _goToProfile() => context.go(AppRoutes.profile);
 
   // ─── Build ────────────────────────────────────────────────────────────────────
 
@@ -171,32 +323,33 @@ class _MapPageState extends State<MapPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: switch (_locationStatus) {
-        _LocationStatus.loading => const _LocationLoadingView(),
+        _LocationStatus.loading =>
+          const AppLoadingView(label: 'Đang xác định vị trí của bạn…'),
         _LocationStatus.permissionDenied => _LocationErrorView(
             icon: Icons.location_off,
-            title: 'Location permission denied',
+            title: 'Quyền truy cập vị trí bị từ chối',
             message:
-                'FAIRRIDE Driver needs your location to show your position '
-                'on the map.',
-            actionLabel: 'Grant permission',
+                'PandaDriver cần quyền truy cập vị trí để hiển thị vị trí '
+                'của bạn trên bản đồ.',
+            actionLabel: 'Cấp quyền',
             onAction: _resolveLocation,
           ),
         _LocationStatus.permissionPermanentlyDenied => _LocationErrorView(
             icon: Icons.location_disabled,
-            title: 'Location access blocked',
+            title: 'Vị trí đang bị chặn',
             message:
-                'Please enable location permission for FAIRRIDE Driver in '
-                'your device Settings.',
-            actionLabel: 'Open Settings',
+                'Vui lòng bật quyền truy cập vị trí cho PandaDriver trong '
+                'phần Cài đặt của thiết bị.',
+            actionLabel: 'Mở Cài đặt',
             onAction: () async => Geolocator.openAppSettings(),
           ),
         _LocationStatus.gpsDisabled => _LocationErrorView(
             icon: Icons.gps_off,
-            title: 'GPS is turned off',
+            title: 'GPS đang tắt',
             message:
-                'Turn on Location Services so FAIRRIDE Driver can show your '
-                'position on the map.',
-            actionLabel: 'Open Location Settings',
+                'Hãy bật Dịch vụ vị trí để PandaDriver có thể hiển thị vị '
+                'trí của bạn trên bản đồ.',
+            actionLabel: 'Mở Cài đặt vị trí',
             onAction: () async => Geolocator.openLocationSettings(),
           ),
         _LocationStatus.ready => _buildMap(),
@@ -214,24 +367,42 @@ class _MapPageState extends State<MapPage> {
           ),
           onMapCreated: (controller) => _mapController = controller,
           myLocationEnabled: true,
-          myLocationButtonEnabled: true,
-          zoomControlsEnabled: true,
+          myLocationButtonEnabled: false,
+          zoomControlsEnabled: false,
           compassEnabled: true,
           mapToolbarEnabled: false,
           mapType: MapType.normal,
-          // Reserve space above the status card so map controls stay visible.
-          padding: const EdgeInsets.only(bottom: 116),
+          // Reserve space above the status panel so map controls/markers
+          // near the bottom stay visible and tappable.
+          padding: const EdgeInsets.only(bottom: 200),
+        ),
+        SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _DriverAvatarButton(onTap: _goToProfile),
+                _RecenterButton(onTap: _recenter),
+              ],
+            ),
+          ),
         ),
         Positioned(
           left: 0,
           right: 0,
           bottom: 0,
-          child: _StatusCard(
-            isOnline: _isOnline,
-            isLoading: _isLoadingStatus || _isToggling,
+          child: HomeStatusPanel(
+            phase: _homePhase,
+            isBusy: _isLoadingStatus || _isToggling,
             error: _availError,
-            uploadStatus: _isOnline ? _uploadStatus : UploadStatus.idle,
-            onToggle: _toggle,
+            pickupAddress: _tripPickupAddress,
+            dropoffAddress: _tripDropoffAddress,
+            countdownSeconds: _offerCountdown,
+            fareLabel: _tripFareLabel,
+            onToggleOnline: _toggle,
+            onViewTrip: _goToTrips,
           ),
         ),
       ],
@@ -239,126 +410,82 @@ class _MapPageState extends State<MapPage> {
   }
 }
 
-// ─── Status card overlay ──────────────────────────────────────────────────────
+// ─── Top bar affordances ───────────────────────────────────────────────────────
 
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({
-    required this.isOnline,
-    required this.isLoading,
-    this.error,
-    required this.uploadStatus,
-    required this.onToggle,
-  });
+class _DriverAvatarButton extends StatelessWidget {
+  const _DriverAvatarButton({required this.onTap});
 
-  final bool isOnline;
-  final bool isLoading;
-  final String? error;
-  final UploadStatus uploadStatus;
-  final VoidCallback onToggle;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Material(
-      elevation: 8,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  if (isLoading)
-                    const SizedBox(
-                      width: 12,
-                      height: 12,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  else
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: isOnline
-                            ? const Color(0xFF1A8C4E)
-                            : cs.outlineVariant,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      isOnline ? 'You are online' : 'You are offline',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  if (isOnline && uploadStatus != UploadStatus.idle) ...[
-                    _UploadIndicator(status: uploadStatus),
-                    const SizedBox(width: 8),
-                  ],
-                  Switch(
-                    value: isOnline,
-                    onChanged: isLoading ? null : (_) => onToggle(),
-                  ),
-                ],
-              ),
-              if (error != null) ...[
-                const SizedBox(height: 6),
-                Text(
-                  error!,
-                  style: TextStyle(color: cs.error, fontSize: 12),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
+    return _CircleFloatingButton(
+      onTap: onTap,
+      icon: Icons.person,
+      iconSize: 24,
     );
   }
 }
 
-// ─── Upload status indicator ─────────────────────────────────────────────────
+class _RecenterButton extends StatelessWidget {
+  const _RecenterButton({required this.onTap});
 
-class _UploadIndicator extends StatelessWidget {
-  const _UploadIndicator({required this.status});
-
-  final UploadStatus status;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final (color, icon) = switch (status) {
-      UploadStatus.uploading => (Colors.orange, Icons.cloud_upload_outlined),
-      UploadStatus.success => (Colors.green, Icons.cloud_done_outlined),
-      UploadStatus.failed => (Colors.red, Icons.cloud_off_outlined),
-      UploadStatus.idle => (Colors.grey, Icons.cloud_outlined),
-    };
-    return Icon(icon, size: 16, color: color);
+    return _CircleFloatingButton(
+      onTap: onTap,
+      icon: Icons.my_location,
+      iconSize: 22,
+    );
   }
 }
 
-// ─── Loading view ─────────────────────────────────────────────────────────────
+/// Shared shell for the small circular floating buttons on Home (avatar,
+/// recenter): press-down scale (via `InkWell.onHighlightChanged`, which is
+/// always safe to combine with `InkWell`'s own tap handling — no nested
+/// gesture detectors), soft card shadow, ripple.
+class _CircleFloatingButton extends StatefulWidget {
+  const _CircleFloatingButton({
+    required this.onTap,
+    required this.icon,
+    required this.iconSize,
+  });
 
-class _LocationLoadingView extends StatelessWidget {
-  const _LocationLoadingView();
+  final VoidCallback onTap;
+  final IconData icon;
+  final double iconSize;
+
+  @override
+  State<_CircleFloatingButton> createState() => _CircleFloatingButtonState();
+}
+
+class _CircleFloatingButtonState extends State<_CircleFloatingButton> {
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: Colors.white,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 20),
-            Text(
-              'Finding your location…',
-              style: TextStyle(fontSize: 15, color: Colors.black54),
+    return Material(
+      color: AppColors.surface,
+      shape: const CircleBorder(),
+      elevation: 0,
+      child: InkWell(
+        onTap: widget.onTap,
+        customBorder: const CircleBorder(),
+        onHighlightChanged: (v) => setState(() => _pressed = v),
+        child: PressableScale(
+          pressed: _pressed,
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: AppShadows.card,
             ),
-          ],
+            alignment: Alignment.center,
+            child: Icon(widget.icon, color: AppColors.primary, size: widget.iconSize),
+          ),
         ),
       ),
     );
@@ -384,36 +511,12 @@ class _LocationErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 72, color: theme.colorScheme.primary),
-            const SizedBox(height: 24),
-            Text(
-              title,
-              style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: Colors.grey.shade600),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 36),
-            ElevatedButton(
-              onPressed: onAction,
-              child: Text(actionLabel),
-            ),
-          ],
-        ),
-      ),
+    return AppEmptyState(
+      icon: icon,
+      title: title,
+      subtitle: message,
+      actionLabel: actionLabel,
+      onAction: onAction,
     );
   }
 }

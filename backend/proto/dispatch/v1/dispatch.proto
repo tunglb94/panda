@@ -48,6 +48,16 @@ message RequestDispatchRequest {
   int32 offer_timeout_sec = 5;
   // 0 uses the server default (5 attempts)
   int32 max_attempts    = 6;
+
+  // trip_type is "ride" (default; empty also means ride) or "delivery".
+  // Delivery V1 Phase 3 (docs/business/DELIVERY_V1_DESIGN.md) — additive,
+  // 100% backward compatible with every existing Ride caller that omits it.
+  string trip_type = 7;
+
+  // vehicle_type is optional. When set on a "delivery" request, Dispatch
+  // rejects it up front unless it is one of "motorcycle"|"car"|"van".
+  // Ignored for "ride" requests.
+  string vehicle_type = 8;
 }
 
 message AcceptTripRequest {

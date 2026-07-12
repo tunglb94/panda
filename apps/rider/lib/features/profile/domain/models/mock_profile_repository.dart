@@ -5,7 +5,7 @@ class MockRiderProfileCatalog {
   const MockRiderProfileCatalog._();
 
   static const RiderProfile sample = RiderProfile(
-    fullName: 'Alex Rider',
+    fullName: 'Nguyen Van Nam',
     phoneNumber: '+1 555 000 0000',
     memberLevel: MemberLevel.gold,
     rating: 4.9,

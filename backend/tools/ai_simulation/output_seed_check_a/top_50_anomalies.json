@@ -1,0 +1,20 @@
+[
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "airport",
+    "severity": 117.41326721161636,
+    "detail": "Khu vực airport có tỉ lệ cầu/cung trung bình 7.83x — thiếu tài xế nghiêm trọng."
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "bus_station",
+    "severity": 47.27611575625694,
+    "detail": "Khu vực bus_station có tỉ lệ cầu/cung trung bình 3.15x — thiếu tài xế nghiêm trọng."
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "hospital",
+    "severity": 42.53856838820603,
+    "detail": "Khu vực hospital có tỉ lệ cầu/cung trung bình 2.84x — thiếu tài xế nghiêm trọng."
+  }
+]

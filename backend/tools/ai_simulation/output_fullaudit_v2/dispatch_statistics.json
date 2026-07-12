@@ -1,0 +1,10 @@
+{
+  "requested": 536085,
+  "accepted": 535217,
+  "rejected": 110,
+  "cancelled": 758,
+  "completed": 535217,
+  "accept_rate_percent": 99.83808537825158,
+  "average_eta_minutes": 34.228202508388215,
+  "average_pickup_minutes": 26.441409815586244
+}

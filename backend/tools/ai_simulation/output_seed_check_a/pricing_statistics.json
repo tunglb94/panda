@@ -1,0 +1,65 @@
+{
+  "total_trips_quoted": 666,
+  "average_base_fare_vnd": 52286.762762762766,
+  "average_final_fare_vnd": 65260.036036036036,
+  "average_surge_multiplier": 1.20366959040846,
+  "surged_trip_count": 580,
+  "surged_trip_percent": 87.08708708708708,
+  "max_surge_observed": 1.7033340362222067,
+  "fare_by_vehicle_type": {
+    "car": {
+      "count": 427,
+      "average_final_fare_vnd": 69607.53864168619
+    },
+    "motorcycle": {
+      "count": 184,
+      "average_final_fare_vnd": 46266.27173913043
+    },
+    "van": {
+      "count": 55,
+      "average_final_fare_vnd": 95050.38181818182
+    }
+  },
+  "fare_histogram": [
+    {
+      "range_label": "0-20k",
+      "count": 7
+    },
+    {
+      "range_label": "20-40k",
+      "count": 151
+    },
+    {
+      "range_label": "40-60k",
+      "count": 198
+    },
+    {
+      "range_label": "60-80k",
+      "count": 135
+    },
+    {
+      "range_label": "80-100k",
+      "count": 87
+    },
+    {
+      "range_label": "100-120k",
+      "count": 38
+    },
+    {
+      "range_label": "120-140k",
+      "count": 18
+    },
+    {
+      "range_label": "140-160k",
+      "count": 24
+    },
+    {
+      "range_label": "160-180k",
+      "count": 5
+    },
+    {
+      "range_label": "180k+",
+      "count": 3
+    }
+  ]
+}

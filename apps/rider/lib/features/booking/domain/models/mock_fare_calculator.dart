@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:rider/shared/utils/currency_format.dart';
+
 import 'vehicle_option.dart';
 
 /// Client-side fare estimate powering the Booking UI's Fare Summary card.
@@ -12,6 +14,10 @@ import 'vehicle_option.dart';
 /// performs no network call — see
 /// `docs/project/MVP_DEVELOPMENT_PLAN.md` Rider App Roadmap stage R4 for
 /// when real fare estimation gets wired in.
+///
+/// The `*Cents` field names are legacy from when this mirrored USD test
+/// rates; values are now whole VND (no subunit — see [formatMoney]), not
+/// actually cents.
 class MockFareBreakdown {
   const MockFareBreakdown({
     required this.baseFareCents,
@@ -21,7 +27,7 @@ class MockFareBreakdown {
     required this.rideFareCents,
     required this.discountCents,
     required this.totalCents,
-    this.currencyCode = 'USD',
+    this.currencyCode = 'VND',
   });
 
   final int baseFareCents;
@@ -58,11 +64,6 @@ class MockFareBreakdown {
     );
   }
 
-  /// Formats [cents] using this breakdown's currency. USD gets a `$` prefix;
-  /// any other configured code is shown as a plain ISO prefix (mock-only —
-  /// no locale-aware currency formatting is wired in yet).
-  String format(int cents) {
-    final symbol = currencyCode == 'USD' ? '\$' : '$currencyCode ';
-    return '$symbol${(cents / 100).toStringAsFixed(2)}';
-  }
+  /// Formats [amount] using this breakdown's currency.
+  String format(int amount) => formatMoney(amount, currencyCode);
 }

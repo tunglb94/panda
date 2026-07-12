@@ -110,6 +110,14 @@ run: ## Run a service (usage: make run SVC=identity)
 	@if [ -z "$(SVC)" ]; then echo "Usage: make run SVC=<service-name>"; exit 1; fi
 	@cd $(BACKEND_DIR) && go run ./services/$(SVC)/cmd/server
 
+.PHONY: dev
+dev: ## One-command backend bring-up: infra + migrations + seed + every service (see scripts/start-all.sh)
+	@bash scripts/start-all.sh
+
+.PHONY: dev-stop
+dev-stop: ## Stop everything started by `make dev`
+	@bash scripts/start-all.sh --stop
+
 ## Convenience targets — one per service
 define RUN_TARGET
 .PHONY: run-$(1)

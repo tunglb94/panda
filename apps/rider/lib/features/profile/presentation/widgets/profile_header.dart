@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'package:rider/core/theme/app_colors.dart';
+import 'package:rider/core/theme/app_spacing.dart';
+import 'package:rider/shared/widgets/app_status_chip.dart';
+
 import '../../domain/models/rider_profile.dart';
 
 /// Avatar (mock initials), full name, phone number, and member level badge.
@@ -10,43 +14,26 @@ class ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
     final level = profile.memberLevel;
     return Column(
       children: [
         CircleAvatar(
           radius: 44,
-          backgroundColor: primary.withValues(alpha: 0.12),
+          backgroundColor: AppColors.primaryLight,
           child: Text(
             profile.avatarInitial,
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: primary),
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: AppColors.primary),
           ),
         ),
-        const SizedBox(height: 12),
-        Text(
-          profile.fullName,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
+        const SizedBox(height: AppSpacing.md),
+        Text(profile.fullName, style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 4),
-        Text(profile.phoneNumber, style: TextStyle(color: Colors.grey.shade500)),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: level.color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.workspace_premium, size: 16, color: level.color),
-              const SizedBox(width: 4),
-              Text(
-                '${level.label} Member',
-                style: TextStyle(color: level.color, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
+        Text(profile.phoneNumber, style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: AppSpacing.md),
+        AppStatusChip(
+          label: '${level.label} Member',
+          color: level.color,
+          icon: Icons.workspace_premium,
         ),
       ],
     );

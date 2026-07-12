@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:rider/core/network/api_client.dart';
+
 import '../../domain/models/settings_entry.dart';
 import '../widgets/developer_preview_section.dart';
 import '../widgets/settings_section.dart';
@@ -11,12 +13,14 @@ import 'notification_center_page.dart';
 /// Center / About have real screens yet; building those out is outside the
 /// scope of this phase.
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({super.key, required this.apiClient});
+
+  final ApiClient apiClient;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: const Text('Cài đặt')),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -25,24 +29,24 @@ class SettingsPage extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               children: [
                 SettingsSection(
-                  title: 'Account',
+                  title: 'Tài khoản',
                   entries: MockSettingsCatalog.account,
                   onTapEntry: (entry) => _handleEntry(context, entry),
                 ),
                 const SizedBox(height: 20),
                 SettingsSection(
-                  title: 'Preferences',
+                  title: 'Tùy chọn',
                   entries: MockSettingsCatalog.preferences,
                   onTapEntry: (entry) => _handleEntry(context, entry),
                 ),
                 const SizedBox(height: 20),
                 SettingsSection(
-                  title: 'Support',
+                  title: 'Hỗ trợ',
                   entries: MockSettingsCatalog.support,
                   onTapEntry: (entry) => _handleEntry(context, entry),
                 ),
                 const SizedBox(height: 20),
-                const DeveloperPreviewSection(),
+                DeveloperPreviewSection(apiClient: apiClient),
                 const SizedBox(height: 20),
                 SettingsSection(
                   entries: [MockSettingsCatalog.logout],
@@ -60,7 +64,7 @@ class SettingsPage extends StatelessWidget {
     switch (entry.action) {
       case SettingsAction.notifications:
         await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const NotificationCenterPage()),
+          MaterialPageRoute(builder: (_) => NotificationCenterPage(apiClient: apiClient)),
         );
       case SettingsAction.logout:
         await _confirmLogout(context);
@@ -72,7 +76,7 @@ class SettingsPage extends StatelessWidget {
       case SettingsAction.helpCenter:
       case SettingsAction.about:
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${entry.label} is a placeholder — not yet implemented.')),
+          SnackBar(content: Text('${entry.label} chưa được triển khai.')),
         );
       case SettingsAction.developerPreview:
         // Not routed through here — DeveloperPreviewSection handles its own
@@ -85,26 +89,26 @@ class SettingsPage extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Log out?'),
+        title: const Text('Đăng xuất?'),
         content: const Text(
-          'This is a UI-only mock — there is no real session to sign out of '
-          'yet (Identity has no login endpoint).',
+          'Đây chỉ là giao diện giả lập — chưa có phiên đăng nhập thực để '
+          'đăng xuất (Identity chưa có endpoint đăng nhập).',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: const Text('Hủy'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Log out'),
+            child: const Text('Đăng xuất'),
           ),
         ],
       ),
     );
     if (confirmed == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Logged out (mock — no backend session existed).')),
+        const SnackBar(content: Text('Đã đăng xuất (giả lập — chưa có phiên backend thực).')),
       );
     }
   }

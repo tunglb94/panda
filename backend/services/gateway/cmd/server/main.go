@@ -9,17 +9,22 @@ import (
 
 	"github.com/fairride/booking/grpc/bookingpb"
 	"github.com/fairride/dispatch/grpc/dispatchpb"
-	driverpostgres "github.com/fairride/driver/infrastructure/postgres"
 	"github.com/fairride/driver/grpc/driverpb"
+	driverpostgres "github.com/fairride/driver/infrastructure/postgres"
 	httpgateway "github.com/fairride/gateway/http"
 	"github.com/fairride/gateway/http/handlers"
 	"github.com/fairride/gateway/http/middleware"
-	identitypostgres "github.com/fairride/identity/infrastructure/postgres"
 	"github.com/fairride/identity/infrastructure/jwt"
+	identitypostgres "github.com/fairride/identity/infrastructure/postgres"
+	notificationapp "github.com/fairride/notification/app"
+	notificationpostgres "github.com/fairride/notification/infrastructure/postgres"
+	reviewapp "github.com/fairride/review/app"
 	"github.com/fairride/review/grpc/reviewpb"
+	reviewpostgres "github.com/fairride/review/infrastructure/postgres"
 	sharedconfig "github.com/fairride/shared/config"
 	"github.com/fairride/shared/database"
 	"github.com/fairride/shared/logger"
+	"github.com/fairride/trip/grpc/trippb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -46,30 +51,112 @@ func main() {
 		log.Fatal().Err(err).Str("addr", bookingAddr).Msg("failed to connect to booking service")
 	}
 	defer bookingConn.Close()
-	bh := handlers.NewBookingHandler(bookingpb.NewBookingServiceClient(bookingConn))
 
-	// Auth handler: requires a shared DB for user + driver lookups.
-	// If DB_URL is unset or the connection fails, auth returns 503 gracefully.
-	var ah *handlers.AuthHandler
+	// Trip service: delivery-lifecycle actions (pickup-parcel/start-delivery/
+	// complete-delivery) and delivery-status enrichment on GetBooking live
+	// only on Trip's own gRPC surface — Booking's proto was never extended
+	// with equivalent RPCs/fields. If TRIP_ADDR is unset, delivery status
+	// enrichment is silently skipped and the delivery action routes return
+	// 503, but Ride booking/polling is entirely unaffected.
+	var tripClient trippb.TripServiceClient
+	if tripAddr := os.Getenv("TRIP_ADDR"); tripAddr != "" {
+		tripConn, connErr := grpc.NewClient(tripAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if connErr != nil {
+			log.Warn().Err(connErr).Str("addr", tripAddr).Msg("gateway: trip service connection failed — delivery actions will return 503")
+		} else {
+			defer tripConn.Close()
+			tripClient = trippb.NewTripServiceClient(tripConn)
+		}
+	}
+	dh := handlers.NewDeliveryHandler(tripClient)
+
+	bh := handlers.NewBookingHandler(bookingpb.NewBookingServiceClient(bookingConn), tripClient)
+
+	// Shared Postgres pool: Auth (identity+driver reads) and the entire
+	// Communication Module (chat/call/notification) + Review's new
+	// average-rating read all run in-process against this one pool — no
+	// separate gRPC hop for any of them (see notification module's report,
+	// "Kien truc": this environment has no protoc/buf toolchain to generate
+	// a brand-new proto package, so these are imported as Go libraries
+	// directly, mirroring the existing identity-service precedent, which
+	// has never had a gRPC surface either). If DB_URL is unset or the
+	// connection fails, every dependent handler gracefully returns 503.
+	var pool *database.Pool
 	if dbURL := os.Getenv("DB_URL"); dbURL != "" {
-		pool, dbErr := database.Connect(context.Background(), database.Config{
+		p, dbErr := database.Connect(context.Background(), database.Config{
 			URL:      dbURL,
 			MaxConns: 5,
 			MinConns: 1,
 		})
 		if dbErr != nil {
-			log.Warn().Err(dbErr).Msg("gateway: DB connection failed — auth will return 503")
+			log.Warn().Err(dbErr).Msg("gateway: DB connection failed — auth/chat/call/notification will return 503")
 		} else {
-			ah = handlers.NewAuthHandler(
-				identitypostgres.NewUserRepository(pool),
-				driverpostgres.NewDriverRepository(pool),
-				tokenSvc,
-			)
+			pool = p
 		}
+	}
+
+	var ah *handlers.AuthHandler
+	if pool != nil {
+		ah = handlers.NewAuthHandler(
+			identitypostgres.NewUserRepository(pool),
+			driverpostgres.NewDriverRepository(pool),
+			tokenSvc,
+		)
 	}
 	if ah == nil {
 		ah = handlers.NewAuthHandler(nil, nil, tokenSvc)
 	}
+
+	// Communication Module — Phone Call / In-App Chat / Notification /
+	// Contact Card. Needs both `pool` (its own tables) and `tripClient`
+	// (participant/status authorization) — degrades gracefully if either is absent.
+	var ch *handlers.ChatHandler
+	var cah *handlers.CallHandler
+	var nh *handlers.NotificationHandler
+	var tripNotifier *handlers.TripEventNotifier
+	if pool != nil && tripClient != nil {
+		convRepo := notificationpostgres.NewConversationRepository(pool)
+		msgRepo := notificationpostgres.NewMessageRepository(pool)
+		notifRepo := notificationpostgres.NewNotificationRepository(pool)
+		callRepo := notificationpostgres.NewCallSessionRepository(pool)
+		broadcaster := notificationapp.NewBroadcaster()
+		pushSender := notificationapp.NewNoopPushSender(func(userID, title, body string) {
+			log.Debug().Str("user_id", userID).Str("title", title).Msg("push: no FCM provider configured — in-app notification only")
+		})
+		createNotify := notificationapp.NewCreateNotificationUseCase(notifRepo, pushSender)
+		tripReader := handlers.NewTripReader(tripClient)
+
+		ch = handlers.NewChatHandler(
+			notificationapp.NewGetOrCreateConversationUseCase(convRepo, tripReader),
+			notificationapp.NewSendMessageUseCase(convRepo, msgRepo, createNotify, broadcaster),
+			notificationapp.NewListMessagesUseCase(convRepo, msgRepo),
+			notificationapp.NewPollMessagesUseCase(convRepo, msgRepo, broadcaster),
+			notificationapp.NewMarkReadUseCase(convRepo, msgRepo),
+			msgRepo,
+		)
+
+		avgRating := reviewapp.NewGetAverageRatingUseCase(reviewpostgres.NewRatingRepository(pool))
+		recordCall := notificationapp.NewRecordCallUseCase(callRepo, createNotify)
+		cah = handlers.NewCallHandler(tripClient, identitypostgres.NewUserRepository(pool), driverpostgres.NewDriverRepository(pool), avgRating, recordCall)
+
+		nh = handlers.NewNotificationHandler(
+			notificationapp.NewListNotificationsUseCase(notifRepo),
+			notificationapp.NewMarkNotificationReadUseCase(notifRepo),
+		)
+
+		tripNotifier = handlers.NewTripEventNotifier(tripClient, createNotify)
+	}
+	if ch == nil {
+		ch = handlers.NewChatHandler(nil, nil, nil, nil, nil, nil)
+	}
+	if cah == nil {
+		cah = handlers.NewCallHandler(nil, nil, nil, nil, nil)
+	}
+	if nh == nil {
+		nh = handlers.NewNotificationHandler(nil, nil)
+	}
+	bh.SetNotifier(tripNotifier)
+	dh.SetNotifier(tripNotifier)
 
 	// Driver availability: proxies to the driver gRPC service.
 	// If DRIVER_ADDR is unset or the connection fails, availability returns 503 gracefully.
@@ -136,7 +223,7 @@ func main() {
 	}
 
 	authMW := middleware.Auth(tokenSvc)
-	router := httpgateway.NewRouter(bh, ah, avh, lh, dph, rh, authMW, log)
+	router := httpgateway.NewRouter(bh, ah, avh, lh, dph, rh, dh, ch, cah, nh, authMW, log)
 
 	addr := cfg.HTTP.Addr
 	srv := &http.Server{

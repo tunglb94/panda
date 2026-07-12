@@ -42,7 +42,7 @@ class _RiderAppState extends State<RiderApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'FAIRRIDE',
+      title: 'Panda',
       theme: AppTheme.light,
       routerConfig: _router,
       debugShowCheckedModeBanner: false,

@@ -29,6 +29,15 @@ const (
 	TripService_PayTrip_FullMethodName           = "/trip.v1.TripService/PayTrip"
 	TripService_ListTripsByRider_FullMethodName  = "/trip.v1.TripService/ListTripsByRider"
 	TripService_ListTripsByDriver_FullMethodName = "/trip.v1.TripService/ListTripsByDriver"
+	// Delivery V1 Phase 4 (docs/business/DELIVERY_V1_DESIGN.md) — additive.
+	TripService_PickupParcel_FullMethodName     = "/trip.v1.TripService/PickupParcel"
+	TripService_StartDelivery_FullMethodName    = "/trip.v1.TripService/StartDelivery"
+	TripService_CompleteDelivery_FullMethodName = "/trip.v1.TripService/CompleteDelivery"
+	// Production hardening (P0-1): AcceptDelivery closes the CREATED→ACCEPTED
+	// gap — AcceptDispatchOfferUseCase (Booking) only updates Dispatch/Trip,
+	// never the in-memory Delivery aggregate that only the Trip service
+	// process holds, so it must call this RPC explicitly after accept.
+	TripService_AcceptDelivery_FullMethodName = "/trip.v1.TripService/AcceptDelivery"
 )
 
 // TripServiceClient is the client API for TripService service.
@@ -57,6 +66,18 @@ type TripServiceClient interface {
 	ListTripsByRider(ctx context.Context, in *ListTripsRequest, opts ...grpc.CallOption) (*TripsResponse, error)
 	// ListTripsByDriver returns all trips for a driver, newest first.
 	ListTripsByDriver(ctx context.Context, in *ListTripsRequest, opts ...grpc.CallOption) (*TripsResponse, error)
+	// PickupParcel transitions a Delivery from Accepted to ParcelPickedUp,
+	// and the linked Trip to InProgress. Delivery V1 Phase 4.
+	PickupParcel(ctx context.Context, in *GetTripRequest, opts ...grpc.CallOption) (*TripResponse, error)
+	// StartDelivery transitions a Delivery from ParcelPickedUp to InDelivery.
+	StartDelivery(ctx context.Context, in *GetTripRequest, opts ...grpc.CallOption) (*TripResponse, error)
+	// CompleteDelivery marks a Delivery Delivered then Completed.
+	CompleteDelivery(ctx context.Context, in *GetTripRequest, opts ...grpc.CallOption) (*TripResponse, error)
+	// AcceptDelivery transitions a Delivery from Created to Accepted.
+	// No-op (not an error) if the trip isn't a delivery, or if the
+	// delivery is already past Created — idempotent, safe to call more
+	// than once for the same trip.
+	AcceptDelivery(ctx context.Context, in *GetTripRequest, opts ...grpc.CallOption) (*TripResponse, error)
 }
 
 type tripServiceClient struct {
@@ -157,6 +178,42 @@ func (c *tripServiceClient) ListTripsByDriver(ctx context.Context, in *ListTrips
 	return out, nil
 }
 
+func (c *tripServiceClient) PickupParcel(ctx context.Context, in *GetTripRequest, opts ...grpc.CallOption) (*TripResponse, error) {
+	out := new(TripResponse)
+	err := c.cc.Invoke(ctx, TripService_PickupParcel_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tripServiceClient) StartDelivery(ctx context.Context, in *GetTripRequest, opts ...grpc.CallOption) (*TripResponse, error) {
+	out := new(TripResponse)
+	err := c.cc.Invoke(ctx, TripService_StartDelivery_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tripServiceClient) CompleteDelivery(ctx context.Context, in *GetTripRequest, opts ...grpc.CallOption) (*TripResponse, error) {
+	out := new(TripResponse)
+	err := c.cc.Invoke(ctx, TripService_CompleteDelivery_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tripServiceClient) AcceptDelivery(ctx context.Context, in *GetTripRequest, opts ...grpc.CallOption) (*TripResponse, error) {
+	out := new(TripResponse)
+	err := c.cc.Invoke(ctx, TripService_AcceptDelivery_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TripServiceServer is the server API for TripService service.
 // All implementations must embed UnimplementedTripServiceServer
 // for forward compatibility
@@ -183,6 +240,18 @@ type TripServiceServer interface {
 	ListTripsByRider(context.Context, *ListTripsRequest) (*TripsResponse, error)
 	// ListTripsByDriver returns all trips for a driver, newest first.
 	ListTripsByDriver(context.Context, *ListTripsRequest) (*TripsResponse, error)
+	// PickupParcel transitions a Delivery from Accepted to ParcelPickedUp,
+	// and the linked Trip to InProgress. Delivery V1 Phase 4.
+	PickupParcel(context.Context, *GetTripRequest) (*TripResponse, error)
+	// StartDelivery transitions a Delivery from ParcelPickedUp to InDelivery.
+	StartDelivery(context.Context, *GetTripRequest) (*TripResponse, error)
+	// CompleteDelivery marks a Delivery Delivered then Completed.
+	CompleteDelivery(context.Context, *GetTripRequest) (*TripResponse, error)
+	// AcceptDelivery transitions a Delivery from Created to Accepted.
+	// No-op (not an error) if the trip isn't a delivery, or if the
+	// delivery is already past Created — idempotent, safe to call more
+	// than once for the same trip.
+	AcceptDelivery(context.Context, *GetTripRequest) (*TripResponse, error)
 	mustEmbedUnimplementedTripServiceServer()
 }
 
@@ -219,6 +288,18 @@ func (UnimplementedTripServiceServer) ListTripsByRider(context.Context, *ListTri
 }
 func (UnimplementedTripServiceServer) ListTripsByDriver(context.Context, *ListTripsRequest) (*TripsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListTripsByDriver not implemented")
+}
+func (UnimplementedTripServiceServer) PickupParcel(context.Context, *GetTripRequest) (*TripResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PickupParcel not implemented")
+}
+func (UnimplementedTripServiceServer) StartDelivery(context.Context, *GetTripRequest) (*TripResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StartDelivery not implemented")
+}
+func (UnimplementedTripServiceServer) CompleteDelivery(context.Context, *GetTripRequest) (*TripResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CompleteDelivery not implemented")
+}
+func (UnimplementedTripServiceServer) AcceptDelivery(context.Context, *GetTripRequest) (*TripResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AcceptDelivery not implemented")
 }
 func (UnimplementedTripServiceServer) mustEmbedUnimplementedTripServiceServer() {}
 
@@ -413,6 +494,78 @@ func _TripService_ListTripsByDriver_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TripService_PickupParcel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTripRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TripServiceServer).PickupParcel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TripService_PickupParcel_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TripServiceServer).PickupParcel(ctx, req.(*GetTripRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TripService_StartDelivery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTripRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TripServiceServer).StartDelivery(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TripService_StartDelivery_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TripServiceServer).StartDelivery(ctx, req.(*GetTripRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TripService_CompleteDelivery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTripRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TripServiceServer).CompleteDelivery(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TripService_CompleteDelivery_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TripServiceServer).CompleteDelivery(ctx, req.(*GetTripRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TripService_AcceptDelivery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTripRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TripServiceServer).AcceptDelivery(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TripService_AcceptDelivery_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TripServiceServer).AcceptDelivery(ctx, req.(*GetTripRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TripService_ServiceDesc is the grpc.ServiceDesc for TripService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -459,6 +612,22 @@ var TripService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListTripsByDriver",
 			Handler:    _TripService_ListTripsByDriver_Handler,
+		},
+		{
+			MethodName: "PickupParcel",
+			Handler:    _TripService_PickupParcel_Handler,
+		},
+		{
+			MethodName: "StartDelivery",
+			Handler:    _TripService_StartDelivery_Handler,
+		},
+		{
+			MethodName: "CompleteDelivery",
+			Handler:    _TripService_CompleteDelivery_Handler,
+		},
+		{
+			MethodName: "AcceptDelivery",
+			Handler:    _TripService_AcceptDelivery_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

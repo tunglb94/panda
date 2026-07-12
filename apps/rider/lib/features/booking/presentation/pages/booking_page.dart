@@ -24,7 +24,7 @@ class BookingPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final trip = tripSelection ?? MockBookingCatalog.sampleTripSelection;
     return Scaffold(
-      appBar: AppBar(title: const Text('Book a Ride')),
+      appBar: AppBar(title: const Text('Đặt xe')),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(

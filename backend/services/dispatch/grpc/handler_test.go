@@ -20,7 +20,9 @@ import (
 
 var testNow = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 
-type stubJobRepo struct{ jobs map[string]*entity.DispatchJob }
+type stubJobRepo struct {
+	jobs map[string]*entity.DispatchJob
+}
 
 var _ repository.DispatchJobRepository = (*stubJobRepo)(nil)
 
@@ -61,11 +63,16 @@ type stubLocRepo struct{ nearby []string }
 
 var _ repository.DriverLocationRepository = (*stubLocRepo)(nil)
 
-func (r *stubLocRepo) UpdateLocation(_ context.Context, _ string, _, _ float64) error { return nil }
+func (r *stubLocRepo) UpdateLocation(_ context.Context, _ string, _, _ float64, _ entity.ServiceType, _, _ bool) error {
+	return nil
+}
 func (r *stubLocRepo) FindNearby(_ context.Context, _, _, _ float64, _ int) ([]*entity.NearbyDriver, error) {
 	var out []*entity.NearbyDriver
 	for _, id := range r.nearby {
-		out = append(out, &entity.NearbyDriver{DriverID: id})
+		// RideEnabled defaults to true (migration 008's DB default / the
+		// real Redis repository's backward-compat fallback) so existing
+		// Ride-only tests here are unaffected by the capability filter.
+		out = append(out, &entity.NearbyDriver{DriverID: id, RideEnabled: true})
 	}
 	return out, nil
 }

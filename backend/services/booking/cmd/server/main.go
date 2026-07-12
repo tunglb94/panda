@@ -74,7 +74,7 @@ func register(srv *sharedgrpc.Server, ready *server.ReadinessTracker) {
 	}
 
 	bookRide := app.NewBookRideUseCase(tripAdapter, dispatchAdapter)
-	acceptOffer := app.NewAcceptDispatchOfferUseCase(dispatchAdapter)
+	acceptOffer := app.NewAcceptDispatchOfferUseCase(dispatchAdapter, tripAdapter)
 	finishTrip := app.NewFinishTripUseCase(pricingAdapter, tripAdapter)
 	if idemStore != nil {
 		bookRide = bookRide.WithIdempotency(idemStore)

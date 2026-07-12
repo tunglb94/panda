@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'package:rider/core/theme/app_colors.dart';
+import 'package:rider/core/theme/app_spacing.dart';
+import 'package:rider/shared/widgets/app_bottom_sheet.dart';
+import 'package:rider/shared/widgets/app_card.dart';
+
 import '../../domain/models/mock_booking_catalog.dart';
 import '../../domain/models/payment_method.dart';
 
@@ -20,85 +25,52 @@ class PaymentMethodCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
       onTap: () => _showPicker(context),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade200),
-        ),
-        child: Row(
-          children: [
-            Icon(selected.icon, color: primary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(selected.label,
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
-                  Text(
-                    selected.subtitle,
-                    style:
-                        TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                  ),
-                ],
-              ),
+      child: Row(
+        children: [
+          Icon(selected.icon, color: AppColors.primary),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(selected.label, style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                Text(selected.subtitle, style: Theme.of(context).textTheme.labelMedium),
+              ],
             ),
-            const Icon(Icons.keyboard_arrow_right, color: Colors.grey),
-          ],
-        ),
+          ),
+          const Icon(Icons.keyboard_arrow_right, color: AppColors.textTertiary),
+        ],
       ),
     );
   }
 
   Future<void> _showPicker(BuildContext context) async {
-    final chosen = await showModalBottomSheet<PaymentMethod>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) {
-        final primary = Theme.of(sheetContext).colorScheme.primary;
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Payment method',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                ),
+    final chosen = await AppBottomSheet.show<PaymentMethod>(
+      context,
+      title: 'Phương thức thanh toán',
+      builder: (sheetContext) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ...MockBookingCatalog.paymentMethods.map((m) {
+            final isSelected = m.type == selected.type;
+            return ListTile(
+              leading: Icon(m.icon, color: isSelected ? AppColors.primary : null),
+              title: Text(m.label),
+              subtitle: Text(m.subtitle),
+              trailing: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: isSelected
+                    ? const Icon(Icons.check_circle, color: AppColors.primary, key: ValueKey('sel'))
+                    : const SizedBox.shrink(key: ValueKey('unsel')),
               ),
-              ...MockBookingCatalog.paymentMethods.map((m) {
-                final isSelected = m.type == selected.type;
-                return ListTile(
-                  leading: Icon(m.icon, color: isSelected ? primary : null),
-                  title: Text(m.label),
-                  subtitle: Text(m.subtitle),
-                  trailing: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    child: isSelected
-                        ? Icon(Icons.check_circle,
-                            color: primary, key: const ValueKey('sel'))
-                        : const SizedBox.shrink(key: ValueKey('unsel')),
-                  ),
-                  onTap: () => Navigator.pop(sheetContext, m),
-                );
-              }),
-              const SizedBox(height: 12),
-            ],
-          ),
-        );
-      },
+              onTap: () => Navigator.pop(sheetContext, m),
+            );
+          }),
+        ],
+      ),
     );
     if (chosen != null) onChanged(chosen);
   }

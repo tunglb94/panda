@@ -7,14 +7,19 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:rider/core/location/location_engine.dart';
 import 'package:rider/core/location/location_engine_config.dart';
 import 'package:rider/core/network/api_client.dart';
+import 'package:rider/core/places/nominatim_places_service.dart';
 import 'package:rider/core/routing/route_engine.dart';
+import 'package:rider/core/routing/route_model.dart';
 import 'package:rider/core/routing/route_point.dart';
 import 'package:rider/core/routing/route_progress.dart';
 import 'package:rider/core/routing/route_progress_engine.dart';
 import 'package:rider/core/routing/route_provider.dart';
 import 'package:rider/features/booking/presentation/widgets/booking_bottom_sheet.dart';
+import 'package:rider/features/delivery/presentation/pages/delivery_form_page.dart';
 import 'package:rider/features/map/data/driver_tracking_repository.dart';
 import 'package:rider/features/map/domain/models/trip_selection.dart';
+import 'package:rider/features/map/presentation/widgets/place_search_field.dart';
+import 'package:rider/shared/widgets/mascot_image.dart';
 
 // ─── Location resolution state machine ───────────────────────────────────────
 
@@ -62,10 +67,16 @@ class MapPageState extends State<MapPage> {
   LatLng _cameraCenter = const LatLng(0, 0);
   LatLng? _pickupPoint;
   LatLng? _destinationPoint;
+  String? _pickupAddress;
+  String? _destinationAddress;
+  bool _isAnimatingCamera = false;
   Set<Marker> _markers = {};
   Set<Polyline> _polylines = {};
   RouteModel? _routeInfo;
   bool _routeLoading = false;
+
+  // — Place search (Phase R-05) ————————————————————————————————————————————————
+  late final NominatimPlacesService _placesService;
 
   // — Route engine (Phase 32) ──────────────────────────────────────────────────
   late final RouteEngine _routeEngine;
@@ -97,6 +108,7 @@ class MapPageState extends State<MapPage> {
       routeEngine: _routeEngine,
     );
     _trackingRepo = DriverTrackingRepository(apiClient: widget.apiClient);
+    _placesService = const NominatimPlacesService();
     _resolveLocation();
   }
 
@@ -223,7 +235,42 @@ class MapPageState extends State<MapPage> {
 
   void _onCameraMove(CameraPosition pos) {
     if (_selectionMode == _SelectionMode.confirmed) return;
-    setState(() => _cameraCenter = pos.target);
+    setState(() {
+      _cameraCenter = pos.target;
+      // A manual drag invalidates whichever address came from search — but
+      // ignore moves caused by our own animateCamera() (see _isAnimatingCamera).
+      if (!_isAnimatingCamera) {
+        if (_selectionMode == _SelectionMode.pickupPending) {
+          _pickupAddress = null;
+        } else if (_selectionMode == _SelectionMode.destinationPending) {
+          _destinationAddress = null;
+        }
+      }
+    });
+  }
+
+  void _onCameraIdle() {
+    _isAnimatingCamera = false;
+  }
+
+  // ─── Place search ─────────────────────────────────────────────────────────────
+
+  void _onPickupPlaceSelected(String address, LatLng location) {
+    _isAnimatingCamera = true;
+    setState(() {
+      _cameraCenter = location;
+      _pickupAddress = address;
+    });
+    _controller?.animateCamera(CameraUpdate.newLatLngZoom(location, _defaultZoom));
+  }
+
+  void _onDestinationPlaceSelected(String address, LatLng location) {
+    _isAnimatingCamera = true;
+    setState(() {
+      _cameraCenter = location;
+      _destinationAddress = address;
+    });
+    _controller?.animateCamera(CameraUpdate.newLatLngZoom(location, _defaultZoom));
   }
 
   // ─── Selection actions ────────────────────────────────────────────────────────
@@ -346,14 +393,14 @@ class MapPageState extends State<MapPage> {
           position: _pickupPoint!,
           icon:
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-          infoWindow: const InfoWindow(title: 'Pickup'),
+          infoWindow: const InfoWindow(title: 'Điểm đón'),
         ),
       if (_destinationPoint != null)
         Marker(
           markerId: const MarkerId('destination'),
           position: _destinationPoint!,
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-          infoWindow: const InfoWindow(title: 'Destination'),
+          infoWindow: const InfoWindow(title: 'Điểm đến'),
         ),
       if (_driverPosition != null)
         Marker(
@@ -363,7 +410,7 @@ class MapPageState extends State<MapPage> {
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
           flat: true,
           rotation: _driverHeading,
-          infoWindow: const InfoWindow(title: 'Driver'),
+          infoWindow: const InfoWindow(title: 'Tài xế'),
           anchor: const Offset(0.5, 0.5),
         ),
     };
@@ -374,6 +421,8 @@ class MapPageState extends State<MapPage> {
     return TripSelection(
       pickup: _pickupPoint!,
       destination: _destinationPoint!,
+      pickupAddress: _pickupAddress,
+      destinationAddress: _destinationAddress,
     );
   }
 
@@ -386,27 +435,28 @@ class MapPageState extends State<MapPage> {
         _LocationStatus.loading => const _LocationLoadingView(),
         _LocationStatus.permissionDenied => _LocationErrorView(
             icon: Icons.location_off,
-            title: 'Location permission denied',
-            message: 'FAIRRIDE needs your location to show nearby drivers and '
-                'estimate fares.',
-            actionLabel: 'Grant permission',
+            title: 'Không có quyền truy cập vị trí',
+            message: 'Panda cần vị trí của bạn để hiển thị tài xế gần đó và '
+                'ước tính cước phí.',
+            actionLabel: 'Cấp quyền',
             onAction: _resolveLocation,
           ),
         _LocationStatus.permissionPermanentlyDenied => _LocationErrorView(
             icon: Icons.location_disabled,
-            title: 'Location access blocked',
-            message: 'Please enable location permission for FAIRRIDE in your '
-                'device Settings.',
-            actionLabel: 'Open Settings',
+            title: 'Quyền truy cập vị trí bị chặn',
+            message: 'Vui lòng bật quyền truy cập vị trí cho Panda trong '
+                'Cài đặt thiết bị.',
+            actionLabel: 'Mở Cài đặt',
             onAction: () async => Geolocator.openAppSettings(),
           ),
         _LocationStatus.gpsDisabled => _LocationErrorView(
             icon: Icons.gps_off,
-            title: 'GPS is turned off',
+            title: 'GPS đang tắt',
             message:
-                'Turn on Location Services so FAIRRIDE can show you on the map.',
-            actionLabel: 'Open Location Settings',
+                'Bật Dịch vụ định vị để Panda có thể hiển thị vị trí của bạn trên bản đồ.',
+            actionLabel: 'Mở Cài đặt định vị',
             onAction: () async => Geolocator.openLocationSettings(),
+            mascotAsset: 'mascot_no_gps.png',
           ),
         _LocationStatus.ready => _buildSelectionMap(),
       },
@@ -422,6 +472,7 @@ class MapPageState extends State<MapPage> {
               CameraPosition(target: _position!, zoom: _defaultZoom),
           onMapCreated: _onMapCreated,
           onCameraMove: _onCameraMove,
+          onCameraIdle: _onCameraIdle,
           markers: _markers,
           polylines: _polylines,
           myLocationEnabled: true,
@@ -433,6 +484,19 @@ class MapPageState extends State<MapPage> {
           padding: const EdgeInsets.only(bottom: 240),
         ),
         if (showPin) const _CenterPin(),
+        // Delivery entry point — only shown before the rider starts picking
+        // a Ride pickup point, so it never overlaps or interferes with the
+        // Ride pickup/destination selection flow below.
+        if (_selectionMode == _SelectionMode.pickupPending)
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 12,
+            right: 12,
+            child: _DeliveryEntryButton(
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => DeliveryFormPage(apiClient: widget.apiClient, initialBias: _cameraCenter),
+              )),
+            ),
+          ),
         Positioned(
           left: 0,
           right: 0,
@@ -442,6 +506,11 @@ class MapPageState extends State<MapPage> {
             cameraCenter: _cameraCenter,
             pickupPoint: _pickupPoint,
             destinationPoint: _destinationPoint,
+            pickupAddress: _pickupAddress,
+            destinationAddress: _destinationAddress,
+            placesService: _placesService,
+            onPickupPlaceSelected: _onPickupPlaceSelected,
+            onDestinationPlaceSelected: _onDestinationPlaceSelected,
             onConfirmPickup: _confirmPickup,
             onConfirmDestination: _confirmDestination,
             onEditPickup: _editPickup,
@@ -456,6 +525,38 @@ class MapPageState extends State<MapPage> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Delivery entry point ───────────────────────────────────────────────────
+
+class _DeliveryEntryButton extends StatelessWidget {
+  const _DeliveryEntryButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      elevation: 3,
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.local_shipping_outlined, size: 18, color: Colors.black87),
+              SizedBox(width: 6),
+              Text('Gửi hàng', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -489,10 +590,15 @@ class _SelectionPanel extends StatelessWidget {
     required this.cameraCenter,
     required this.pickupPoint,
     required this.destinationPoint,
+    required this.placesService,
+    required this.onPickupPlaceSelected,
+    required this.onDestinationPlaceSelected,
     required this.onConfirmPickup,
     required this.onConfirmDestination,
     required this.onEditPickup,
     required this.onEditDestination,
+    this.pickupAddress,
+    this.destinationAddress,
     this.onBookRide,
     this.routeDistanceText,
     this.routeDurationText,
@@ -504,6 +610,11 @@ class _SelectionPanel extends StatelessWidget {
   final LatLng cameraCenter;
   final LatLng? pickupPoint;
   final LatLng? destinationPoint;
+  final String? pickupAddress;
+  final String? destinationAddress;
+  final NominatimPlacesService placesService;
+  final void Function(String address, LatLng location) onPickupPlaceSelected;
+  final void Function(String address, LatLng location) onDestinationPlaceSelected;
   final VoidCallback onConfirmPickup;
   final VoidCallback onConfirmDestination;
   final VoidCallback onEditPickup;
@@ -540,27 +651,36 @@ class _SelectionPanel extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        PlaceSearchField(
+          key: const ValueKey('pickup-search'),
+          placesService: placesService,
+          hintText: 'Tìm điểm đón (VD: Chợ Bến Thành)',
+          biasCenter: cameraCenter,
+          onSelected: onPickupPlaceSelected,
+        ),
+        const SizedBox(height: 12),
         _PointRow(
           icon: Icons.my_location,
           iconColor: primary,
-          label: 'Set pickup',
-          subtitle: 'Drag the map to adjust your pickup location',
+          label: 'Điểm đón',
+          subtitle: 'Hoặc kéo bản đồ để điều chỉnh',
           coordinate: cameraCenter,
+          addressText: pickupAddress,
           active: true,
         ),
         const SizedBox(height: 8),
         _PointRow(
           icon: Icons.flag_outlined,
           iconColor: Colors.red,
-          label: 'Destination',
-          subtitle: 'Confirm pickup first',
+          label: 'Điểm đến',
+          subtitle: 'Xác nhận điểm đón trước',
           coordinate: null,
           active: false,
         ),
         const SizedBox(height: 20),
         FilledButton(
           onPressed: onConfirmPickup,
-          child: const Text('Confirm Pickup'),
+          child: const Text('Xác nhận điểm đón'),
         ),
       ],
     );
@@ -575,27 +695,37 @@ class _SelectionPanel extends StatelessWidget {
         _PointRow(
           icon: Icons.my_location,
           iconColor: primary,
-          label: 'Pickup',
+          label: 'Điểm đón',
           coordinate: pickupPoint,
+          addressText: pickupAddress,
           active: false,
           trailing: TextButton(
             onPressed: onEditPickup,
-            child: const Text('Edit'),
+            child: const Text('Sửa'),
           ),
         ),
         const Divider(height: 20),
+        PlaceSearchField(
+          key: const ValueKey('destination-search'),
+          placesService: placesService,
+          hintText: 'Tìm điểm đến (VD: Sân bay Tân Sơn Nhất)',
+          biasCenter: cameraCenter,
+          onSelected: onDestinationPlaceSelected,
+        ),
+        const SizedBox(height: 12),
         _PointRow(
           icon: Icons.flag,
           iconColor: Colors.red,
-          label: 'Set destination',
-          subtitle: 'Drag the map to set your destination',
+          label: 'Chọn điểm đến',
+          subtitle: 'Hoặc kéo bản đồ để điều chỉnh',
           coordinate: cameraCenter,
+          addressText: destinationAddress,
           active: true,
         ),
         const SizedBox(height: 20),
         FilledButton(
           onPressed: onConfirmDestination,
-          child: const Text('Confirm Destination'),
+          child: const Text('Xác nhận điểm đến'),
         ),
       ],
     );
@@ -614,24 +744,26 @@ class _SelectionPanel extends StatelessWidget {
         _PointRow(
           icon: Icons.my_location,
           iconColor: primary,
-          label: 'Pickup',
+          label: 'Điểm đón',
           coordinate: pickupPoint,
+          addressText: pickupAddress,
           active: false,
           trailing: TextButton(
             onPressed: onEditPickup,
-            child: const Text('Edit'),
+            child: const Text('Sửa'),
           ),
         ),
         const Divider(height: 20),
         _PointRow(
           icon: Icons.flag,
           iconColor: Colors.red,
-          label: 'Destination',
+          label: 'Điểm đến',
           coordinate: destinationPoint,
+          addressText: destinationAddress,
           active: false,
           trailing: TextButton(
             onPressed: onEditDestination,
-            child: const Text('Edit'),
+            child: const Text('Sửa'),
           ),
         ),
         if (routeLoading) ...[
@@ -664,7 +796,7 @@ class _SelectionPanel extends StatelessWidget {
         FilledButton.icon(
           onPressed: onBookRide,
           icon: const Icon(Icons.local_taxi),
-          label: const Text('Book this ride'),
+          label: const Text('Đặt xe ngay'),
         ),
       ],
     );
@@ -681,6 +813,7 @@ class _PointRow extends StatelessWidget {
     required this.coordinate,
     required this.active,
     this.subtitle,
+    this.addressText,
     this.trailing,
   });
 
@@ -689,6 +822,7 @@ class _PointRow extends StatelessWidget {
   final String label;
   final String? subtitle;
   final LatLng? coordinate;
+  final String? addressText;
   final bool active;
   final Widget? trailing;
 
@@ -723,7 +857,18 @@ class _PointRow extends StatelessWidget {
                       ?.copyWith(color: Colors.grey.shade600),
                 ),
               ],
-              if (coordinate != null) ...[
+              if (addressText != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  addressText!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: active ? primary : Colors.grey.shade700,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ] else if (coordinate != null) ...[
                 const SizedBox(height: 2),
                 Text(
                   _formatCoord(coordinate!),
@@ -784,7 +929,7 @@ class _RouteProgressBar extends StatelessWidget {
             const Spacer(),
             if (!progress.isOnRoute)
               Text(
-                'Off route',
+                'Lệch lộ trình',
                 style: textStyle?.copyWith(color: Colors.orange),
               ),
           ],
@@ -799,12 +944,12 @@ class _RouteProgressBar extends StatelessWidget {
   }
 
   static String _formatDuration(int seconds) {
-    if (seconds < 60) return '< 1 min';
+    if (seconds < 60) return '< 1 phút';
     final mins = (seconds / 60).round();
-    if (mins < 60) return '$mins min';
+    if (mins < 60) return '$mins phút';
     final hours = mins ~/ 60;
     final rem = mins % 60;
-    return rem == 0 ? '${hours}h' : '${hours}h ${rem}min';
+    return rem == 0 ? '${hours}h' : '${hours}h ${rem}phút';
   }
 }
 
@@ -824,7 +969,7 @@ class _LocationLoadingView extends StatelessWidget {
             CircularProgressIndicator(),
             SizedBox(height: 20),
             Text(
-              'Finding your location…',
+              'Đang tìm vị trí của bạn…',
               style: TextStyle(fontSize: 15, color: Colors.black54),
             ),
           ],
@@ -843,6 +988,7 @@ class _LocationErrorView extends StatelessWidget {
     required this.message,
     required this.actionLabel,
     required this.onAction,
+    this.mascotAsset,
   });
 
   final IconData icon;
@@ -850,6 +996,12 @@ class _LocationErrorView extends StatelessWidget {
   final String message;
   final String actionLabel;
   final VoidCallback onAction;
+
+  /// Optional Panda mascot (file name under `assets/mascot/`) shown instead
+  /// of the plain icon for the one state where a mascot genuinely matches
+  /// the content (GPS disabled) — see `docs/design/MASCOT_CATALOG.md`.
+  /// Left unset for the permission-related states to avoid overusing it.
+  final String? mascotAsset;
 
   @override
   Widget build(BuildContext context) {
@@ -860,7 +1012,10 @@ class _LocationErrorView extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 72, color: theme.colorScheme.primary),
+            if (mascotAsset != null)
+              MascotImage(asset: mascotAsset!, size: MascotSize.large, animation: MascotAnimation.scale)
+            else
+              Icon(icon, size: 72, color: theme.colorScheme.primary),
             const SizedBox(height: 24),
             Text(
               title,

@@ -1,0 +1,62 @@
+[
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0728",
+    "severity": 4024.021,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0817",
+    "severity": 3961.302,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0915",
+    "severity": 3876.645,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0288",
+    "severity": 3858.679,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0924",
+    "severity": 3850.348,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0669",
+    "severity": 3846.394,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0943",
+    "severity": 3635.43,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "airport",
+    "severity": 678.6362988512896,
+    "detail": "Khu vực airport có tỉ lệ cầu/cung trung bình 45.24x — thiếu tài xế nghiêm trọng."
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "hospital",
+    "severity": 659.450899323802,
+    "detail": "Khu vực hospital có tỉ lệ cầu/cung trung bình 43.96x — thiếu tài xế nghiêm trọng."
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "entertainment",
+    "severity": 651.8330883847494,
+    "detail": "Khu vực entertainment có tỉ lệ cầu/cung trung bình 43.46x — thiếu tài xế nghiêm trọng."
+  }
+]

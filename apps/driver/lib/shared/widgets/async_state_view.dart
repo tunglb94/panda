@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'app_empty_state.dart';
+import 'app_loading_view.dart';
+
 /// Generic Loading / Success / Empty / Error wrapper around a [Future].
 ///
 /// Mirrors `apps/rider`'s `AsyncStateView` (Profile module, Phase R-03)
@@ -66,25 +69,20 @@ class AsyncStateView<T> extends StatelessWidget {
 
   static Widget _defaultLoading(BuildContext context) => const Padding(
         padding: EdgeInsets.symmetric(vertical: 48),
-        child: Center(child: CircularProgressIndicator()),
+        child: AppLoadingView(),
       );
 
-  static Widget _defaultError(BuildContext context, Object error) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 48),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.error_outline, size: 40, color: Colors.red.shade400),
-              const SizedBox(height: 12),
-              const Text('Something went wrong.'),
-            ],
-          ),
-        ),
+  static Widget _defaultError(BuildContext context, Object error) =>
+      const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: AppEmptyState.error(),
       );
 
   static Widget _defaultEmpty(BuildContext context) => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 48),
-        child: Center(child: Text('Nothing here yet.')),
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: AppEmptyState(
+          icon: Icons.inbox_outlined,
+          title: 'Chưa có gì ở đây',
+        ),
       );
 }

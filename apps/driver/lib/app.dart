@@ -51,7 +51,7 @@ class _DriverAppState extends State<DriverApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'FAIRRIDE Driver',
+      title: 'PandaDriver',
       theme: AppTheme.light,
       routerConfig: _router,
       debugShowCheckedModeBanner: false,

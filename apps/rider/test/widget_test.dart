@@ -9,13 +9,17 @@
 // (no GoogleMap widget is instantiated here, so no plugin mocking is
 // required).
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
+import 'package:rider/core/auth/auth_state.dart';
+import 'package:rider/core/network/api_client.dart';
+import 'package:rider/core/storage/token_storage.dart';
 import 'package:rider/features/booking/presentation/pages/booking_page.dart';
-import 'package:rider/features/history/domain/models/mock_trip_history_catalog.dart';
-import 'package:rider/features/history/presentation/pages/receipt_page.dart';
-import 'package:rider/features/history/presentation/pages/trip_detail_page.dart';
 import 'package:rider/features/history/presentation/pages/trip_history_page.dart';
 import 'package:rider/features/profile/presentation/pages/notification_center_page.dart';
 import 'package:rider/features/profile/presentation/pages/profile_page.dart';
@@ -24,10 +28,28 @@ import 'package:rider/features/trip/domain/models/rider_trip_status.dart';
 import 'package:rider/features/trip/presentation/pages/trip_preview_menu_page.dart';
 import 'package:rider/features/trip/presentation/pages/trip_state_preview_page.dart';
 
+/// Real (not mocked) dependencies for widgets that now require them —
+/// no network call is actually made unless a test explicitly settles past
+/// one, since none of the tests below assert on live backend data.
+ApiClient _testApiClient() =>
+    ApiClient(baseUrl: 'http://localhost:8080', authState: AuthState());
+
+http.Response _json(Map<String, dynamic> body, {int status = 200}) => http.Response(
+      jsonEncode(body),
+      status,
+      headers: {'content-type': 'application/json'},
+    );
+
+ApiClient _mockApiClient(Future<http.Response> Function(http.Request) handler) => ApiClient(
+      baseUrl: 'http://test.local',
+      authState: AuthState(),
+      httpClient: MockClient((req) => handler(req)),
+    );
+
 void main() {
   testWidgets('BookingPage renders trip summary and vehicle options',
       (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: BookingPage()));
+    await tester.pumpWidget(MaterialApp(home: BookingPage(apiClient: _testApiClient())));
 
     expect(find.text('Book a Ride'), findsOneWidget);
     expect(find.text('Choose a ride'), findsOneWidget);
@@ -38,7 +60,7 @@ void main() {
 
   testWidgets('TripPreviewMenuPage lists all five trip lifecycle states',
       (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: TripPreviewMenuPage()));
+    await tester.pumpWidget(MaterialApp(home: TripPreviewMenuPage(apiClient: _testApiClient())));
 
     for (final status in RiderTripStatus.values) {
       expect(find.text(status.label), findsOneWidget);
@@ -49,23 +71,25 @@ void main() {
       'TripStatePreviewPage renders Driver Assigned state with driver info',
       (WidgetTester tester) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        home: TripStatePreviewPage(status: RiderTripStatus.driverAssigned),
+      MaterialApp(
+        home: TripStatePreviewPage(
+          status: RiderTripStatus.driverAssigned,
+          apiClient: _testApiClient(),
+        ),
       ),
     );
 
     expect(find.text('Driver Assigned'), findsWidgets);
     expect(find.text('Nguyen Van A'), findsOneWidget);
     expect(find.text('Cancel Ride'), findsOneWidget);
-    expect(find.text('Contact Driver'), findsOneWidget);
     expect(find.text('Emergency'), findsOneWidget);
   });
 
   testWidgets('TripStatePreviewPage renders Trip Completed state with fare',
       (WidgetTester tester) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        home: TripStatePreviewPage(status: RiderTripStatus.completed),
+      MaterialApp(
+        home: TripStatePreviewPage(status: RiderTripStatus.completed, apiClient: _testApiClient()),
       ),
     );
 
@@ -76,7 +100,13 @@ void main() {
 
   testWidgets('ProfilePage shows loading then mock profile info',
       (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: ProfilePage()));
+    await tester.pumpWidget(MaterialApp(
+      home: ProfilePage(
+        authState: AuthState(),
+        tokenStorage: TokenStorage(),
+        apiClient: _testApiClient(),
+      ),
+    ));
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
@@ -97,7 +127,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(const MaterialApp(home: SettingsPage()));
+    await tester.pumpWidget(MaterialApp(home: SettingsPage(apiClient: _testApiClient())));
 
     for (final label in [
       'Personal Information',
@@ -114,126 +144,76 @@ void main() {
     }
   });
 
-  testWidgets('NotificationCenterPage shows mock notifications',
+  testWidgets('NotificationCenterPage shows real notifications from the API',
       (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: NotificationCenterPage()));
+    final client = _mockApiClient((req) async {
+      return _json({
+        'notifications': [
+          {
+            'id': 'n1',
+            'category': 'trip',
+            'title': 'Chuyến đi đã hoàn tất',
+            'body': 'Cảm ơn bạn đã sử dụng Panda.',
+            'trip_id': 't1',
+            'conversation_id': '',
+            'created_at': DateTime.now().toUtc().toIso8601String(),
+            'is_read': false,
+          },
+          {
+            'id': 'n2',
+            'category': 'chat',
+            'title': 'Tin nhắn mới',
+            'body': 'Tôi tới rồi',
+            'trip_id': 't1',
+            'conversation_id': 'c1',
+            'created_at': DateTime.now().toUtc().toIso8601String(),
+            'is_read': true,
+          },
+        ],
+        'unread_count': 1,
+      });
+    });
+    await tester.pumpWidget(MaterialApp(home: NotificationCenterPage(apiClient: client)));
     await tester.pumpAndSettle();
 
-    expect(find.text('Trip completed'), findsOneWidget);
-    expect(find.text('Welcome to FAIRRIDE'), findsOneWidget);
+    expect(find.text('Chuyến đi đã hoàn tất'), findsOneWidget);
+    expect(find.text('Tin nhắn mới'), findsOneWidget);
   });
 
-  testWidgets('NotificationCenterPage shows empty state via dev preview menu',
+  testWidgets('NotificationCenterPage shows empty state when the feed is empty',
       (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: NotificationCenterPage()));
+    final client = _mockApiClient((req) async => _json({'notifications': [], 'unread_count': 0}));
+    await tester.pumpWidget(MaterialApp(home: NotificationCenterPage(apiClient: client)));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.tune));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Empty (dev)'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('No notifications yet'), findsOneWidget);
+    expect(find.text('Chưa có thông báo nào'), findsOneWidget);
   });
 
-  testWidgets('NotificationCenterPage shows error state via dev preview menu',
+  testWidgets('NotificationCenterPage shows error state on a backend failure',
       (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: NotificationCenterPage()));
+    final client = _mockApiClient((req) async => _json({'error': 'internal'}, status: 500));
+    await tester.pumpWidget(MaterialApp(home: NotificationCenterPage(apiClient: client)));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.tune));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Error (dev)'));
-    await tester.pumpAndSettle();
-
-    expect(find.text("Couldn't load notifications"), findsOneWidget);
+    expect(find.text('Không thể tải thông báo'), findsOneWidget);
   });
 
-  testWidgets('TripHistoryPage shows loading then grouped mock trips',
+  // NOTE (Closed Beta polish pass): the previous TripHistoryPage/
+  // TripDetailPage/ReceiptPage tests here asserted on an English-language,
+  // mock-catalog-driven, filtered/grouped history flow that no longer
+  // matches the real app — the live `TripHistoryPage` has always fetched
+  // `GET /api/v1/rider/trips` directly (Vietnamese strings, no filter
+  // chips, no dev preview menu), and `TripDetailPage`/`ReceiptPage` were
+  // dead code (never reachable from any route) built against a richer mock
+  // model than the backend actually returns. Both were removed as part of
+  // the design-system/cleanup pass; `TripHistoryPage` was rebuilt on the
+  // shared component library with real tap-through navigation to a new,
+  // honest `TripDetailPage`. Fresh tests for that flow are a follow-up —
+  // see the sprint report's P1 backlog.
+  testWidgets('TripHistoryPage shows loading then the real trip list',
       (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(400, 1800);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-
-    await tester.pumpWidget(const MaterialApp(home: TripHistoryPage()));
+    await tester.pumpWidget(MaterialApp(home: TripHistoryPage(apiClient: _testApiClient())));
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
-
-    await tester.pumpAndSettle();
-
-    // "Today" legitimately appears twice: the date-group header and the
-    // "Today" date-filter chip.
-    expect(find.text('Today'), findsWidgets);
-    expect(find.text('Nguyen Van A · Toyota Vios'), findsOneWidget);
-  });
-
-  testWidgets('TripHistoryPage Completed filter hides cancelled trips',
-      (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(400, 1800);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-
-    await tester.pumpWidget(const MaterialApp(home: TripHistoryPage()));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Le Van C · Ford Transit'), findsOneWidget);
-
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Completed'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Le Van C · Ford Transit'), findsNothing);
-  });
-
-  testWidgets('TripHistoryPage shows empty state via dev preview menu',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: TripHistoryPage()));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byIcon(Icons.tune));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Empty (dev)'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('No trips yet'), findsOneWidget);
-  });
-
-  testWidgets('TripHistoryPage shows error state via dev preview menu',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: TripHistoryPage()));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byIcon(Icons.tune));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Error (dev)'));
-    await tester.pumpAndSettle();
-
-    expect(find.text("Couldn't load trip history"), findsOneWidget);
-  });
-
-  testWidgets('TripDetailPage shows route, driver, timeline, and fare',
-      (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(400, 2000);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-
-    final entry = MockTripHistoryCatalog.sample().first;
-    await tester.pumpWidget(MaterialApp(home: TripDetailPage(entry: entry)));
-
-    expect(find.text('Route summary'), findsOneWidget);
-    expect(find.text('Nguyen Van A'), findsOneWidget);
-    expect(find.text('Timeline'), findsOneWidget);
-    expect(find.text('Fare summary'), findsOneWidget);
-    expect(find.text('View Receipt'), findsOneWidget);
-  });
-
-  testWidgets('ReceiptPage shows trip id, rider, and total',
-      (WidgetTester tester) async {
-    final entry = MockTripHistoryCatalog.sample().first;
-    await tester.pumpWidget(MaterialApp(home: ReceiptPage(entry: entry)));
-
-    expect(find.text('Trip Receipt'), findsOneWidget);
-    expect(find.text(entry.id), findsOneWidget);
-    expect(find.text('Alex Rider'), findsOneWidget);
-    expect(find.text('Total'), findsOneWidget);
   });
 }

@@ -1,0 +1,1212 @@
+{
+  "total_riders": 200,
+  "average_trip_count": 104.19,
+  "membership_counts": {
+    "diamond": 5,
+    "free": 138,
+    "gold": 15,
+    "silver": 42
+  },
+  "riders": [
+    {
+      "id": "rider-00104",
+      "membership": "free",
+      "trip_count": 24,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00121",
+      "membership": "free",
+      "trip_count": 55,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00160",
+      "membership": "gold",
+      "trip_count": 129,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00194",
+      "membership": "free",
+      "trip_count": 167,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00023",
+      "membership": "free",
+      "trip_count": 77,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00027",
+      "membership": "free",
+      "trip_count": 161,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00029",
+      "membership": "free",
+      "trip_count": 65,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00091",
+      "membership": "silver",
+      "trip_count": 105,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00105",
+      "membership": "gold",
+      "trip_count": 161,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00107",
+      "membership": "silver",
+      "trip_count": 43,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00109",
+      "membership": "silver",
+      "trip_count": 126,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00120",
+      "membership": "diamond",
+      "trip_count": 47,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00003",
+      "membership": "free",
+      "trip_count": 48,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00046",
+      "membership": "silver",
+      "trip_count": 57,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00049",
+      "membership": "free",
+      "trip_count": 195,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00072",
+      "membership": "free",
+      "trip_count": 100,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00084",
+      "membership": "gold",
+      "trip_count": 131,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00144",
+      "membership": "silver",
+      "trip_count": 5,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00174",
+      "membership": "free",
+      "trip_count": 147,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00016",
+      "membership": "free",
+      "trip_count": 183,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00039",
+      "membership": "free",
+      "trip_count": 77,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00058",
+      "membership": "gold",
+      "trip_count": 131,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00099",
+      "membership": "free",
+      "trip_count": 145,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00103",
+      "membership": "free",
+      "trip_count": 101,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00119",
+      "membership": "free",
+      "trip_count": 197,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00140",
+      "membership": "free",
+      "trip_count": 39,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00157",
+      "membership": "free",
+      "trip_count": 21,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00013",
+      "membership": "free",
+      "trip_count": 30,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00085",
+      "membership": "free",
+      "trip_count": 122,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00181",
+      "membership": "free",
+      "trip_count": 30,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00186",
+      "membership": "free",
+      "trip_count": 198,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00189",
+      "membership": "free",
+      "trip_count": 123,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00191",
+      "membership": "free",
+      "trip_count": 63,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00008",
+      "membership": "free",
+      "trip_count": 35,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00078",
+      "membership": "free",
+      "trip_count": 30,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00097",
+      "membership": "free",
+      "trip_count": 138,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00124",
+      "membership": "free",
+      "trip_count": 196,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00148",
+      "membership": "silver",
+      "trip_count": 60,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00158",
+      "membership": "free",
+      "trip_count": 99,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00172",
+      "membership": "free",
+      "trip_count": 66,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00176",
+      "membership": "free",
+      "trip_count": 191,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00011",
+      "membership": "free",
+      "trip_count": 60,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00020",
+      "membership": "free",
+      "trip_count": 71,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00063",
+      "membership": "free",
+      "trip_count": 82,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00074",
+      "membership": "silver",
+      "trip_count": 56,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00187",
+      "membership": "silver",
+      "trip_count": 183,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00190",
+      "membership": "free",
+      "trip_count": 4,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00192",
+      "membership": "free",
+      "trip_count": 184,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00198",
+      "membership": "free",
+      "trip_count": 165,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00012",
+      "membership": "free",
+      "trip_count": 191,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00069",
+      "membership": "free",
+      "trip_count": 7,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00125",
+      "membership": "silver",
+      "trip_count": 137,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00145",
+      "membership": "free",
+      "trip_count": 145,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00147",
+      "membership": "free",
+      "trip_count": 158,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00185",
+      "membership": "free",
+      "trip_count": 142,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00019",
+      "membership": "free",
+      "trip_count": 155,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00068",
+      "membership": "free",
+      "trip_count": 79,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00177",
+      "membership": "free",
+      "trip_count": 76,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00014",
+      "membership": "silver",
+      "trip_count": 45,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00086",
+      "membership": "free",
+      "trip_count": 34,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00096",
+      "membership": "gold",
+      "trip_count": 65,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00133",
+      "membership": "free",
+      "trip_count": 200,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00168",
+      "membership": "free",
+      "trip_count": 118,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00193",
+      "membership": "silver",
+      "trip_count": 107,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00048",
+      "membership": "silver",
+      "trip_count": 113,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00056",
+      "membership": "free",
+      "trip_count": 96,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00135",
+      "membership": "free",
+      "trip_count": 145,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00170",
+      "membership": "free",
+      "trip_count": 193,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00052",
+      "membership": "free",
+      "trip_count": 178,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00087",
+      "membership": "silver",
+      "trip_count": 139,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00127",
+      "membership": "free",
+      "trip_count": 28,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00196",
+      "membership": "gold",
+      "trip_count": 166,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00033",
+      "membership": "free",
+      "trip_count": 123,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00077",
+      "membership": "silver",
+      "trip_count": 26,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00093",
+      "membership": "free",
+      "trip_count": 156,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00100",
+      "membership": "free",
+      "trip_count": 125,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00142",
+      "membership": "free",
+      "trip_count": 187,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00152",
+      "membership": "free",
+      "trip_count": 45,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00180",
+      "membership": "gold",
+      "trip_count": 92,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00183",
+      "membership": "free",
+      "trip_count": 48,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00028",
+      "membership": "free",
+      "trip_count": 134,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00045",
+      "membership": "free",
+      "trip_count": 141,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00118",
+      "membership": "free",
+      "trip_count": 88,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00122",
+      "membership": "silver",
+      "trip_count": 154,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00155",
+      "membership": "free",
+      "trip_count": 170,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00199",
+      "membership": "free",
+      "trip_count": 37,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00006",
+      "membership": "free",
+      "trip_count": 42,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00030",
+      "membership": "silver",
+      "trip_count": 88,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00083",
+      "membership": "gold",
+      "trip_count": 8,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00088",
+      "membership": "diamond",
+      "trip_count": 199,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00102",
+      "membership": "silver",
+      "trip_count": 88,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00156",
+      "membership": "free",
+      "trip_count": 196,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00163",
+      "membership": "free",
+      "trip_count": 116,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00169",
+      "membership": "silver",
+      "trip_count": 59,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00032",
+      "membership": "free",
+      "trip_count": 87,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00035",
+      "membership": "silver",
+      "trip_count": 5,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00044",
+      "membership": "free",
+      "trip_count": 130,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00094",
+      "membership": "gold",
+      "trip_count": 100,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00106",
+      "membership": "free",
+      "trip_count": 123,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00115",
+      "membership": "silver",
+      "trip_count": 131,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00136",
+      "membership": "free",
+      "trip_count": 125,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00139",
+      "membership": "diamond",
+      "trip_count": 35,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00022",
+      "membership": "free",
+      "trip_count": 133,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00061",
+      "membership": "free",
+      "trip_count": 85,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00090",
+      "membership": "free",
+      "trip_count": 107,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00055",
+      "membership": "free",
+      "trip_count": 160,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00197",
+      "membership": "free",
+      "trip_count": 127,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00038",
+      "membership": "free",
+      "trip_count": 138,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00071",
+      "membership": "free",
+      "trip_count": 110,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00079",
+      "membership": "free",
+      "trip_count": 77,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00129",
+      "membership": "gold",
+      "trip_count": 193,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00161",
+      "membership": "free",
+      "trip_count": 120,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00002",
+      "membership": "free",
+      "trip_count": 187,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00024",
+      "membership": "free",
+      "trip_count": 121,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00043",
+      "membership": "free",
+      "trip_count": 15,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00047",
+      "membership": "free",
+      "trip_count": 23,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00073",
+      "membership": "gold",
+      "trip_count": 199,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00126",
+      "membership": "free",
+      "trip_count": 77,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00141",
+      "membership": "free",
+      "trip_count": 28,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00171",
+      "membership": "free",
+      "trip_count": 165,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00025",
+      "membership": "free",
+      "trip_count": 42,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00034",
+      "membership": "silver",
+      "trip_count": 199,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00051",
+      "membership": "free",
+      "trip_count": 20,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00057",
+      "membership": "silver",
+      "trip_count": 146,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00060",
+      "membership": "free",
+      "trip_count": 78,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00082",
+      "membership": "free",
+      "trip_count": 65,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00112",
+      "membership": "free",
+      "trip_count": 109,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00117",
+      "membership": "silver",
+      "trip_count": 191,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00017",
+      "membership": "free",
+      "trip_count": 166,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00018",
+      "membership": "free",
+      "trip_count": 185,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00031",
+      "membership": "free",
+      "trip_count": 134,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00036",
+      "membership": "free",
+      "trip_count": 26,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00064",
+      "membership": "silver",
+      "trip_count": 194,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00070",
+      "membership": "gold",
+      "trip_count": 85,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00075",
+      "membership": "silver",
+      "trip_count": 38,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00080",
+      "membership": "free",
+      "trip_count": 16,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00001",
+      "membership": "free",
+      "trip_count": 136,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00007",
+      "membership": "free",
+      "trip_count": 61,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00067",
+      "membership": "silver",
+      "trip_count": 90,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00092",
+      "membership": "silver",
+      "trip_count": 141,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00098",
+      "membership": "free",
+      "trip_count": 163,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00113",
+      "membership": "diamond",
+      "trip_count": 141,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00132",
+      "membership": "free",
+      "trip_count": 30,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00134",
+      "membership": "gold",
+      "trip_count": 87,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00015",
+      "membership": "free",
+      "trip_count": 141,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00137",
+      "membership": "free",
+      "trip_count": 92,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00146",
+      "membership": "free",
+      "trip_count": 93,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00149",
+      "membership": "free",
+      "trip_count": 69,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00164",
+      "membership": "free",
+      "trip_count": 22,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00167",
+      "membership": "diamond",
+      "trip_count": 184,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00175",
+      "membership": "free",
+      "trip_count": 21,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00182",
+      "membership": "free",
+      "trip_count": 78,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00021",
+      "membership": "silver",
+      "trip_count": 35,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00041",
+      "membership": "silver",
+      "trip_count": 112,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00053",
+      "membership": "silver",
+      "trip_count": 96,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00054",
+      "membership": "silver",
+      "trip_count": 120,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00059",
+      "membership": "silver",
+      "trip_count": 31,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00110",
+      "membership": "free",
+      "trip_count": 54,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00111",
+      "membership": "free",
+      "trip_count": 178,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00131",
+      "membership": "free",
+      "trip_count": 190,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00004",
+      "membership": "gold",
+      "trip_count": 91,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00005",
+      "membership": "gold",
+      "trip_count": 47,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00081",
+      "membership": "free",
+      "trip_count": 36,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00128",
+      "membership": "silver",
+      "trip_count": 79,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00159",
+      "membership": "free",
+      "trip_count": 44,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00165",
+      "membership": "free",
+      "trip_count": 137,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00195",
+      "membership": "free",
+      "trip_count": 19,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00037",
+      "membership": "free",
+      "trip_count": 197,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00166",
+      "membership": "silver",
+      "trip_count": 90,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00000",
+      "membership": "silver",
+      "trip_count": 71,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00042",
+      "membership": "free",
+      "trip_count": 199,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00089",
+      "membership": "free",
+      "trip_count": 99,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00143",
+      "membership": "free",
+      "trip_count": 66,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00151",
+      "membership": "free",
+      "trip_count": 98,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00188",
+      "membership": "free",
+      "trip_count": 87,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00050",
+      "membership": "free",
+      "trip_count": 159,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00062",
+      "membership": "silver",
+      "trip_count": 130,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00108",
+      "membership": "free",
+      "trip_count": 112,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00150",
+      "membership": "silver",
+      "trip_count": 95,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00173",
+      "membership": "free",
+      "trip_count": 102,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00065",
+      "membership": "free",
+      "trip_count": 61,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00138",
+      "membership": "free",
+      "trip_count": 153,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00179",
+      "membership": "free",
+      "trip_count": 20,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00184",
+      "membership": "free",
+      "trip_count": 89,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00010",
+      "membership": "silver",
+      "trip_count": 38,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00026",
+      "membership": "free",
+      "trip_count": 6,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00101",
+      "membership": "free",
+      "trip_count": 22,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00114",
+      "membership": "free",
+      "trip_count": 175,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00116",
+      "membership": "free",
+      "trip_count": 193,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00178",
+      "membership": "silver",
+      "trip_count": 171,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00009",
+      "membership": "free",
+      "trip_count": 198,
+      "has_active_voucher": true
+    },
+    {
+      "id": "rider-00123",
+      "membership": "silver",
+      "trip_count": 32,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00130",
+      "membership": "free",
+      "trip_count": 28,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00153",
+      "membership": "free",
+      "trip_count": 170,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00154",
+      "membership": "silver",
+      "trip_count": 129,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00162",
+      "membership": "free",
+      "trip_count": 88,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00040",
+      "membership": "free",
+      "trip_count": 188,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00066",
+      "membership": "free",
+      "trip_count": 41,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00076",
+      "membership": "silver",
+      "trip_count": 103,
+      "has_active_voucher": false
+    },
+    {
+      "id": "rider-00095",
+      "membership": "free",
+      "trip_count": 153,
+      "has_active_voucher": false
+    }
+  ]
+}

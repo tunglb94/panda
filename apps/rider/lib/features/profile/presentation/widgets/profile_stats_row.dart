@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'package:rider/core/theme/app_colors.dart';
+import 'package:rider/core/theme/app_icon_sizes.dart';
+import 'package:rider/core/theme/app_spacing.dart';
+import 'package:rider/shared/widgets/app_card.dart';
+
 import '../../domain/models/rider_profile.dart';
 
 /// Rating and total completed trips, side by side.
@@ -10,29 +15,25 @@ class ProfileStatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
+    return AppCard(
+      color: AppColors.surfaceAlt,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
       child: Row(
         children: [
           Expanded(
             child: _StatColumn(
               icon: Icons.star,
               iconColor: Colors.amber.shade700,
-              label: 'Rating',
+              label: 'Đánh giá',
               value: profile.rating.toStringAsFixed(1),
             ),
           ),
-          Container(width: 1, height: 36, color: Colors.grey.shade300),
+          Container(width: 1, height: 36, color: AppColors.border),
           Expanded(
             child: _StatColumn(
               icon: Icons.route,
-              iconColor: Theme.of(context).colorScheme.primary,
-              label: 'Completed Trips',
+              iconColor: AppColors.primary,
+              label: 'Chuyến đã hoàn thành',
               value: '${profile.totalCompletedTrips}',
             ),
           ),
@@ -62,13 +63,13 @@ class _StatColumn extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 16, color: iconColor),
-            const SizedBox(width: 4),
-            Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Icon(icon, size: AppIconSize.sm, color: iconColor),
+            const SizedBox(width: AppSpacing.xs),
+            Text(value, style: Theme.of(context).textTheme.titleMedium),
           ],
         ),
         const SizedBox(height: 2),
-        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+        Text(label, style: Theme.of(context).textTheme.labelSmall),
       ],
     );
   }

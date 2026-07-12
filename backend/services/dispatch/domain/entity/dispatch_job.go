@@ -24,13 +24,81 @@ const DefaultOfferTimeoutSec = 30
 // DefaultMaxAttempts is the maximum number of drivers to try when the caller supplies 0.
 const DefaultMaxAttempts = 5
 
+// TripType discriminates what kind of trip a DispatchJob is matching a
+// driver for. Delivery V1 Phase 3 (docs/business/DELIVERY_V1_DESIGN.md
+// Phần 9) — a local mirror of trip.entity.TripType's two values, following
+// this codebase's existing convention (Pricing/Driver services each keep
+// their own independent VehicleType enum rather than sharing one across
+// module boundaries; Dispatch does the same here for TripType/VehicleType
+// rather than adding a cross-module dependency on the Trip service).
+type TripType string
+
+const (
+	TripTypeRide     TripType = "ride"
+	TripTypeDelivery TripType = "delivery"
+)
+
+// ServiceType is the product/service tier a dispatch request is being
+// matched for (Bike, Bike Plus, Car, Car XL) — a dimension separate from
+// the physical vehicle (VehicleType lives only in the Driver service;
+// Dispatch never needs it, since VehicleType/ServiceType coherence is
+// validated once, at driver registration — see
+// driver.ServiceType.RequiredVehicleType). Applies identically to Ride and
+// Delivery dispatch jobs — TripType is the orthogonal dimension that
+// already distinguishes them; there is deliberately no
+// "delivery_bike"/"delivery_car" ServiceType (see this refactor's report —
+// encoding "delivery" in both TripType and ServiceType would duplicate the
+// same information). Same values as Driver's ServiceType
+// (string-compatible by convention, not a shared Go type).
+type ServiceType string
+
+const (
+	ServiceTypeBike     ServiceType = "motorcycle" // alias of Driver's VehicleTypeMotorcycle wire value
+	ServiceTypeBikePlus ServiceType = "bike_plus"
+	ServiceTypeCar      ServiceType = "car" // alias of Driver's VehicleTypeCar wire value
+	ServiceTypeCarXL    ServiceType = "car_xl"
+)
+
+var supportedServiceTypes = map[ServiceType]bool{
+	ServiceTypeBike:     true,
+	ServiceTypeBikePlus: true,
+	ServiceTypeCar:      true,
+	ServiceTypeCarXL:    true,
+}
+
+// IsSupported reports whether s is one of the 4 recognized ServiceType
+// values. Applies the same for Ride and Delivery requests alike — there is
+// no separate delivery allow-list (see this type's doc comment). The empty
+// ServiceType ("not specified") is NOT itself considered supported by this
+// method — callers that want to treat "unspecified" as "no constraint"
+// must check for emptiness themselves (see RequestDispatchUseCase.Execute).
+func (s ServiceType) IsSupported() bool {
+	return supportedServiceTypes[s]
+}
+
 // NearbyDriver is the value returned by DriverLocationRepository.FindNearby.
+// ServiceType/RideEnabled/DeliveryEnabled are zero-valued when the driver
+// has never reported them (older client, or the Redis key expired) —
+// offerNextDriver treats an empty ServiceType the same as "no service-type
+// constraint on this job" rather than excluding the driver, matching the
+// empty-means-unfiltered rule used throughout this catalog for backward
+// compatibility.
 type NearbyDriver struct {
-	DriverID string
+	DriverID        string
+	ServiceType     ServiceType
+	RideEnabled     bool
+	DeliveryEnabled bool
 }
 
 // DispatchJob is the aggregate root tracking a single dispatch cycle for a trip.
 // It records every driver offered and enforces valid state transitions.
+//
+// TripType is TripTypeRide for every job created via NewDispatchJob;
+// RequestDispatchUseCase overrides it to TripTypeDelivery (and sets
+// ServiceType) for Delivery bookings — see
+// docs/business/DELIVERY_V1_DESIGN.md Phần 9. Matching itself
+// (offerNextDriver's nearest-active-driver algorithm) is unchanged for
+// either TripType.
 type DispatchJob struct {
 	JobID            string
 	TripID           string
@@ -45,11 +113,17 @@ type DispatchJob struct {
 	OfferTimeoutSec  int
 	MaxAttempts      int
 	AttemptCount     int
+	TripType         TripType
+	ServiceType      ServiceType // empty unless the caller specified one
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 }
 
 // NewDispatchJob creates a validated DispatchJob in the Pending status.
+// Unchanged from before Delivery was introduced: same signature, same
+// validation, same behavior for every existing caller — it now simply also
+// stamps TripType=TripTypeRide on the returned job (VehicleType stays
+// empty). RequestDispatchUseCase overrides both for Delivery bookings.
 func NewDispatchJob(
 	jobID, tripID, riderID string,
 	pickupLat, pickupLon float64,
@@ -80,6 +154,7 @@ func NewDispatchJob(
 		Status:          JobStatusPending,
 		OfferTimeoutSec: offerTimeoutSec,
 		MaxAttempts:     maxAttempts,
+		TripType:        TripTypeRide,
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}, nil

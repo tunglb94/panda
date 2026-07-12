@@ -15,7 +15,8 @@ import (
 const driverFields = `
 	driver_id, user_id, license_number, vehicle_type,
 	vehicle_brand, vehicle_model, vehicle_color, plate_number,
-	online_status, verification_status, created_at, updated_at`
+	online_status, verification_status, created_at, updated_at,
+	service_type, ride_enabled, delivery_enabled`
 
 const driverTable = `driver_profiles`
 
@@ -46,8 +47,9 @@ func (r *DriverRepository) Save(ctx context.Context, d *entity.DriverProfile) er
 		INSERT INTO driver_profiles (
 			driver_id, user_id, license_number, vehicle_type,
 			vehicle_brand, vehicle_model, vehicle_color, plate_number,
-			online_status, verification_status, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+			online_status, verification_status, created_at, updated_at,
+			service_type, ride_enabled, delivery_enabled
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		ON CONFLICT (driver_id) DO UPDATE SET
 			license_number      = EXCLUDED.license_number,
 			vehicle_type        = EXCLUDED.vehicle_type,
@@ -57,7 +59,10 @@ func (r *DriverRepository) Save(ctx context.Context, d *entity.DriverProfile) er
 			plate_number        = EXCLUDED.plate_number,
 			online_status       = EXCLUDED.online_status,
 			verification_status = EXCLUDED.verification_status,
-			updated_at          = EXCLUDED.updated_at`,
+			updated_at          = EXCLUDED.updated_at,
+			service_type        = EXCLUDED.service_type,
+			ride_enabled        = EXCLUDED.ride_enabled,
+			delivery_enabled    = EXCLUDED.delivery_enabled`,
 		d.DriverID,
 		d.UserID,
 		d.LicenseNumber,
@@ -70,6 +75,9 @@ func (r *DriverRepository) Save(ctx context.Context, d *entity.DriverProfile) er
 		string(d.VerificationStatus),
 		d.CreatedAt.UTC(),
 		d.UpdatedAt.UTC(),
+		string(d.ServiceType),
+		d.RideEnabled,
+		d.DeliveryEnabled,
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -85,12 +93,14 @@ func (r *DriverRepository) Save(ctx context.Context, d *entity.DriverProfile) er
 
 func (r *DriverRepository) queryOne(ctx context.Context, sql string, args ...any) (*entity.DriverProfile, error) {
 	var (
-		driverID, userID, licenseNumber string
-		vehicleType                     string
-		vehicleBrand, vehicleModel      string
-		vehicleColor, plateNumber       string
+		driverID, userID, licenseNumber  string
+		vehicleType                      string
+		vehicleBrand, vehicleModel       string
+		vehicleColor, plateNumber        string
 		onlineStatus, verificationStatus string
-		createdAt, updatedAt            time.Time
+		createdAt, updatedAt             time.Time
+		serviceType                      string
+		rideEnabled, deliveryEnabled     bool
 	)
 
 	err := r.pool.QueryRow(ctx, sql, args...).Scan(
@@ -98,6 +108,7 @@ func (r *DriverRepository) queryOne(ctx context.Context, sql string, args ...any
 		&vehicleBrand, &vehicleModel, &vehicleColor, &plateNumber,
 		&onlineStatus, &verificationStatus,
 		&createdAt, &updatedAt,
+		&serviceType, &rideEnabled, &deliveryEnabled,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -113,5 +124,7 @@ func (r *DriverRepository) queryOne(ctx context.Context, sql string, args ...any
 		entity.OnlineStatus(onlineStatus),
 		entity.VerificationStatus(verificationStatus),
 		createdAt.UTC(), updatedAt.UTC(),
+		entity.ServiceType(serviceType),
+		rideEnabled, deliveryEnabled,
 	), nil
 }

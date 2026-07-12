@@ -71,6 +71,20 @@ message BookRideRequest {
   string dropoff_address = 3;
   double pickup_lat      = 4;
   double pickup_lon      = 5;
+
+  // trip_type is "ride" (default; empty also means ride) or "delivery".
+  // Delivery V1 Phase 2 (docs/business/DELIVERY_V1_DESIGN.md) — additive,
+  // 100% backward compatible with every existing Ride caller that omits it.
+  string trip_type = 6;
+
+  // The following fields are only read when trip_type == "delivery".
+  string pickup_contact_name  = 7;
+  string pickup_contact_phone = 8;
+  string receiver_name        = 9;
+  string receiver_phone       = 10;
+  string package_note         = 11;
+  int64  package_value        = 12; // smallest currency unit
+  double package_weight       = 13; // kg
 }
 
 message AcceptDispatchOfferRequest {
@@ -108,6 +122,10 @@ message CancelRideRequest {
 message BookRideResponse {
   string trip_id = 1;
   string status  = 2; // "searching"
+
+  // delivery_id is set only when the booking was a Delivery; empty for Ride.
+  // Delivery V1 Phase 2 (docs/business/DELIVERY_V1_DESIGN.md).
+  string delivery_id = 3;
 }
 
 message BookingActionResponse {

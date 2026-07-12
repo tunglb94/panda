@@ -1,0 +1,59 @@
+{
+  "categories": [
+    {
+      "category": "Bike",
+      "trip_count": 123,
+      "average_fare_vnd": 42962.9918699187,
+      "average_commission_vnd": 9520.934959349594,
+      "average_driver_income_vnd": 33442.0569105691,
+      "average_profit_vnd": 7568.841463414634,
+      "average_market_saving_vnd": 122.08943089430895
+    },
+    {
+      "category": "Bike Plus",
+      "not_modeled": true,
+      "trip_count": 0,
+      "average_fare_vnd": 0,
+      "average_commission_vnd": 0,
+      "average_driver_income_vnd": 0,
+      "average_profit_vnd": 0,
+      "average_market_saving_vnd": 0
+    },
+    {
+      "category": "Car",
+      "trip_count": 299,
+      "average_fare_vnd": 66140.92642140469,
+      "average_commission_vnd": 13597.020066889632,
+      "average_driver_income_vnd": 52543.90635451505,
+      "average_profit_vnd": 11237.318060200669,
+      "average_market_saving_vnd": 292.90635451505017
+    },
+    {
+      "category": "Car XL",
+      "trip_count": 39,
+      "average_fare_vnd": 92137.84615384616,
+      "average_commission_vnd": 18244.358974358973,
+      "average_driver_income_vnd": 73893.48717948717,
+      "average_profit_vnd": 15419.923076923074,
+      "average_market_saving_vnd": 0
+    },
+    {
+      "category": "Delivery Bike",
+      "trip_count": 52,
+      "average_fare_vnd": 49011.46153846154,
+      "average_commission_vnd": 10679.48076923077,
+      "average_driver_income_vnd": 38331.980769230766,
+      "average_profit_vnd": 8611.532692307694,
+      "average_market_saving_vnd": 0
+    },
+    {
+      "category": "Delivery Car",
+      "trip_count": 112,
+      "average_fare_vnd": 66535.32142857143,
+      "average_commission_vnd": 13861.05357142857,
+      "average_driver_income_vnd": 52674.267857142855,
+      "average_profit_vnd": 11474.948214285716,
+      "average_market_saving_vnd": 104.33928571428571
+    }
+  ]
+}

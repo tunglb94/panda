@@ -40,6 +40,24 @@ service TripService {
 
   // ListTripsByDriver returns all trips for a driver, newest first.
   rpc ListTripsByDriver(ListTripsRequest) returns (TripsResponse);
+
+  // ─── Delivery V1 Phase 4 (docs/business/DELIVERY_V1_DESIGN.md) ────────────
+  // Only valid for a trip with trip_type == "delivery"; returns
+  // InvalidArgument for a Ride trip. Reuses GetTripRequest/TripResponse —
+  // no new message types, 100% backward compatible.
+
+  // PickupParcel transitions a Delivery from Accepted to ParcelPickedUp,
+  // and (reusing Trip's existing Start()) the linked Trip to InProgress.
+  rpc PickupParcel(GetTripRequest) returns (TripResponse);
+
+  // StartDelivery transitions a Delivery from ParcelPickedUp to InDelivery.
+  // Trip.Status is not affected (already InProgress from PickupParcel).
+  rpc StartDelivery(GetTripRequest) returns (TripResponse);
+
+  // CompleteDelivery marks a Delivery Delivered then Completed in one call
+  // (mirrors PayTrip's MarkPaid→Settle chaining). Trip.Status is not
+  // advanced — that requires a real fare from Pricing, out of scope here.
+  rpc CompleteDelivery(GetTripRequest) returns (TripResponse);
 }
 
 // ─── Request messages ────────────────────────────────────────────────────────
@@ -48,6 +66,20 @@ message CreateTripRequest {
   string rider_id        = 1;
   string pickup_address  = 2;
   string dropoff_address = 3;
+
+  // trip_type is "ride" (default; empty also means ride) or "delivery".
+  // Delivery V1 Phase 2 (docs/business/DELIVERY_V1_DESIGN.md) — additive,
+  // 100% backward compatible with every existing Ride caller that omits it.
+  string trip_type = 4;
+
+  // The following fields are only read when trip_type == "delivery".
+  string pickup_contact_name  = 5;
+  string pickup_contact_phone = 6;
+  string receiver_name        = 7;
+  string receiver_phone       = 8;
+  string package_note         = 9;
+  int64  package_value        = 10; // smallest currency unit
+  double package_weight       = 11; // kg
 }
 
 message CancelTripRequest {
@@ -97,4 +129,15 @@ message TripProto {
   google.protobuf.Timestamp updated_at = 9;
   int64  final_fare_total              = 10; // 0 until completed
   string fare_currency                 = 11; // empty until completed
+
+  // trip_type is "ride" or "delivery"; delivery_id is set only when
+  // trip_type == "delivery". Delivery V1 Phase 2.
+  string trip_type   = 12;
+  string delivery_id = 13;
+
+  // delivery_status mirrors entity.DeliveryStatus ("CREATED"|"ACCEPTED"|
+  // "PARCEL_PICKED_UP"|"IN_DELIVERY"|"DELIVERED"|"COMPLETED"|"CANCELLED");
+  // empty for a Ride trip. Delivery V1 Phase 4
+  // (docs/business/DELIVERY_V1_DESIGN.md).
+  string delivery_status = 14;
 }

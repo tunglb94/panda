@@ -53,6 +53,7 @@ func testDriver() *driverentity.DriverProfile {
 		driverentity.OnlineStatusOffline,
 		driverentity.VerificationStatusVerified,
 		time.Now(), time.Now(),
+		driverentity.ServiceTypeCar, true, false,
 	)
 }
 

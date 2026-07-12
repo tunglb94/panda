@@ -1,0 +1,18 @@
+{
+  "voucher_issued_count": 27,
+  "voucher_used_count": 15,
+  "voucher_kept_count": 63,
+  "voucher_still_held_at_end_count": 13,
+  "voucher_expired_count": 0,
+  "by_type": [
+    {
+      "type": "manual_coupon",
+      "redeemed_count": 13,
+      "total_cost_vnd": 65910,
+      "gmv_generated_vnd": 659154,
+      "roi": 9.000819299044151,
+      "cost_per_redemption_vnd": 5070,
+      "repeat_rate_percent": 92.3076923076923
+    }
+  ]
+}

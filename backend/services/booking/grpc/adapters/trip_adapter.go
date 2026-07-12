@@ -19,16 +19,27 @@ func NewTripAdapter(client trippb.TripServiceClient) *TripAdapter {
 	return &TripAdapter{client: client}
 }
 
-func (a *TripAdapter) CreateTrip(ctx context.Context, riderID, pickup, dropoff string) (string, error) {
+func (a *TripAdapter) CreateTrip(ctx context.Context, in app.CreateTripParams) (*app.CreateTripResult, error) {
 	resp, err := a.client.CreateTrip(ctx, &trippb.CreateTripRequest{
-		RiderId:        riderID,
-		PickupAddress:  pickup,
-		DropoffAddress: dropoff,
+		RiderId:            in.RiderID,
+		PickupAddress:      in.PickupAddress,
+		DropoffAddress:     in.DropoffAddress,
+		TripType:           in.TripType,
+		PickupContactName:  in.PickupContactName,
+		PickupContactPhone: in.PickupContactPhone,
+		ReceiverName:       in.ReceiverName,
+		ReceiverPhone:      in.ReceiverPhone,
+		PackageNote:        in.PackageNote,
+		PackageValue:       in.PackageValue,
+		PackageWeight:      in.PackageWeightKg,
 	})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return resp.GetTrip().GetTripId(), nil
+	return &app.CreateTripResult{
+		TripID:     resp.GetTrip().GetTripId(),
+		DeliveryID: resp.GetTrip().GetDeliveryId(),
+	}, nil
 }
 
 func (a *TripAdapter) MarkDriverArrived(ctx context.Context, tripID string) error {
@@ -93,6 +104,11 @@ func (a *TripAdapter) ListByDriver(ctx context.Context, driverID string) ([]app.
 		return nil, err
 	}
 	return protoToSummaries(resp.GetTrips()), nil
+}
+
+func (a *TripAdapter) AcceptDelivery(ctx context.Context, tripID string) error {
+	_, err := a.client.AcceptDelivery(ctx, &trippb.GetTripRequest{TripId: tripID})
+	return err
 }
 
 func protoToSummaries(trips []*trippb.TripProto) []app.TripSummary {

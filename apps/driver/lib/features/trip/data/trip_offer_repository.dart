@@ -6,12 +6,21 @@ class TripOffer {
     required this.pickupAddress,
     required this.dropoffAddress,
     required this.offerExpiresAt,
+    this.tripType = '',
   });
 
   final String tripId;
   final String pickupAddress;
   final String dropoffAddress;
   final DateTime offerExpiresAt;
+
+  /// Best-effort — see `GetDriverOffer`'s Trip-service enrichment in
+  /// `booking_handler.go` (`GetDriverCurrentOfferResponse` has no
+  /// `trip_type` field on its own). Empty means "ride" (the default) or
+  /// the enrichment lookup failed.
+  final String tripType;
+
+  bool get isDelivery => tripType == 'delivery';
 }
 
 class TripOfferRepository {
@@ -27,6 +36,7 @@ class TripOfferRepository {
       pickupAddress: data['pickup_address'] as String? ?? '',
       dropoffAddress: data['dropoff_address'] as String? ?? '',
       offerExpiresAt: DateTime.parse(data['offer_expires_at'] as String),
+      tripType: data['trip_type'] as String? ?? '',
     );
   }
 

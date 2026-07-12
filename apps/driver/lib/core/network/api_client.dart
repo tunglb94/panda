@@ -19,23 +19,33 @@ class ApiClient {
 
   final String _baseUrl;
   final AuthState _authState;
+  static const _timeout = Duration(seconds: 15);
 
   Future<Map<String, dynamic>> post(String path,
       {Map<String, dynamic>? body}) async {
     final uri = Uri.parse('$_baseUrl$path');
-    final response = await http.post(
-      uri,
-      headers: _headers(),
-      body: body != null ? jsonEncode(body) : null,
-    );
+    final response = await http
+        .post(
+          uri,
+          headers: _headers(),
+          body: body != null ? jsonEncode(body) : null,
+        )
+        .timeout(_timeout, onTimeout: _throwTimeout);
     return _parse(response);
   }
 
   Future<Map<String, dynamic>> get(String path) async {
     final uri = Uri.parse('$_baseUrl$path');
-    final response = await http.get(uri, headers: _headers());
+    final response = await http
+        .get(uri, headers: _headers())
+        .timeout(_timeout, onTimeout: _throwTimeout);
     return _parse(response);
   }
+
+  Never _throwTimeout() => throw const ApiException(
+        statusCode: 0,
+        message: 'Hết thời gian chờ. Kiểm tra kết nối và thử lại.',
+      );
 
   Map<String, String> _headers() {
     final token = _authState.accessToken;
@@ -49,7 +59,7 @@ class ApiClient {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
-    String message = 'Request failed';
+    String message = 'Yêu cầu thất bại';
     try {
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       message = body['error'] as String? ?? message;

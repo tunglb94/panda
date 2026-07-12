@@ -30,8 +30,14 @@ type DispatchJobRepository interface {
 // DriverLocationRepository manages real-time driver coordinates for dispatch matching.
 // Backed by Redis GEO + TTL keys; entirely independent of Phase 6 availability state.
 type DriverLocationRepository interface {
-	// UpdateLocation stores the driver's current coordinates and refreshes the active TTL.
-	UpdateLocation(ctx context.Context, driverID string, lat, lon float64) error
+	// UpdateLocation stores the driver's current coordinates and refreshes
+	// the active TTL. serviceType is optional (empty = not reported).
+	// rideEnabled/deliveryEnabled are the driver's current trip-type
+	// capability — callers should default an unreported capability to
+	// rideEnabled=true/deliveryEnabled=false (migration 008's DB column
+	// defaults) before calling, so legacy clients keep matching Ride jobs
+	// exactly as before this field existed.
+	UpdateLocation(ctx context.Context, driverID string, lat, lon float64, serviceType entity.ServiceType, rideEnabled, deliveryEnabled bool) error
 
 	// FindNearby returns drivers within radiusKM of the given coordinates, nearest first.
 	// At most limit drivers are returned.

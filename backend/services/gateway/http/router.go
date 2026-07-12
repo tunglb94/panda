@@ -18,6 +18,10 @@ func NewRouter(
 	lh *handlers.LocationHandler,
 	dph *handlers.DriverProfileHandler,
 	rh *handlers.RatingHandler,
+	dh *handlers.DeliveryHandler,
+	ch *handlers.ChatHandler,
+	cah *handlers.CallHandler,
+	nh *handlers.NotificationHandler,
 	authMiddleware func(http.Handler) http.Handler,
 	log zerolog.Logger,
 ) http.Handler {
@@ -59,10 +63,27 @@ func NewRouter(
 	mux.Handle("POST /api/v1/rides/{tripID}/arrive", auth(http.HandlerFunc(bh.ArriveAtPickup)))
 	mux.Handle("POST /api/v1/rides/{tripID}/start", auth(http.HandlerFunc(bh.StartTrip)))
 	mux.Handle("POST /api/v1/rides/{tripID}/finish", auth(http.HandlerFunc(bh.FinishTrip)))
+
+	// Delivery lifecycle — driver-only actions, auth required. Trip service
+	// owns these RPCs directly (Booking's proto has no delivery-lifecycle
+	// equivalent); see DeliveryHandler.
+	mux.Handle("POST /api/v1/rides/{tripID}/pickup-parcel", auth(http.HandlerFunc(dh.PickupParcel)))
+	mux.Handle("POST /api/v1/rides/{tripID}/start-delivery", auth(http.HandlerFunc(dh.StartDelivery)))
+	mux.Handle("POST /api/v1/rides/{tripID}/complete-delivery", auth(http.HandlerFunc(dh.CompleteDelivery)))
 	mux.Handle("POST /api/v1/rides/{tripID}/pay", auth(http.HandlerFunc(bh.PayRide)))
 	mux.Handle("POST /api/v1/rides/{tripID}/cancel", auth(http.HandlerFunc(bh.CancelRide)))
 	mux.Handle("POST /api/v1/rides/{tripID}/rate", auth(http.HandlerFunc(rh.SubmitRating)))
 	mux.Handle("GET /api/v1/rides/{tripID}/rating", auth(http.HandlerFunc(rh.GetRating)))
+
+	// Communication Module — Phone Call, In-App Chat, Notification (auth required).
+	mux.Handle("GET /api/v1/rides/{tripID}/contact", auth(http.HandlerFunc(cah.GetContact)))
+	mux.Handle("POST /api/v1/rides/{tripID}/call", auth(http.HandlerFunc(cah.Call)))
+	mux.Handle("GET /api/v1/rides/{tripID}/conversation", auth(http.HandlerFunc(ch.GetConversation)))
+	mux.Handle("GET /api/v1/conversations/{id}/messages", auth(http.HandlerFunc(ch.ListOrPollMessages)))
+	mux.Handle("POST /api/v1/conversations/{id}/messages", auth(http.HandlerFunc(ch.SendMessage)))
+	mux.Handle("POST /api/v1/conversations/{id}/read", auth(http.HandlerFunc(ch.MarkConversationRead)))
+	mux.Handle("GET /api/v1/notifications", auth(http.HandlerFunc(nh.ListNotifications)))
+	mux.Handle("POST /api/v1/notifications/{id}/read", auth(http.HandlerFunc(nh.MarkRead)))
 
 	return middleware.Logging(log)(mux)
 }

@@ -8,6 +8,12 @@ class TripDetail {
     required this.driverId,
     required this.finalFareCents,
     required this.currency,
+    this.pickupAddress = '',
+    this.dropoffAddress = '',
+    this.dispatchStatus = '',
+    this.tripType = '',
+    this.deliveryId = '',
+    this.deliveryStatus = '',
   });
 
   final String tripId;
@@ -22,6 +28,34 @@ class TripDetail {
   final int finalFareCents;
 
   final String currency;
+
+  /// `GET /api/v1/rides/{tripId}` already returns these two fields (see
+  /// `booking_handler.go`'s `GetBookingDetails` JSON mapping) — parsing them
+  /// here means a screen no longer has to rely solely on navigation
+  /// arguments passed in from a list tile to know the route.
+  final String pickupAddress;
+  final String dropoffAddress;
+
+  /// Raw dispatch status ("searching"/"assigned"/... or "unknown" if no
+  /// dispatch job exists yet for this trip). Empty if the backend omitted it.
+  final String dispatchStatus;
+
+  /// "ride" or "delivery". Empty means the gateway couldn't enrich this
+  /// response with Trip-service data (see `TripStatusClient` in
+  /// `booking_handler.go` — best-effort, never fails the request) — treat
+  /// empty the same as "ride" for UI purposes, never as "unknown/delivery".
+  final String tripType;
+
+  /// Empty for a Ride trip, or when the gateway's Trip-service enrichment
+  /// was unavailable.
+  final String deliveryId;
+
+  /// Raw `Delivery.Status` string: CREATED/ACCEPTED/PARCEL_PICKED_UP/
+  /// IN_DELIVERY/DELIVERED/COMPLETED/CANCELLED. Empty if not a delivery
+  /// trip or the enrichment was unavailable.
+  final String deliveryStatus;
+
+  bool get isDelivery => tripType == 'delivery';
 }
 
 class TripRepository {
@@ -37,6 +71,12 @@ class TripRepository {
       driverId: body['driver_id'] as String? ?? '',
       finalFareCents: (body['final_fare'] as num?)?.toInt() ?? 0,
       currency: body['currency'] as String? ?? '',
+      pickupAddress: body['pickup_address'] as String? ?? '',
+      dropoffAddress: body['dropoff_address'] as String? ?? '',
+      dispatchStatus: body['dispatch_status'] as String? ?? '',
+      tripType: body['trip_type'] as String? ?? '',
+      deliveryId: body['delivery_id'] as String? ?? '',
+      deliveryStatus: body['delivery_status'] as String? ?? '',
     );
   }
 
@@ -51,8 +91,17 @@ class TripRepository {
     );
   }
 
-  Future<void> submitRating(String tripId, int stars, {String? comment}) async {
-    final body = <String, dynamic>{'stars': stars};
+  Future<void> submitRating(
+    String tripId,
+    int stars, {
+    required String driverId,
+    String? comment,
+  }) async {
+    final body = <String, dynamic>{
+      'stars': stars,
+      'ratee_id': driverId,
+      'role': 'rider',
+    };
     if (comment != null && comment.isNotEmpty) body['comment'] = comment;
     await _client.post('/api/v1/rides/$tripId/rate', body: body);
   }
@@ -64,6 +113,7 @@ class TripRepository {
       vehicleModel: body['vehicle_model'] as String? ?? '',
       vehicleColor: body['vehicle_color'] as String? ?? '',
       plateNumber: body['plate_number'] as String? ?? '—',
+      verificationStatus: body['verification_status'] as String? ?? '',
     );
   }
 }

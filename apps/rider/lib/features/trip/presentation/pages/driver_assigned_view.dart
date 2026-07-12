@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:rider/core/network/api_client.dart';
 import 'package:rider/features/booking/presentation/widgets/trip_point_cards.dart';
+import 'package:rider/features/contact/domain/models/contact_info.dart';
 import 'package:rider/features/map/domain/models/trip_selection.dart';
 
 import '../../domain/models/driver_profile.dart';
@@ -18,11 +20,19 @@ class DriverAssignedView extends StatelessWidget {
     super.key,
     required this.tripSelection,
     required this.driver,
+    this.contact,
+    required this.tripId,
+    required this.apiClient,
+    this.chatUnreadCount = 0,
     required this.onCancel,
   });
 
   final TripSelection tripSelection;
   final DriverProfile driver;
+  final ContactInfo? contact;
+  final String tripId;
+  final ApiClient apiClient;
+  final int chatUnreadCount;
   final VoidCallback onCancel;
 
   @override
@@ -34,7 +44,7 @@ class DriverAssignedView extends StatelessWidget {
           address: tripSelection.pickupAddress,
           coordinate: tripSelection.pickup,
         ),
-        const SizedBox(height: 8),
+        const RouteConnector(),
         DestinationCard(
           address: tripSelection.destinationAddress,
           coordinate: tripSelection.destination,
@@ -44,13 +54,15 @@ class DriverAssignedView extends StatelessWidget {
         const SizedBox(height: 16),
         const TripProgressIndicator(status: RiderTripStatus.driverAssigned),
         const SizedBox(height: 16),
-        DriverInfoCard(driver: driver),
+        DriverInfoCard(driver: driver, contact: contact),
         const SizedBox(height: 20),
-        const Row(
+        Row(
           children: [
-            Expanded(child: ContactDriverButton()),
-            SizedBox(width: 12),
-            Expanded(child: EmergencyButton()),
+            Expanded(
+              child: ContactDriverButton(tripId: tripId, apiClient: apiClient, unreadCount: chatUnreadCount),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(child: EmergencyButton()),
           ],
         ),
         const SizedBox(height: 12),

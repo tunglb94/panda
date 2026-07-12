@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../../../../core/auth/auth_state.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/token_storage.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../shared/widgets/app_button.dart';
+import '../../../../shared/widgets/mascot_image.dart';
 import '../../data/auth_repository.dart';
 
 class LoginPage extends StatefulWidget {
@@ -33,18 +37,17 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxxl),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _Logo(cs: cs),
-                const SizedBox(height: 48),
+                const _Logo(),
+                const SizedBox(height: AppSpacing.xxxl + AppSpacing.lg),
                 TextField(
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,
@@ -52,30 +55,23 @@ class _LoginPageState extends State<LoginPage> {
                   enabled: !_isLoading,
                   onSubmitted: (_) => _login(),
                   decoration: const InputDecoration(
-                    labelText: 'Phone number',
-                    hintText: '+1 555 000 0000',
-                    border: OutlineInputBorder(),
+                    labelText: 'Số điện thoại',
+                    hintText: '090 123 4567',
                     prefixIcon: Icon(Icons.phone_outlined),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 if (_error != null)
                   Text(
                     _error!,
-                    style: TextStyle(color: cs.error, fontSize: 13),
+                    style: const TextStyle(color: AppColors.error, fontSize: 13),
                     textAlign: TextAlign.center,
                   ),
-                const SizedBox(height: 20),
-                FilledButton(
-                  onPressed: _isLoading ? null : _login,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text('Sign In'),
+                const SizedBox(height: AppSpacing.xl),
+                AppButton.primary(
+                  label: 'Đăng nhập',
+                  isLoading: _isLoading,
+                  onPressed: _login,
                 ),
               ],
             ),
@@ -86,11 +82,13 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _login() async {
-    final phone = _phoneCtrl.text.trim();
-    if (phone.isEmpty) {
-      setState(() => _error = 'Phone number is required');
+    if (_isLoading) return;
+    final rawPhone = _phoneCtrl.text.trim();
+    if (rawPhone.isEmpty) {
+      setState(() => _error = 'Vui lòng nhập số điện thoại');
       return;
     }
+    final phone = _normalizeVietnamesePhone(rawPhone);
 
     setState(() {
       _isLoading = true;
@@ -109,14 +107,14 @@ class _LoginPageState extends State<LoginPage> {
     } on ApiException catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.message;
+          _error = e.statusCode == 0 ? e.message : 'Đăng nhập thất bại. Vui lòng thử lại.';
           _isLoading = false;
         });
       }
     } catch (_) {
       if (mounted) {
         setState(() {
-          _error = 'Login failed. Please try again.';
+          _error = 'Đăng nhập thất bại. Vui lòng thử lại.';
           _isLoading = false;
         });
       }
@@ -124,38 +122,42 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-class _Logo extends StatelessWidget {
-  const _Logo({required this.cs});
+/// Accepts the Vietnamese-style local input drivers actually type (e.g.
+/// `090 123 4567`) and normalizes it to the `+84...` form the backend
+/// stores phone numbers in. Panda only serves Vietnam today, so the app
+/// doesn't ask drivers to type a country code. Input that already has a `+`
+/// is passed through unchanged (covers dev/test accounts).
+String _normalizeVietnamesePhone(String raw) {
+  final digitsOnly = raw.replaceAll(RegExp(r'[^0-9+]'), '');
+  if (digitsOnly.startsWith('+')) return digitsOnly;
+  if (digitsOnly.startsWith('84')) return '+$digitsOnly';
+  if (digitsOnly.startsWith('0')) return '+84${digitsOnly.substring(1)}';
+  return '+84$digitsOnly';
+}
 
-  final ColorScheme cs;
+class _Logo extends StatelessWidget {
+  const _Logo();
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Column(
       children: [
-        Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            color: cs.primaryContainer,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Icon(Icons.directions_car, size: 40, color: cs.primary),
+        const MascotImage(
+          asset: 'mascot_welcome.png',
+          size: MascotSize.large,
+          animation: MascotAnimation.bounce,
+          semanticLabel: 'Chào mừng đến với PandaDriver',
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
         Text(
-          'FAIRRIDE',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: cs.primary,
-              ),
+          'PandaDriver',
+          style: textTheme.headlineMedium?.copyWith(color: AppColors.primary),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: AppSpacing.xs),
         Text(
-          'Driver Portal',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: cs.onSurfaceVariant,
-              ),
+          'Ứng dụng dành cho tài xế',
+          style: textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
         ),
       ],
     );

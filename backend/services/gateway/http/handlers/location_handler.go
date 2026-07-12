@@ -8,6 +8,7 @@ import (
 	"github.com/fairride/dispatch/grpc/dispatchpb"
 	"github.com/fairride/gateway/http/middleware"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 // DispatchLocationClient is the subset of dispatchpb.DispatchServiceClient used
@@ -31,6 +32,22 @@ func NewLocationHandler(client DispatchLocationClient) *LocationHandler {
 type updateLocationRequest struct {
 	Lat float64 `json:"lat"`
 	Lon float64 `json:"lon"`
+	// ServiceType is optional (Vehicle/Service Catalog refactor) — one of
+	// the 4 product tiers ("bike"/"bike_plus"/"car"/"car_xl") or empty.
+	// Omitted/empty is fully backward compatible: dispatch treats "not
+	// reported" as "no service-type filter" for this driver, exactly as
+	// before this field existed. Carried to Dispatch as gRPC metadata
+	// rather than a new UpdateDriverLocationRequest field — avoids
+	// touching the generated proto message at all.
+	ServiceType string `json:"service_type"`
+	// RideEnabled/DeliveryEnabled are the driver's current trip-type
+	// capability. Both are pointers so "omitted" is distinguishable from
+	// "explicitly false" — an omitted RideEnabled defaults to true and an
+	// omitted DeliveryEnabled defaults to false (migration 008's DB column
+	// defaults), so a client that predates this field keeps matching Ride
+	// jobs exactly as before and is simply not yet Delivery-eligible.
+	RideEnabled     *bool `json:"ride_enabled"`
+	DeliveryEnabled *bool `json:"delivery_enabled"`
 }
 
 // UpdateLocation handles POST /api/v1/driver/location.
@@ -50,7 +67,15 @@ func (h *LocationHandler) UpdateLocation(w http.ResponseWriter, r *http.Request)
 		writeBadRequest(w, "invalid request body")
 		return
 	}
-	if _, err := h.client.UpdateDriverLocation(r.Context(), &dispatchpb.UpdateDriverLocationRequest{
+	ctx := r.Context()
+	if req.ServiceType != "" {
+		ctx = metadata.AppendToOutgoingContext(ctx, "x-service-type", req.ServiceType)
+	}
+	rideEnabled := req.RideEnabled == nil || *req.RideEnabled             // default true
+	deliveryEnabled := req.DeliveryEnabled != nil && *req.DeliveryEnabled // default false
+	ctx = metadata.AppendToOutgoingContext(ctx, "x-ride-enabled", boolMetadataValue(rideEnabled))
+	ctx = metadata.AppendToOutgoingContext(ctx, "x-delivery-enabled", boolMetadataValue(deliveryEnabled))
+	if _, err := h.client.UpdateDriverLocation(ctx, &dispatchpb.UpdateDriverLocationRequest{
 		DriverId: claims.UserID,
 		Lat:      req.Lat,
 		Lon:      req.Lon,
@@ -59,6 +84,13 @@ func (h *LocationHandler) UpdateLocation(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func boolMetadataValue(b bool) string {
+	if b {
+		return "1"
+	}
+	return "0"
 }
 
 // GetLocation handles GET /api/v1/driver/{driverID}/location.

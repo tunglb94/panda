@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
+import 'package:rider/core/theme/app_colors.dart';
+import 'package:rider/core/theme/app_radius.dart';
+import 'package:rider/core/theme/app_spacing.dart';
 import 'package:rider/features/booking/presentation/widgets/trip_point_cards.dart';
 import 'package:rider/features/map/domain/models/trip_selection.dart';
+import 'package:rider/shared/widgets/mascot_image.dart';
 
 import '../../domain/models/driver_profile.dart';
 import '../../domain/models/rider_trip_status.dart';
@@ -29,11 +33,20 @@ class TripCompletedView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const Center(
+          child: MascotImage(
+            asset: 'mascot_celebration.png',
+            size: MascotSize.medium,
+            animation: MascotAnimation.bounce,
+            semanticLabel: 'Chuyến đi hoàn tất',
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
         PickupCard(
           address: tripSelection.pickupAddress,
           coordinate: tripSelection.pickup,
         ),
-        const SizedBox(height: 8),
+        const RouteConnector(),
         DestinationCard(
           address: tripSelection.destinationAddress,
           coordinate: tripSelection.destination,
@@ -49,7 +62,7 @@ class TripCompletedView extends StatelessWidget {
         const SizedBox(height: 20),
         SizedBox(
           width: double.infinity,
-          child: FilledButton(onPressed: onDone, child: const Text('Done')),
+          child: FilledButton(onPressed: onDone, child: const Text('Xong')),
         ),
       ],
     );
@@ -63,21 +76,24 @@ class _FinalFareCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        color: AppColors.surfaceAlt,
+        borderRadius: AppRadius.mdAll,
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text('Final fare',
-              style: TextStyle(fontWeight: FontWeight.bold)),
-          Text(
-            fareText,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          Text('Cước phí cuối cùng', style: theme.textTheme.titleSmall),
+          Flexible(
+            child: Text(
+              fareText,
+              textAlign: TextAlign.right,
+              style: theme.textTheme.titleMedium?.copyWith(color: AppColors.primary),
+            ),
           ),
         ],
       ),

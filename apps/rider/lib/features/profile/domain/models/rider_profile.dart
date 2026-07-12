@@ -9,10 +9,10 @@ enum MemberLevel { standard, silver, gold, platinum }
 
 extension MemberLevelX on MemberLevel {
   String get label => switch (this) {
-        MemberLevel.standard => 'Standard',
-        MemberLevel.silver => 'Silver',
-        MemberLevel.gold => 'Gold',
-        MemberLevel.platinum => 'Platinum',
+        MemberLevel.standard => 'Tiêu chuẩn',
+        MemberLevel.silver => 'Bạc',
+        MemberLevel.gold => 'Vàng',
+        MemberLevel.platinum => 'Bạch kim',
       };
 
   Color get color => switch (this) {

@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/pages/login_page.dart';
@@ -79,7 +78,7 @@ abstract final class AppRouter {
               routes: [
                 GoRoute(
                   path: AppRoutes.earnings,
-                  builder: (context, state) => const EarningsPage(),
+                  builder: (context, state) => EarningsPage(apiClient: apiClient),
                 ),
               ],
             ),
@@ -87,7 +86,7 @@ abstract final class AppRouter {
               routes: [
                 GoRoute(
                   path: AppRoutes.notifications,
-                  builder: (context, state) => const NotificationsPage(),
+                  builder: (context, state) => NotificationsPage(apiClient: apiClient),
                 ),
               ],
             ),
@@ -95,7 +94,11 @@ abstract final class AppRouter {
               routes: [
                 GoRoute(
                   path: AppRoutes.profile,
-                  builder: (context, state) => ProfilePage(apiClient: apiClient),
+                  builder: (context, state) => ProfilePage(
+                    apiClient: apiClient,
+                    authState: authState,
+                    tokenStorage: tokenStorage,
+                  ),
                 ),
               ],
             ),

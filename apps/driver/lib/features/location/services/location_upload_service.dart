@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import '../../../core/location/location.dart';
-import '../../../core/location/location_engine_config.dart';
 import '../data/location_upload_repository.dart';
 
 enum UploadStatus { idle, uploading, success, failed }

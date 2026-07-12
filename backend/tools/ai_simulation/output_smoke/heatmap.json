@@ -1,0 +1,964 @@
+{
+  "cells": [
+    {
+      "zone": "cbd",
+      "hour": 0,
+      "count": 2
+    },
+    {
+      "zone": "cbd",
+      "hour": 1,
+      "count": 0
+    },
+    {
+      "zone": "cbd",
+      "hour": 2,
+      "count": 0
+    },
+    {
+      "zone": "cbd",
+      "hour": 3,
+      "count": 1
+    },
+    {
+      "zone": "cbd",
+      "hour": 4,
+      "count": 0
+    },
+    {
+      "zone": "cbd",
+      "hour": 5,
+      "count": 0
+    },
+    {
+      "zone": "cbd",
+      "hour": 6,
+      "count": 3
+    },
+    {
+      "zone": "cbd",
+      "hour": 7,
+      "count": 2
+    },
+    {
+      "zone": "cbd",
+      "hour": 8,
+      "count": 0
+    },
+    {
+      "zone": "cbd",
+      "hour": 9,
+      "count": 0
+    },
+    {
+      "zone": "cbd",
+      "hour": 10,
+      "count": 1
+    },
+    {
+      "zone": "cbd",
+      "hour": 11,
+      "count": 0
+    },
+    {
+      "zone": "cbd",
+      "hour": 12,
+      "count": 2
+    },
+    {
+      "zone": "cbd",
+      "hour": 13,
+      "count": 0
+    },
+    {
+      "zone": "cbd",
+      "hour": 14,
+      "count": 1
+    },
+    {
+      "zone": "cbd",
+      "hour": 15,
+      "count": 1
+    },
+    {
+      "zone": "cbd",
+      "hour": 16,
+      "count": 1
+    },
+    {
+      "zone": "cbd",
+      "hour": 17,
+      "count": 0
+    },
+    {
+      "zone": "cbd",
+      "hour": 18,
+      "count": 0
+    },
+    {
+      "zone": "cbd",
+      "hour": 19,
+      "count": 0
+    },
+    {
+      "zone": "cbd",
+      "hour": 20,
+      "count": 0
+    },
+    {
+      "zone": "cbd",
+      "hour": 21,
+      "count": 0
+    },
+    {
+      "zone": "cbd",
+      "hour": 22,
+      "count": 0
+    },
+    {
+      "zone": "cbd",
+      "hour": 23,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 0,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 1,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 2,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 3,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 4,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 5,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 6,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 7,
+      "count": 1
+    },
+    {
+      "zone": "residential",
+      "hour": 8,
+      "count": 3
+    },
+    {
+      "zone": "residential",
+      "hour": 9,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 10,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 11,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 12,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 13,
+      "count": 1
+    },
+    {
+      "zone": "residential",
+      "hour": 14,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 15,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 16,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 17,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 18,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 19,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 20,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 21,
+      "count": 1
+    },
+    {
+      "zone": "residential",
+      "hour": 22,
+      "count": 0
+    },
+    {
+      "zone": "residential",
+      "hour": 23,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 0,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 1,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 2,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 3,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 4,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 5,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 6,
+      "count": 1
+    },
+    {
+      "zone": "industrial",
+      "hour": 7,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 8,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 9,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 10,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 11,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 12,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 13,
+      "count": 1
+    },
+    {
+      "zone": "industrial",
+      "hour": 14,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 15,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 16,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 17,
+      "count": 1
+    },
+    {
+      "zone": "industrial",
+      "hour": 18,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 19,
+      "count": 1
+    },
+    {
+      "zone": "industrial",
+      "hour": 20,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 21,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 22,
+      "count": 0
+    },
+    {
+      "zone": "industrial",
+      "hour": 23,
+      "count": 1
+    },
+    {
+      "zone": "airport",
+      "hour": 0,
+      "count": 1
+    },
+    {
+      "zone": "airport",
+      "hour": 1,
+      "count": 1
+    },
+    {
+      "zone": "airport",
+      "hour": 2,
+      "count": 2
+    },
+    {
+      "zone": "airport",
+      "hour": 3,
+      "count": 0
+    },
+    {
+      "zone": "airport",
+      "hour": 4,
+      "count": 1
+    },
+    {
+      "zone": "airport",
+      "hour": 5,
+      "count": 0
+    },
+    {
+      "zone": "airport",
+      "hour": 6,
+      "count": 0
+    },
+    {
+      "zone": "airport",
+      "hour": 7,
+      "count": 1
+    },
+    {
+      "zone": "airport",
+      "hour": 8,
+      "count": 1
+    },
+    {
+      "zone": "airport",
+      "hour": 9,
+      "count": 0
+    },
+    {
+      "zone": "airport",
+      "hour": 10,
+      "count": 1
+    },
+    {
+      "zone": "airport",
+      "hour": 11,
+      "count": 0
+    },
+    {
+      "zone": "airport",
+      "hour": 12,
+      "count": 2
+    },
+    {
+      "zone": "airport",
+      "hour": 13,
+      "count": 0
+    },
+    {
+      "zone": "airport",
+      "hour": 14,
+      "count": 1
+    },
+    {
+      "zone": "airport",
+      "hour": 15,
+      "count": 0
+    },
+    {
+      "zone": "airport",
+      "hour": 16,
+      "count": 0
+    },
+    {
+      "zone": "airport",
+      "hour": 17,
+      "count": 1
+    },
+    {
+      "zone": "airport",
+      "hour": 18,
+      "count": 1
+    },
+    {
+      "zone": "airport",
+      "hour": 19,
+      "count": 0
+    },
+    {
+      "zone": "airport",
+      "hour": 20,
+      "count": 0
+    },
+    {
+      "zone": "airport",
+      "hour": 21,
+      "count": 1
+    },
+    {
+      "zone": "airport",
+      "hour": 22,
+      "count": 1
+    },
+    {
+      "zone": "airport",
+      "hour": 23,
+      "count": 1
+    },
+    {
+      "zone": "bus_station",
+      "hour": 0,
+      "count": 0
+    },
+    {
+      "zone": "bus_station",
+      "hour": 1,
+      "count": 1
+    },
+    {
+      "zone": "bus_station",
+      "hour": 2,
+      "count": 1
+    },
+    {
+      "zone": "bus_station",
+      "hour": 3,
+      "count": 0
+    },
+    {
+      "zone": "bus_station",
+      "hour": 4,
+      "count": 0
+    },
+    {
+      "zone": "bus_station",
+      "hour": 5,
+      "count": 1
+    },
+    {
+      "zone": "bus_station",
+      "hour": 6,
+      "count": 0
+    },
+    {
+      "zone": "bus_station",
+      "hour": 7,
+      "count": 0
+    },
+    {
+      "zone": "bus_station",
+      "hour": 8,
+      "count": 0
+    },
+    {
+      "zone": "bus_station",
+      "hour": 9,
+      "count": 0
+    },
+    {
+      "zone": "bus_station",
+      "hour": 10,
+      "count": 1
+    },
+    {
+      "zone": "bus_station",
+      "hour": 11,
+      "count": 1
+    },
+    {
+      "zone": "bus_station",
+      "hour": 12,
+      "count": 1
+    },
+    {
+      "zone": "bus_station",
+      "hour": 13,
+      "count": 1
+    },
+    {
+      "zone": "bus_station",
+      "hour": 14,
+      "count": 0
+    },
+    {
+      "zone": "bus_station",
+      "hour": 15,
+      "count": 1
+    },
+    {
+      "zone": "bus_station",
+      "hour": 16,
+      "count": 0
+    },
+    {
+      "zone": "bus_station",
+      "hour": 17,
+      "count": 1
+    },
+    {
+      "zone": "bus_station",
+      "hour": 18,
+      "count": 0
+    },
+    {
+      "zone": "bus_station",
+      "hour": 19,
+      "count": 0
+    },
+    {
+      "zone": "bus_station",
+      "hour": 20,
+      "count": 0
+    },
+    {
+      "zone": "bus_station",
+      "hour": 21,
+      "count": 0
+    },
+    {
+      "zone": "bus_station",
+      "hour": 22,
+      "count": 0
+    },
+    {
+      "zone": "bus_station",
+      "hour": 23,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 0,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 1,
+      "count": 1
+    },
+    {
+      "zone": "hospital",
+      "hour": 2,
+      "count": 1
+    },
+    {
+      "zone": "hospital",
+      "hour": 3,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 4,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 5,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 6,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 7,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 8,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 9,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 10,
+      "count": 1
+    },
+    {
+      "zone": "hospital",
+      "hour": 11,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 12,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 13,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 14,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 15,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 16,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 17,
+      "count": 1
+    },
+    {
+      "zone": "hospital",
+      "hour": 18,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 19,
+      "count": 1
+    },
+    {
+      "zone": "hospital",
+      "hour": 20,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 21,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 22,
+      "count": 0
+    },
+    {
+      "zone": "hospital",
+      "hour": 23,
+      "count": 0
+    },
+    {
+      "zone": "school",
+      "hour": 0,
+      "count": 0
+    },
+    {
+      "zone": "school",
+      "hour": 1,
+      "count": 1
+    },
+    {
+      "zone": "school",
+      "hour": 2,
+      "count": 1
+    },
+    {
+      "zone": "school",
+      "hour": 3,
+      "count": 0
+    },
+    {
+      "zone": "school",
+      "hour": 4,
+      "count": 0
+    },
+    {
+      "zone": "school",
+      "hour": 5,
+      "count": 0
+    },
+    {
+      "zone": "school",
+      "hour": 6,
+      "count": 1
+    },
+    {
+      "zone": "school",
+      "hour": 7,
+      "count": 1
+    },
+    {
+      "zone": "school",
+      "hour": 8,
+      "count": 1
+    },
+    {
+      "zone": "school",
+      "hour": 9,
+      "count": 1
+    },
+    {
+      "zone": "school",
+      "hour": 10,
+      "count": 0
+    },
+    {
+      "zone": "school",
+      "hour": 11,
+      "count": 2
+    },
+    {
+      "zone": "school",
+      "hour": 12,
+      "count": 1
+    },
+    {
+      "zone": "school",
+      "hour": 13,
+      "count": 1
+    },
+    {
+      "zone": "school",
+      "hour": 14,
+      "count": 0
+    },
+    {
+      "zone": "school",
+      "hour": 15,
+      "count": 0
+    },
+    {
+      "zone": "school",
+      "hour": 16,
+      "count": 0
+    },
+    {
+      "zone": "school",
+      "hour": 17,
+      "count": 1
+    },
+    {
+      "zone": "school",
+      "hour": 18,
+      "count": 1
+    },
+    {
+      "zone": "school",
+      "hour": 19,
+      "count": 1
+    },
+    {
+      "zone": "school",
+      "hour": 20,
+      "count": 0
+    },
+    {
+      "zone": "school",
+      "hour": 21,
+      "count": 0
+    },
+    {
+      "zone": "school",
+      "hour": 22,
+      "count": 0
+    },
+    {
+      "zone": "school",
+      "hour": 23,
+      "count": 1
+    },
+    {
+      "zone": "entertainment",
+      "hour": 0,
+      "count": 0
+    },
+    {
+      "zone": "entertainment",
+      "hour": 1,
+      "count": 0
+    },
+    {
+      "zone": "entertainment",
+      "hour": 2,
+      "count": 0
+    },
+    {
+      "zone": "entertainment",
+      "hour": 3,
+      "count": 2
+    },
+    {
+      "zone": "entertainment",
+      "hour": 4,
+      "count": 0
+    },
+    {
+      "zone": "entertainment",
+      "hour": 5,
+      "count": 0
+    },
+    {
+      "zone": "entertainment",
+      "hour": 6,
+      "count": 0
+    },
+    {
+      "zone": "entertainment",
+      "hour": 7,
+      "count": 0
+    },
+    {
+      "zone": "entertainment",
+      "hour": 8,
+      "count": 1
+    },
+    {
+      "zone": "entertainment",
+      "hour": 9,
+      "count": 0
+    },
+    {
+      "zone": "entertainment",
+      "hour": 10,
+      "count": 0
+    },
+    {
+      "zone": "entertainment",
+      "hour": 11,
+      "count": 0
+    },
+    {
+      "zone": "entertainment",
+      "hour": 12,
+      "count": 0
+    },
+    {
+      "zone": "entertainment",
+      "hour": 13,
+      "count": 0
+    },
+    {
+      "zone": "entertainment",
+      "hour": 14,
+      "count": 0
+    },
+    {
+      "zone": "entertainment",
+      "hour": 15,
+      "count": 0
+    },
+    {
+      "zone": "entertainment",
+      "hour": 16,
+      "count": 0
+    },
+    {
+      "zone": "entertainment",
+      "hour": 17,
+      "count": 1
+    },
+    {
+      "zone": "entertainment",
+      "hour": 18,
+      "count": 2
+    },
+    {
+      "zone": "entertainment",
+      "hour": 19,
+      "count": 0
+    },
+    {
+      "zone": "entertainment",
+      "hour": 20,
+      "count": 0
+    },
+    {
+      "zone": "entertainment",
+      "hour": 21,
+      "count": 0
+    },
+    {
+      "zone": "entertainment",
+      "hour": 22,
+      "count": 1
+    },
+    {
+      "zone": "entertainment",
+      "hour": 23,
+      "count": 1
+    }
+  ]
+}

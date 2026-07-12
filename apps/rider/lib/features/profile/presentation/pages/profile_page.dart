@@ -3,15 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:rider/core/auth/auth_state.dart';
 import 'package:rider/core/network/api_client.dart';
 import 'package:rider/core/storage/token_storage.dart';
+import 'package:rider/core/theme/app_spacing.dart';
 import 'package:rider/features/history/presentation/pages/trip_history_page.dart';
+import 'package:rider/features/wallet/presentation/pages/wallet_page.dart';
+import 'package:rider/shared/widgets/app_badge.dart';
+import 'package:rider/shared/widgets/app_card.dart';
+import 'package:rider/shared/widgets/app_settings_tile.dart';
+import 'package:rider/shared/widgets/async_state_view.dart';
 
-import '../../domain/models/mock_notification_repository.dart';
+import '../../data/notification_repository.dart';
 import '../../domain/models/mock_profile_repository.dart';
 import '../../domain/models/rider_profile.dart';
-import '../widgets/async_state_view.dart';
 import '../widgets/profile_header.dart';
 import '../widgets/profile_stats_row.dart';
-import '../widgets/unread_badge.dart';
 import 'notification_center_page.dart';
 import 'settings_page.dart';
 
@@ -39,17 +43,27 @@ class _ProfilePageState extends State<ProfilePage> {
   static const _profileRepository = MockProfileRepository();
 
   late Future<RiderProfile> _profileFuture;
-  int _unreadCount = MockNotificationCatalog.sample().where((n) => !n.isRead).length;
+  int _unreadCount = 0;
 
   @override
   void initState() {
     super.initState();
     _profileFuture = _profileRepository.fetchProfile();
+    _loadUnreadCount();
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final feed = await NotificationRepository(widget.apiClient).fetchAll();
+      if (mounted) setState(() => _unreadCount = feed.unreadCount);
+    } catch (_) {
+      // Non-fatal — badge just stays at 0 until the notification page loads.
+    }
   }
 
   Future<void> _openNotifications() async {
     final result = await Navigator.of(context).push<int>(
-      MaterialPageRoute(builder: (_) => const NotificationCenterPage()),
+      MaterialPageRoute(builder: (_) => NotificationCenterPage(apiClient: widget.apiClient)),
     );
     if (result != null && mounted) {
       setState(() => _unreadCount = result);
@@ -60,10 +74,10 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: const Text('Hồ sơ'),
         actions: [
           IconButton(
-            tooltip: 'Notifications',
+            tooltip: 'Thông báo',
             onPressed: _openNotifications,
             icon: Stack(
               clipBehavior: Clip.none,
@@ -72,7 +86,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 Positioned(
                   right: -4,
                   top: -4,
-                  child: UnreadBadge(count: _unreadCount),
+                  child: AppBadge(count: _unreadCount),
                 ),
               ],
             ),
@@ -84,67 +98,56 @@ class _ProfilePageState extends State<ProfilePage> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               child: AsyncStateView<RiderProfile>(
                 future: _profileFuture,
                 successBuilder: (context, profile) => Column(
                   children: [
                     ProfileHeader(profile: profile),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: AppSpacing.xl),
                     ProfileStatsRow(profile: profile),
-                    const SizedBox(height: 24),
-                    ListTile(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: Colors.grey.shade200),
+                    const SizedBox(height: AppSpacing.xxl),
+                    AppCard(
+                      padding: EdgeInsets.zero,
+                      child: Column(
+                        children: [
+                          AppSettingsTile(
+                            icon: Icons.account_balance_wallet_outlined,
+                            label: 'Ví',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => const WalletPage()),
+                            ),
+                          ),
+                          const Divider(height: 1),
+                          AppSettingsTile(
+                            icon: Icons.receipt_long_outlined,
+                            label: 'Lịch sử chuyến đi',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => TripHistoryPage(apiClient: widget.apiClient),
+                              ),
+                            ),
+                          ),
+                          const Divider(height: 1),
+                          AppSettingsTile(
+                            icon: Icons.settings_outlined,
+                            label: 'Cài đặt',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => SettingsPage(apiClient: widget.apiClient)),
+                            ),
+                          ),
+                          const Divider(height: 1),
+                          AppSettingsTile(
+                            icon: Icons.logout,
+                            label: 'Đăng xuất',
+                            isDestructive: true,
+                            onTap: () async {
+                              await widget.authState.logout(widget.tokenStorage);
+                              // GoRouter's refreshListenable redirects to /login.
+                            },
+                          ),
+                        ],
                       ),
-                      leading: Icon(
-                        Icons.settings_outlined,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      title: const Text('Settings'),
-                      trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const SettingsPage()),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ListTile(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: Colors.grey.shade200),
-                      ),
-                      leading: Icon(
-                        Icons.receipt_long_outlined,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      title: const Text('Trip History'),
-                      trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => TripHistoryPage(apiClient: widget.apiClient),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ListTile(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: Colors.grey.shade200),
-                      ),
-                      leading: Icon(
-                        Icons.logout,
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                      title: Text(
-                        'Sign Out',
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.error),
-                      ),
-                      onTap: () async {
-                        await widget.authState.logout(widget.tokenStorage);
-                        // GoRouter's refreshListenable redirects to /login.
-                      },
                     ),
                   ],
                 ),

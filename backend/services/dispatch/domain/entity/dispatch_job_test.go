@@ -37,6 +37,36 @@ func TestNewDispatchJob_Valid(t *testing.T) {
 	}
 }
 
+// ─── TripType / ServiceType (Vehicle/Service Catalog refactor) ──
+
+func TestNewDispatchJob_DefaultsTripTypeRide(t *testing.T) {
+	job := newJob(t)
+	if job.TripType != entity.TripTypeRide {
+		t.Errorf("TripType = %q, want ride", job.TripType)
+	}
+	if job.ServiceType != "" {
+		t.Errorf("ServiceType = %q, want empty", job.ServiceType)
+	}
+}
+
+// TestServiceType_IsSupported locks in the single, shared allow-list used
+// for both Ride and Delivery dispatch requests — no separate delivery-only
+// list, since ServiceType no longer encodes TripType.
+func TestServiceType_IsSupported(t *testing.T) {
+	supported := []entity.ServiceType{entity.ServiceTypeBike, entity.ServiceTypeBikePlus, entity.ServiceTypeCar, entity.ServiceTypeCarXL}
+	for _, st := range supported {
+		if !st.IsSupported() {
+			t.Errorf("%q should be supported", st)
+		}
+	}
+	unsupported := []entity.ServiceType{"bicycle", "van", "truck", "delivery_bike", "delivery_car", ""}
+	for _, st := range unsupported {
+		if st.IsSupported() {
+			t.Errorf("%q should not be supported", st)
+		}
+	}
+}
+
 func TestNewDispatchJob_DefaultsApplied(t *testing.T) {
 	job, err := entity.NewDispatchJob("j1", "trip1", "rider1", 0, 0, 0, 0, testNow)
 	if err != nil {

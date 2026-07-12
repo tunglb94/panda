@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_spacing.dart';
+
 /// Reusable label/value row for the Developer page (and future Profile
 /// detail screens).
 class InfoRow extends StatelessWidget {
@@ -10,18 +12,19 @@ class InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: Colors.grey.shade600)),
-          const SizedBox(width: 12),
+          Text(label, style: textTheme.bodySmall),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Text(
               value,
               textAlign: TextAlign.right,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
         ],

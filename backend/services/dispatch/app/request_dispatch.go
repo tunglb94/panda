@@ -12,6 +12,18 @@ import (
 )
 
 // RequestDispatchInput carries the caller-supplied fields for a new dispatch job.
+//
+// TripType is entity.TripTypeRide (the zero value "" is also treated as
+// Ride) or entity.TripTypeDelivery — Delivery V1 Phase 3
+// (docs/business/DELIVERY_V1_DESIGN.md Phần 9). ServiceType is optional;
+// when set, it is checked against entity.ServiceType.IsSupported (the same
+// allow-list for either TripType — see that method's doc comment) before
+// any dispatch job is created. When set, offerNextDriver also uses it to
+// exclude candidates whose own reported service type doesn't match exactly,
+// AND whose driver capability doesn't cover this TripType (Vehicle/Service
+// Catalog refactor — see offer_next_driver.go's doc comment). Requests
+// that omit ServiceType entirely are unaffected by either check —
+// unchanged from every caller written before this catalog existed.
 type RequestDispatchInput struct {
 	TripID          string
 	RiderID         string
@@ -19,6 +31,9 @@ type RequestDispatchInput struct {
 	PickupLon       float64
 	OfferTimeoutSec int // 0 = use entity default
 	MaxAttempts     int // 0 = use entity default
+
+	TripType    entity.TripType
+	ServiceType entity.ServiceType
 }
 
 // RequestDispatchUseCase creates a dispatch job and immediately offers the trip
@@ -50,6 +65,23 @@ func (uc *RequestDispatchUseCase) Execute(ctx context.Context, in RequestDispatc
 		return nil, domainerrors.InvalidArgument("trip_id is required")
 	}
 
+	tripType := entity.TripTypeRide
+	if in.TripType == entity.TripTypeDelivery {
+		tripType = entity.TripTypeDelivery
+	}
+
+	// Reject an unsupported service type before any dispatch job is created
+	// or the trip is marked searching — no partial state, no offer attempt
+	// ever made. One allow-list for both TripTypes now (ServiceType no
+	// longer encodes delivery-vs-ride — see entity.ServiceType's doc
+	// comment). Requests that omit service_type entirely are unaffected
+	// (see entity.ServiceType.IsSupported's doc comment on why an empty
+	// ServiceType is not itself rejected here) — preserves every caller
+	// written before this catalog existed.
+	if in.ServiceType != "" && !in.ServiceType.IsSupported() {
+		return nil, domainerrors.InvalidArgument("service type is not supported: " + string(in.ServiceType))
+	}
+
 	jobID, err := generateJobID()
 	if err != nil {
 		return nil, domainerrors.Internal("failed to generate job id")
@@ -65,6 +97,8 @@ func (uc *RequestDispatchUseCase) Execute(ctx context.Context, in RequestDispatc
 	if err != nil {
 		return nil, err
 	}
+	job.TripType = tripType
+	job.ServiceType = in.ServiceType
 
 	// Atomic: mark trip as searching and persist the initial job record together.
 	// If either write fails neither is committed, preventing a trip stuck in

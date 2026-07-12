@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:rider/shared/widgets/app_button.dart';
+
 enum _BookState { idle, loading, success }
 
 /// Primary CTA for the Booking UI.
@@ -8,7 +10,10 @@ enum _BookState { idle, loading, success }
 /// supplied mock delay) and animates through loading → success states, which
 /// is what the real booking submission
 /// (`docs/project/MVP_DEVELOPMENT_PLAN.md` Rider App Roadmap stage R4) will
-/// eventually drive for real.
+/// eventually drive for real. Built on `AppButton`'s own loading/success
+/// morph rather than reimplementing the same `AnimatedSwitcher` state
+/// machine a second time — this widget now only owns the state transition
+/// timing, not the visuals.
 class BookRideButton extends StatefulWidget {
   const BookRideButton({super.key, required this.label, required this.onConfirm});
 
@@ -39,34 +44,11 @@ class _BookRideButtonState extends State<BookRideButton> {
 
   @override
   Widget build(BuildContext context) {
-    return FilledButton(
+    return AppButton.primary(
+      label: _state == _BookState.success ? 'Đã đặt xe' : widget.label,
+      isLoading: _state == _BookState.loading,
+      isSuccess: _state == _BookState.success,
       onPressed: _state == _BookState.idle ? _handlePress : null,
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 220),
-        transitionBuilder: (child, animation) =>
-            ScaleTransition(scale: animation, child: child),
-        child: switch (_state) {
-          _BookState.idle => Text(widget.label, key: const ValueKey('idle')),
-          _BookState.loading => const SizedBox(
-              key: ValueKey('loading'),
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.4,
-                color: Colors.white,
-              ),
-            ),
-          _BookState.success => const Row(
-              key: ValueKey('success'),
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.check_circle, color: Colors.white, size: 20),
-                SizedBox(width: 8),
-                Text('Requested'),
-              ],
-            ),
-        },
-      ),
     );
   }
 }

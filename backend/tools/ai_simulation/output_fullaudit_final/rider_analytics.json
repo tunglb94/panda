@@ -1,0 +1,17 @@
+{
+  "average_ride_trips": 39.6658,
+  "average_deliveries": 13.9153,
+  "total_voucher_saved_vnd": 9456162,
+  "total_promotion_used_count": 20043,
+  "average_fare_vnd": 61876.61379105692,
+  "average_price_sensitivity": 0.5037311054236209,
+  "membership_counts": {
+    "diamond": 212,
+    "free": 6936,
+    "gold": 836,
+    "silver": 2016
+  },
+  "retention_rate_percent": 82.36966666666666,
+  "cancelled_requests_total": 684,
+  "cancellation_rate_percent": 0.1274692508386135
+}

@@ -45,17 +45,17 @@ class MockSettingsCatalog {
     SettingsEntry(
       action: SettingsAction.personalInformation,
       icon: Icons.person_outline,
-      label: 'Personal Information',
+      label: 'Thông tin cá nhân',
     ),
     SettingsEntry(
       action: SettingsAction.paymentMethods,
       icon: Icons.payment_outlined,
-      label: 'Payment Methods',
+      label: 'Phương thức thanh toán',
     ),
     SettingsEntry(
       action: SettingsAction.notifications,
       icon: Icons.notifications_outlined,
-      label: 'Notifications',
+      label: 'Thông báo',
     ),
   ];
 
@@ -63,17 +63,17 @@ class MockSettingsCatalog {
     SettingsEntry(
       action: SettingsAction.privacy,
       icon: Icons.privacy_tip_outlined,
-      label: 'Privacy',
+      label: 'Quyền riêng tư',
     ),
     SettingsEntry(
       action: SettingsAction.security,
       icon: Icons.lock_outline,
-      label: 'Security',
+      label: 'Bảo mật',
     ),
     SettingsEntry(
       action: SettingsAction.language,
       icon: Icons.language_outlined,
-      label: 'Language',
+      label: 'Ngôn ngữ',
     ),
   ];
 
@@ -81,19 +81,19 @@ class MockSettingsCatalog {
     SettingsEntry(
       action: SettingsAction.helpCenter,
       icon: Icons.help_outline,
-      label: 'Help Center',
+      label: 'Trung tâm trợ giúp',
     ),
     SettingsEntry(
       action: SettingsAction.about,
       icon: Icons.info_outline,
-      label: 'About',
+      label: 'Giới thiệu',
     ),
   ];
 
   static const SettingsEntry logout = SettingsEntry(
     action: SettingsAction.logout,
     icon: Icons.logout,
-    label: 'Logout',
+    label: 'Đăng xuất',
     isDestructive: true,
   );
 }

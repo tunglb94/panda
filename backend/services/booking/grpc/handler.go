@@ -5,6 +5,7 @@ import (
 	"context"
 
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -71,17 +72,41 @@ func (h *Handler) BookRide(ctx context.Context, req *bookingpb.BookRideRequest) 
 	if req.GetDropoffAddress() == "" {
 		return nil, status.Error(codes.InvalidArgument, "dropoff_address is required")
 	}
+	// service_type is NOT a field on BookRideRequest — adding one would
+	// require regenerating the message's compiled descriptor, which this
+	// environment has no protoc/buf toolchain for. Instead the gateway
+	// carries it as incoming gRPC metadata ("x-service-type", see
+	// gateway/http/handlers/booking_handler.go), which needs no schema
+	// change at all and is equally wire-safe. Absent metadata (older
+	// gateway build, or a caller that hasn't set one) resolves to "",
+	// which Dispatch treats as "no service-type filter" — fully backward
+	// compatible.
+	var serviceType string
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if vals := md.Get("x-service-type"); len(vals) > 0 {
+			serviceType = vals[0]
+		}
+	}
 	result, err := h.bookRide.Execute(ctx, app.BookRideInput{
-		RiderID:        req.GetRiderId(),
-		PickupAddress:  req.GetPickupAddress(),
-		DropoffAddress: req.GetDropoffAddress(),
-		PickupLat:      req.GetPickupLat(),
-		PickupLon:      req.GetPickupLon(),
+		RiderID:            req.GetRiderId(),
+		PickupAddress:      req.GetPickupAddress(),
+		DropoffAddress:     req.GetDropoffAddress(),
+		PickupLat:          req.GetPickupLat(),
+		PickupLon:          req.GetPickupLon(),
+		TripType:           req.GetTripType(),
+		ServiceType:        serviceType,
+		PickupContactName:  req.GetPickupContactName(),
+		PickupContactPhone: req.GetPickupContactPhone(),
+		ReceiverName:       req.GetReceiverName(),
+		ReceiverPhone:      req.GetReceiverPhone(),
+		PackageNote:        req.GetPackageNote(),
+		PackageValue:       req.GetPackageValue(),
+		PackageWeightKg:    req.GetPackageWeight(),
 	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &bookingpb.BookRideResponse{TripId: result.TripID, Status: result.Status}, nil
+	return &bookingpb.BookRideResponse{TripId: result.TripID, Status: result.Status, DeliveryId: result.DeliveryID}, nil
 }
 
 // AcceptDispatchOffer implements BookingServiceServer.AcceptDispatchOffer.
@@ -264,13 +289,13 @@ func toTripSummaryProtos(trips []app.TripSummary) []*bookingpb.TripSummaryProto 
 	out := make([]*bookingpb.TripSummaryProto, len(trips))
 	for i, t := range trips {
 		out[i] = &bookingpb.TripSummaryProto{
-			TripId:        t.TripID,
-			Status:        t.Status,
-			PickupAddress: t.PickupAddress,
+			TripId:         t.TripID,
+			Status:         t.Status,
+			PickupAddress:  t.PickupAddress,
 			DropoffAddress: t.DropoffAddress,
-			FinalFare:     t.FinalFare,
-			Currency:      t.Currency,
-			CreatedAt:     timestamppb.New(t.CreatedAt),
+			FinalFare:      t.FinalFare,
+			Currency:       t.Currency,
+			CreatedAt:      timestamppb.New(t.CreatedAt),
 		}
 	}
 	return out

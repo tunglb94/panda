@@ -11,22 +11,22 @@ enum DriverActivityStatus { offline, waitingForTrips, searchingNearby, busy }
 
 extension DriverActivityStatusX on DriverActivityStatus {
   String get title => switch (this) {
-        DriverActivityStatus.offline => "You're offline",
-        DriverActivityStatus.waitingForTrips => 'Waiting for trips',
-        DriverActivityStatus.searchingNearby => 'Searching nearby',
-        DriverActivityStatus.busy => 'On a trip (placeholder)',
+        DriverActivityStatus.offline => "Bạn đang ngoại tuyến",
+        DriverActivityStatus.waitingForTrips => 'Đang chờ chuyến',
+        DriverActivityStatus.searchingNearby => 'Đang tìm gần đây',
+        DriverActivityStatus.busy => 'Đang trong chuyến (placeholder)',
       };
 
   String get message => switch (this) {
         DriverActivityStatus.offline =>
-          'Go online to start receiving trip requests.',
+          'Bật trực tuyến để bắt đầu nhận yêu cầu chuyến đi.',
         DriverActivityStatus.waitingForTrips =>
-          "You're online. Sit tight — trip requests will appear here.",
+          "Bạn đang trực tuyến. Chờ chút — yêu cầu chuyến sẽ hiện ở đây.",
         DriverActivityStatus.searchingNearby =>
-          'Checking nearby for riders looking for a ride.',
+          'Đang kiểm tra xung quanh tìm hành khách cần đi xe.',
         DriverActivityStatus.busy =>
-          'This is a placeholder — trip assignment is not wired up yet '
-              '(see Driver App Roadmap stages D4/D6).',
+          'Đây là placeholder — việc gán chuyến đi chưa được kết nối '
+              '(xem Driver App Roadmap stages D4/D6).',
       };
 
   IconData get icon => switch (this) {

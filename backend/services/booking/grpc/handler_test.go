@@ -27,14 +27,18 @@ func newStubTrip() *stubTrip {
 	return &stubTrip{trips: make(map[string]*app.TripInfo), nextID: "trip-001"}
 }
 
-func (s *stubTrip) CreateTrip(_ context.Context, riderID, pickup, dropoff string) (string, error) {
+func (s *stubTrip) CreateTrip(_ context.Context, in app.CreateTripParams) (*app.CreateTripResult, error) {
 	if s.createErr != nil {
-		return "", s.createErr
+		return nil, s.createErr
 	}
 	id := s.nextID
-	s.trips[id] = &app.TripInfo{TripID: id, RiderID: riderID, Status: "pending",
-		PickupAddress: pickup, DropoffAddress: dropoff}
-	return id, nil
+	s.trips[id] = &app.TripInfo{TripID: id, RiderID: in.RiderID, Status: "pending",
+		PickupAddress: in.PickupAddress, DropoffAddress: in.DropoffAddress}
+	result := &app.CreateTripResult{TripID: id}
+	if in.TripType == "delivery" {
+		result.DeliveryID = "delivery-001"
+	}
+	return result, nil
 }
 
 func (s *stubTrip) StartTrip(_ context.Context, tripID string) error {
@@ -106,6 +110,10 @@ func (s *stubTrip) ListByDriver(_ context.Context, _ string) ([]app.TripSummary,
 	return nil, nil
 }
 
+func (s *stubTrip) AcceptDelivery(_ context.Context, _ string) error {
+	return nil
+}
+
 type stubDispatch struct {
 	jobs       map[string]*app.DispatchInfo
 	acceptErr  error
@@ -117,7 +125,7 @@ func newStubDispatch() *stubDispatch {
 	return &stubDispatch{jobs: make(map[string]*app.DispatchInfo)}
 }
 
-func (s *stubDispatch) RequestDispatch(_ context.Context, tripID, _ string, _, _ float64) error {
+func (s *stubDispatch) RequestDispatch(_ context.Context, tripID, _, _, _ string, _, _ float64) error {
 	if s.requestErr != nil {
 		return s.requestErr
 	}
@@ -178,7 +186,7 @@ func (s *stubPricing) CalculateFinalFare(_ context.Context, _ string, _, _ float
 func newHandler(trip *stubTrip, dispatch *stubDispatch, pricing *stubPricing) *bookinggrpc.Handler {
 	return bookinggrpc.NewHandler(
 		app.NewBookRideUseCase(trip, dispatch),
-		app.NewAcceptDispatchOfferUseCase(dispatch),
+		app.NewAcceptDispatchOfferUseCase(dispatch, trip),
 		app.NewRejectDispatchOfferUseCase(dispatch),
 		app.NewArriveAtPickupUseCase(trip),
 		app.NewStartTripUseCase(trip),
@@ -237,6 +245,56 @@ func TestBookRide_MissingPickup(t *testing.T) {
 	st, _ := status.FromError(err)
 	if st.Code() != codes.InvalidArgument {
 		t.Errorf("code = %v, want InvalidArgument", st.Code())
+	}
+}
+
+// TestBookRide_Delivery_OK is an end-to-end (proto request -> handler ->
+// use case -> proto response) check that Delivery V1 Phase 2's new
+// BookRideRequest fields flow through the gRPC handler correctly and
+// DeliveryId comes back populated. Delivery V1 Phase 2
+// (docs/business/DELIVERY_V1_DESIGN.md).
+func TestBookRide_Delivery_OK(t *testing.T) {
+	h := newHandler(newStubTrip(), newStubDispatch(), defaultPricing())
+	resp, err := h.BookRide(context.Background(), &bookingpb.BookRideRequest{
+		RiderId:            "r1",
+		PickupAddress:      "123 Main St",
+		DropoffAddress:     "456 Elm Ave",
+		PickupLat:          10.77,
+		PickupLon:          106.69,
+		TripType:           "delivery",
+		PickupContactName:  "Nguyen Van A",
+		PickupContactPhone: "0912345678",
+		ReceiverName:       "Tran Thi B",
+		ReceiverPhone:      "0987654321",
+		PackageNote:        "handle with care",
+		PackageValue:       500000,
+		PackageWeight:      1.5,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetStatus() != "searching" {
+		t.Errorf("status = %q, want searching", resp.GetStatus())
+	}
+	if resp.GetDeliveryId() != "delivery-001" {
+		t.Errorf("delivery_id = %q, want delivery-001", resp.GetDeliveryId())
+	}
+}
+
+func TestBookRide_RideOnly_DeliveryIdStaysEmpty(t *testing.T) {
+	h := newHandler(newStubTrip(), newStubDispatch(), defaultPricing())
+	resp, err := h.BookRide(context.Background(), &bookingpb.BookRideRequest{
+		RiderId:        "r1",
+		PickupAddress:  "123 Main St",
+		DropoffAddress: "456 Elm Ave",
+		PickupLat:      10.77,
+		PickupLon:      106.69,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetDeliveryId() != "" {
+		t.Errorf("delivery_id = %q, want empty for a Ride booking", resp.GetDeliveryId())
 	}
 }
 
@@ -416,7 +474,7 @@ func (s *stubDispatchWithOffer) GetDriverOffer(_ context.Context, _ string) (*ap
 func newHandlerWithOfferDispatch(trip *stubTrip, dispatch app.DispatchClient, pricing *stubPricing) *bookinggrpc.Handler {
 	return bookinggrpc.NewHandler(
 		app.NewBookRideUseCase(trip, dispatch),
-		app.NewAcceptDispatchOfferUseCase(dispatch),
+		app.NewAcceptDispatchOfferUseCase(dispatch, trip),
 		app.NewRejectDispatchOfferUseCase(dispatch),
 		app.NewArriveAtPickupUseCase(trip),
 		app.NewStartTripUseCase(trip),
@@ -441,7 +499,7 @@ func TestGetDriverCurrentOffer_HasOffer(t *testing.T) {
 	dispatch := &stubDispatchWithOffer{
 		stubDispatch: newStubDispatch(),
 		offer: &app.DriverOfferInfo{
-			TripID:        "trip1",
+			TripID:         "trip1",
 			OfferExpiresAt: time.Date(2026, 1, 1, 13, 0, 0, 0, time.UTC),
 		},
 	}

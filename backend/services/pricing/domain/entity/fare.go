@@ -1,7 +1,8 @@
 // Package entity defines the pricing domain model for FAIRRIDE.
 // All monetary amounts are int64 in the smallest unit of the configured currency
-// (e.g. cents for USD, satang for THB). This avoids floating-point rounding errors
-// in final stored values while keeping intermediate math in float64.
+// (e.g. cents for USD, satang for THB — but whole VND, which has no subunit
+// per Business Rule Bible v1.0 §2.2.9). This avoids floating-point rounding
+// errors in final stored values while keeping intermediate math in float64.
 package entity
 
 // VehicleType matches the enum in the driver service; duplicated here so the
@@ -13,6 +14,14 @@ const (
 	VehicleTypeMotorcycle VehicleType = "motorcycle"
 	VehicleTypeVan        VehicleType = "van"
 )
+
+// NOTE (Vehicle/Service Catalog refactor): Pricing is explicitly out of
+// scope for this refactor ("Không thay đổi Pricing") — it keeps rating by
+// VehicleType only, exactly as before. This means Bike and Bike Plus (both
+// VehicleType=motorcycle) currently price identically, and Car XL
+// (VehicleType=van, see driver's ServiceType.RequiredVehicleType) prices
+// the same as a plain Van/XL booking — there is no Bike-Plus-specific or
+// Car-XL-specific rate card. See the refactor's report, "Known Gap".
 
 // VehicleRates holds the per-vehicle-type fare parameters.
 // All monetary fields are in the smallest unit of the configured currency.
@@ -39,33 +48,41 @@ type FareConfig struct {
 	Rates map[VehicleType]VehicleRates
 }
 
-// DefaultFareConfig returns conservative USD-equivalent defaults suitable for
-// testing and early development. Operators MUST override these for production.
-// At default rates a 5 km / 15 min car trip totals $2.75 + $0.50 booking fee = $3.25.
+// DefaultFareConfig returns the launch-market rates from the Business Rule
+// Bible v1.0 (docs/business/business-rule-bible-v1.0.md §2.2.1-§2.2.5). VND
+// has no decimal subunit (§2.2.9), so amounts here are whole VND, not cents.
+//
+// VehicleTypeCar uses the BRB "Standard (4-seat)" row and VehicleTypeVan uses
+// "XL (7-seat)" — the closest match for each of this service's three
+// VehicleType values. BRB v1.0 defines no motorcycle-specific rates; the
+// VehicleTypeMotorcycle figures below are an interim estimate (~40% of the
+// Standard car rate, roughly matching observed market bike/car ratios) and
+// are NOT sourced from the BRB — replace once product defines an official
+// motorcycle rate.
 func DefaultFareConfig() FareConfig {
 	return FareConfig{
-		CurrencyCode: "USD",
+		CurrencyCode: "VND",
 		Rates: map[VehicleType]VehicleRates{
 			VehicleTypeCar: {
-				BaseFare:      50,  // $0.50
-				PerKmRate:     30,  // $0.30/km
-				PerMinuteRate: 5,   // $0.05/min
-				MinimumFare:   200, // $2.00
-				BookingFee:    50,  // $0.50
+				BaseFare:      10_000, // BRB §2.2.1 Standard
+				PerKmRate:     4_000,  // BRB §2.2.2 Standard
+				PerMinuteRate: 400,    // BRB §2.2.3 Standard
+				MinimumFare:   25_000, // BRB §2.2.4 Standard
+				BookingFee:    2_000,  // BRB §2.2.5 (flat, all classes)
 			},
 			VehicleTypeMotorcycle: {
-				BaseFare:      30,  // $0.30
-				PerKmRate:     20,  // $0.20/km
-				PerMinuteRate: 3,   // $0.03/min
-				MinimumFare:   150, // $1.50
-				BookingFee:    30,  // $0.30
+				BaseFare:      5_000,  // interim estimate — not in BRB v1.0
+				PerKmRate:     1_600,  // interim estimate — not in BRB v1.0
+				PerMinuteRate: 200,    // interim estimate — not in BRB v1.0
+				MinimumFare:   12_000, // interim estimate — not in BRB v1.0
+				BookingFee:    2_000,  // BRB §2.2.5 (flat, all classes)
 			},
 			VehicleTypeVan: {
-				BaseFare:      100, // $1.00
-				PerKmRate:     50,  // $0.50/km
-				PerMinuteRate: 8,   // $0.08/min
-				MinimumFare:   300, // $3.00
-				BookingFee:    75,  // $0.75
+				BaseFare:      18_000, // BRB §2.2.1 XL
+				PerKmRate:     5_000,  // BRB §2.2.2 XL
+				PerMinuteRate: 500,    // BRB §2.2.3 XL
+				MinimumFare:   40_000, // BRB §2.2.4 XL
+				BookingFee:    2_000,  // BRB §2.2.5 (flat, all classes)
 			},
 		},
 	}
@@ -75,8 +92,9 @@ func DefaultFareConfig() FareConfig {
 // Monetary fields are in the smallest currency unit defined by CurrencyCode.
 //
 // Calculation rules (enforced by FareCalculator):
-//   ride_fare = max(BaseFare + DistanceFare + TimeFare, MinimumFare)
-//   Total     = RideFare + BookingFee
+//
+//	ride_fare = max(BaseFare + DistanceFare + TimeFare, MinimumFare)
+//	Total     = RideFare + BookingFee
 type FareBreakdown struct {
 	VehicleType  VehicleType
 	DistanceKM   float64

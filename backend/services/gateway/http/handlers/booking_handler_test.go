@@ -14,6 +14,7 @@ import (
 	"github.com/fairride/gateway/http/handlers"
 	"github.com/fairride/gateway/http/middleware"
 	"github.com/fairride/identity/infrastructure/jwt"
+	"github.com/fairride/trip/grpc/trippb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -31,6 +32,7 @@ type stubBookingClient struct {
 	getBookingDetails     func(ctx context.Context, in *bookingpb.GetBookingDetailsRequest, opts ...grpc.CallOption) (*bookingpb.BookingDetailsResponse, error)
 	getDriverCurrentOffer func(ctx context.Context, in *bookingpb.GetDriverCurrentOfferRequest, opts ...grpc.CallOption) (*bookingpb.GetDriverCurrentOfferResponse, error)
 	cancelRide            func(ctx context.Context, in *bookingpb.CancelRideRequest, opts ...grpc.CallOption) (*bookingpb.BookingActionResponse, error)
+	listRiderTrips        func(ctx context.Context, in *bookingpb.ListTripsRequest, opts ...grpc.CallOption) (*bookingpb.TripListResponse, error)
 }
 
 func (s *stubBookingClient) BookRide(ctx context.Context, in *bookingpb.BookRideRequest, opts ...grpc.CallOption) (*bookingpb.BookRideResponse, error) {
@@ -69,7 +71,10 @@ func (s *stubBookingClient) CancelRide(ctx context.Context, in *bookingpb.Cancel
 func (s *stubBookingClient) PayRide(ctx context.Context, in *bookingpb.StartTripRequest, opts ...grpc.CallOption) (*bookingpb.FinishedTripResponse, error) {
 	return &bookingpb.FinishedTripResponse{TripId: in.GetTripId(), Status: "settled"}, nil
 }
-func (s *stubBookingClient) ListRiderTrips(_ context.Context, _ *bookingpb.ListTripsRequest, _ ...grpc.CallOption) (*bookingpb.TripListResponse, error) {
+func (s *stubBookingClient) ListRiderTrips(ctx context.Context, in *bookingpb.ListTripsRequest, opts ...grpc.CallOption) (*bookingpb.TripListResponse, error) {
+	if s.listRiderTrips != nil {
+		return s.listRiderTrips(ctx, in, opts...)
+	}
 	return &bookingpb.TripListResponse{}, nil
 }
 func (s *stubBookingClient) ListDriverTrips(_ context.Context, _ *bookingpb.ListTripsRequest, _ ...grpc.CallOption) (*bookingpb.TripListResponse, error) {
@@ -119,7 +124,7 @@ func TestBookRide_Success(t *testing.T) {
 			return &bookingpb.BookRideResponse{TripId: "trip-99", Status: "searching"}, nil
 		},
 	}
-	h := handlers.NewBookingHandler(stub)
+	h := handlers.NewBookingHandler(stub, nil)
 
 	body := jsonBody(t, map[string]any{
 		"pickup_address":  "A",
@@ -149,7 +154,7 @@ func TestBookRide_Success(t *testing.T) {
 }
 
 func TestBookRide_MissingPickup(t *testing.T) {
-	h := handlers.NewBookingHandler(&stubBookingClient{})
+	h := handlers.NewBookingHandler(&stubBookingClient{}, nil)
 	body := jsonBody(t, map[string]any{"dropoff_address": "B"})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rides", body)
 	req = withClaims(req, "rider-1", "rider")
@@ -166,7 +171,7 @@ func TestBookRide_GRPCError_MapsToHTTP(t *testing.T) {
 			return nil, status.Error(codes.Internal, "upstream down")
 		},
 	}
-	h := handlers.NewBookingHandler(stub)
+	h := handlers.NewBookingHandler(stub, nil)
 	body := jsonBody(t, map[string]any{"pickup_address": "A", "dropoff_address": "B"})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rides", body)
 	req = withClaims(req, "rider-1", "rider")
@@ -193,7 +198,7 @@ func TestGetBooking_Success(t *testing.T) {
 			}, nil
 		},
 	}
-	h := handlers.NewBookingHandler(stub)
+	h := handlers.NewBookingHandler(stub, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/rides/trip-1", nil)
 	req = withClaims(req, "rider-1", "rider")
@@ -213,7 +218,7 @@ func TestGetBooking_NotFound(t *testing.T) {
 			return nil, status.Error(codes.NotFound, "trip not found")
 		},
 	}
-	h := handlers.NewBookingHandler(stub)
+	h := handlers.NewBookingHandler(stub, nil)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/rides/nope", nil)
 	req = withClaims(req, "rider-1", "rider")
 	req.SetPathValue("tripID", "nope")
@@ -224,6 +229,201 @@ func TestGetBooking_NotFound(t *testing.T) {
 	}
 }
 
+func TestBookRide_ForwardsDeliveryFields(t *testing.T) {
+	var captured *bookingpb.BookRideRequest
+	stub := &stubBookingClient{
+		bookRide: func(_ context.Context, in *bookingpb.BookRideRequest, _ ...grpc.CallOption) (*bookingpb.BookRideResponse, error) {
+			captured = in
+			return &bookingpb.BookRideResponse{TripId: "trip-99", Status: "searching", DeliveryId: "delivery-1"}, nil
+		},
+	}
+	h := handlers.NewBookingHandler(stub, nil)
+
+	body := jsonBody(t, map[string]any{
+		"pickup_address":       "A",
+		"dropoff_address":      "B",
+		"trip_type":            "delivery",
+		"pickup_contact_name":  "Alice",
+		"pickup_contact_phone": "0900000001",
+		"receiver_name":        "Bob",
+		"receiver_phone":       "0900000002",
+		"package_note":         "Fragile",
+		"package_value":        50000,
+		"package_weight":       1.5,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/rides", body)
+	req = withClaims(req, "rider-1", "rider")
+	w := httptest.NewRecorder()
+
+	h.BookRide(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("want 201, got %d — body: %s", w.Code, w.Body.String())
+	}
+	if captured == nil {
+		t.Fatal("BookRide was never called on the client")
+	}
+	if captured.GetTripType() != "delivery" {
+		t.Fatalf("want trip_type=delivery, got %q", captured.GetTripType())
+	}
+	if captured.GetReceiverName() != "Bob" || captured.GetReceiverPhone() != "0900000002" {
+		t.Fatalf("receiver fields not forwarded: %+v", captured)
+	}
+	if captured.GetPackageNote() != "Fragile" || captured.GetPackageValue() != 50000 || captured.GetPackageWeight() != 1.5 {
+		t.Fatalf("package fields not forwarded: %+v", captured)
+	}
+	var resp map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["delivery_id"] != "delivery-1" {
+		t.Fatalf("want delivery_id=delivery-1, got %q", resp["delivery_id"])
+	}
+}
+
+func TestGetBooking_EnrichesDeliveryStatusWhenTripClientPresent(t *testing.T) {
+	stub := &stubBookingClient{
+		getBookingDetails: func(_ context.Context, in *bookingpb.GetBookingDetailsRequest, _ ...grpc.CallOption) (*bookingpb.BookingDetailsResponse, error) {
+			return &bookingpb.BookingDetailsResponse{TripId: in.GetTripId(), TripStatus: "in_progress"}, nil
+		},
+	}
+	tripStub := &stubTripClient{
+		getTrip: func(_ context.Context, in *trippb.GetTripRequest, _ ...grpc.CallOption) (*trippb.TripResponse, error) {
+			return &trippb.TripResponse{Trip: &trippb.TripProto{
+				TripId:         in.GetTripId(),
+				TripType:       "delivery",
+				DeliveryId:     "delivery-1",
+				DeliveryStatus: "IN_DELIVERY",
+			}}, nil
+		},
+	}
+	h := handlers.NewBookingHandler(stub, tripStub)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/rides/trip-1", nil)
+	req = withClaims(req, "rider-1", "rider")
+	req.SetPathValue("tripID", "trip-1")
+	w := httptest.NewRecorder()
+	h.GetBooking(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d — body: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["trip_type"] != "delivery" || resp["delivery_id"] != "delivery-1" || resp["delivery_status"] != "IN_DELIVERY" {
+		t.Fatalf("delivery fields not merged into response: %+v", resp)
+	}
+}
+
+func TestGetBooking_OmitsDeliveryFieldsWhenTripClientNil(t *testing.T) {
+	stub := &stubBookingClient{
+		getBookingDetails: func(_ context.Context, in *bookingpb.GetBookingDetailsRequest, _ ...grpc.CallOption) (*bookingpb.BookingDetailsResponse, error) {
+			return &bookingpb.BookingDetailsResponse{TripId: in.GetTripId(), TripStatus: "in_progress"}, nil
+		},
+	}
+	h := handlers.NewBookingHandler(stub, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/rides/trip-1", nil)
+	req = withClaims(req, "rider-1", "rider")
+	req.SetPathValue("tripID", "trip-1")
+	w := httptest.NewRecorder()
+	h.GetBooking(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d — body: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if _, present := resp["delivery_status"]; present {
+		t.Fatalf("delivery_status should be absent when tripClient is nil, got %+v", resp)
+	}
+}
+
+func TestListRiderTrips_EnrichesTripTypeWhenTripClientPresent(t *testing.T) {
+	stub := &stubBookingClient{
+		listRiderTrips: func(_ context.Context, _ *bookingpb.ListTripsRequest, _ ...grpc.CallOption) (*bookingpb.TripListResponse, error) {
+			return &bookingpb.TripListResponse{Trips: []*bookingpb.TripSummaryProto{
+				{TripId: "trip-ride", Status: "completed"},
+				{TripId: "trip-delivery", Status: "in_progress"},
+			}}, nil
+		},
+	}
+	tripStub := &stubTripClient{
+		getTrip: func(_ context.Context, in *trippb.GetTripRequest, _ ...grpc.CallOption) (*trippb.TripResponse, error) {
+			tripType := "ride"
+			if in.GetTripId() == "trip-delivery" {
+				tripType = "delivery"
+			}
+			return &trippb.TripResponse{Trip: &trippb.TripProto{TripId: in.GetTripId(), TripType: tripType}}, nil
+		},
+	}
+	h := handlers.NewBookingHandler(stub, tripStub)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/rider/trips", nil)
+	req = withClaims(req, "rider-1", "rider")
+	w := httptest.NewRecorder()
+	h.ListRiderTrips(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d — body: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Trips []map[string]any `json:"trips"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Trips) != 2 {
+		t.Fatalf("want 2 trips, got %d", len(resp.Trips))
+	}
+	byID := map[string]any{}
+	for _, item := range resp.Trips {
+		byID[item["trip_id"].(string)] = item["trip_type"]
+	}
+	if byID["trip-ride"] != "ride" || byID["trip-delivery"] != "delivery" {
+		t.Fatalf("trip_type not enriched correctly: %+v", byID)
+	}
+}
+
+func TestListRiderTrips_OmitsTripTypeWhenTripClientNil(t *testing.T) {
+	stub := &stubBookingClient{
+		listRiderTrips: func(_ context.Context, _ *bookingpb.ListTripsRequest, _ ...grpc.CallOption) (*bookingpb.TripListResponse, error) {
+			return &bookingpb.TripListResponse{Trips: []*bookingpb.TripSummaryProto{{TripId: "trip-1", Status: "completed"}}}, nil
+		},
+	}
+	h := handlers.NewBookingHandler(stub, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/rider/trips", nil)
+	req = withClaims(req, "rider-1", "rider")
+	w := httptest.NewRecorder()
+	h.ListRiderTrips(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d — body: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Trips []map[string]any `json:"trips"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if _, present := resp.Trips[0]["trip_type"]; present {
+		t.Fatalf("trip_type should be omitted (empty) when tripClient is nil, got %+v", resp.Trips[0])
+	}
+}
+
+type stubTripClient struct {
+	getTrip func(ctx context.Context, in *trippb.GetTripRequest, opts ...grpc.CallOption) (*trippb.TripResponse, error)
+}
+
+func (s *stubTripClient) GetTrip(ctx context.Context, in *trippb.GetTripRequest, opts ...grpc.CallOption) (*trippb.TripResponse, error) {
+	return s.getTrip(ctx, in, opts...)
+}
+
 // ─── AcceptDispatchOffer ──────────────────────────────────────────────────────
 
 func TestAcceptDispatchOffer_Success(t *testing.T) {
@@ -232,7 +432,7 @@ func TestAcceptDispatchOffer_Success(t *testing.T) {
 			return &bookingpb.BookingActionResponse{TripId: in.GetTripId(), Status: "driver_assigned"}, nil
 		},
 	}
-	h := handlers.NewBookingHandler(stub)
+	h := handlers.NewBookingHandler(stub, nil)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rides/trip-1/accept", strings.NewReader("{}"))
 	req = withClaims(req, "driver-1", "driver")
 	req.SetPathValue("tripID", "trip-1")
@@ -249,7 +449,7 @@ func TestAcceptDispatchOffer_PreconditionFailed(t *testing.T) {
 			return nil, status.Error(codes.FailedPrecondition, "offer already taken")
 		},
 	}
-	h := handlers.NewBookingHandler(stub)
+	h := handlers.NewBookingHandler(stub, nil)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rides/trip-1/accept", nil)
 	req = withClaims(req, "driver-1", "driver")
 	req.SetPathValue("tripID", "trip-1")
@@ -268,7 +468,7 @@ func TestRejectDispatchOffer_Success(t *testing.T) {
 			return &bookingpb.BookingActionResponse{TripId: in.GetTripId(), Status: "searching"}, nil
 		},
 	}
-	h := handlers.NewBookingHandler(stub)
+	h := handlers.NewBookingHandler(stub, nil)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rides/trip-1/reject", strings.NewReader("{}"))
 	req = withClaims(req, "driver-1", "driver")
 	req.SetPathValue("tripID", "trip-1")
@@ -287,7 +487,7 @@ func TestStartTrip_Success(t *testing.T) {
 			return &bookingpb.BookingActionResponse{TripId: in.GetTripId(), Status: "in_progress"}, nil
 		},
 	}
-	h := handlers.NewBookingHandler(stub)
+	h := handlers.NewBookingHandler(stub, nil)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rides/trip-1/start", nil)
 	req = withClaims(req, "driver-1", "driver")
 	req.SetPathValue("tripID", "trip-1")
@@ -304,7 +504,7 @@ func TestStartTrip_NotFound(t *testing.T) {
 			return nil, status.Error(codes.NotFound, "trip not found")
 		},
 	}
-	h := handlers.NewBookingHandler(stub)
+	h := handlers.NewBookingHandler(stub, nil)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rides/nope/start", nil)
 	req = withClaims(req, "driver-1", "driver")
 	req.SetPathValue("tripID", "nope")
@@ -331,7 +531,7 @@ func TestFinishTrip_Success(t *testing.T) {
 			}, nil
 		},
 	}
-	h := handlers.NewBookingHandler(stub)
+	h := handlers.NewBookingHandler(stub, nil)
 	body := jsonBody(t, map[string]any{
 		"vehicle_type": "car",
 		"distance_km":  5.0,
@@ -355,7 +555,7 @@ func TestFinishTrip_Success(t *testing.T) {
 }
 
 func TestFinishTrip_MissingVehicleType(t *testing.T) {
-	h := handlers.NewBookingHandler(&stubBookingClient{})
+	h := handlers.NewBookingHandler(&stubBookingClient{}, nil)
 	body := jsonBody(t, map[string]any{"distance_km": 5.0, "duration_min": 15.0})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rides/trip-1/finish", body)
 	req = withClaims(req, "driver-1", "driver")
@@ -388,7 +588,7 @@ func TestGRPCErrorMapping(t *testing.T) {
 				return nil, status.Error(tc.grpcCode, "err")
 			},
 		}
-		h := handlers.NewBookingHandler(stub)
+		h := handlers.NewBookingHandler(stub, nil)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/rides/t/start", nil)
 		req = withClaims(req, "driver-1", "driver")
 		req.SetPathValue("tripID", "t")
@@ -415,7 +615,7 @@ func TestGetDriverOffer_HasOffer(t *testing.T) {
 			}, nil
 		},
 	}
-	h := handlers.NewBookingHandler(stub)
+	h := handlers.NewBookingHandler(stub, nil)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/driver/current-offer", nil)
 	req = withClaims(req, "driver-1", "driver")
 	w := httptest.NewRecorder()
@@ -441,7 +641,7 @@ func TestGetDriverOffer_HasOffer(t *testing.T) {
 
 func TestGetDriverOffer_NoOffer(t *testing.T) {
 	stub := &stubBookingClient{}
-	h := handlers.NewBookingHandler(stub)
+	h := handlers.NewBookingHandler(stub, nil)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/driver/current-offer", nil)
 	req = withClaims(req, "driver-1", "driver")
 	w := httptest.NewRecorder()
@@ -461,7 +661,7 @@ func TestGetDriverOffer_NoOffer(t *testing.T) {
 
 func TestGetDriverOffer_MissingClaims(t *testing.T) {
 	stub := &stubBookingClient{}
-	h := handlers.NewBookingHandler(stub)
+	h := handlers.NewBookingHandler(stub, nil)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/driver/current-offer", nil)
 	// no withClaims
 	w := httptest.NewRecorder()
@@ -482,7 +682,7 @@ func TestCancelRide_Success(t *testing.T) {
 			return &bookingpb.BookingActionResponse{TripId: "trip-1", Status: "cancelled"}, nil
 		},
 	}
-	h := handlers.NewBookingHandler(stub)
+	h := handlers.NewBookingHandler(stub, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rides/trip-1/cancel", nil)
 	req.SetPathValue("tripID", "trip-1")
@@ -504,7 +704,7 @@ func TestCancelRide_Success(t *testing.T) {
 }
 
 func TestCancelRide_MissingTripID(t *testing.T) {
-	h := handlers.NewBookingHandler(&stubBookingClient{})
+	h := handlers.NewBookingHandler(&stubBookingClient{}, nil)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rides//cancel", nil)
 	req = withClaims(req, "rider-1", "rider")
 	w := httptest.NewRecorder()
@@ -520,7 +720,7 @@ func TestCancelRide_GRPCError(t *testing.T) {
 			return nil, status.Error(codes.Internal, "trip service down")
 		},
 	}
-	h := handlers.NewBookingHandler(stub)
+	h := handlers.NewBookingHandler(stub, nil)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/rides/trip-1/cancel", nil)
 	req.SetPathValue("tripID", "trip-1")
 	req = withClaims(req, "rider-1", "rider")

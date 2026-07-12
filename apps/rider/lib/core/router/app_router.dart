@@ -5,15 +5,17 @@ import 'package:rider/core/routing/route_provider.dart';
 import 'package:rider/core/storage/token_storage.dart';
 import 'package:rider/features/auth/presentation/pages/login_page.dart';
 import 'package:rider/features/booking/presentation/pages/booking_page.dart';
+import 'package:rider/features/home/presentation/pages/home_hub_page.dart';
 import 'package:rider/features/map/domain/models/trip_selection.dart';
-import 'package:rider/features/map/presentation/pages/map_page.dart';
 import 'package:rider/features/profile/presentation/pages/profile_page.dart';
+import 'package:rider/features/wallet/presentation/pages/wallet_page.dart';
 import 'package:rider/shared/widgets/scaffold_with_nav.dart';
 
 abstract final class AppRoutes {
   static const login = '/login';
   static const home = '/';
   static const booking = '/booking';
+  static const wallet = '/wallet';
   static const profile = '/profile';
 }
 
@@ -52,7 +54,7 @@ class AppRouter {
               routes: [
                 GoRoute(
                   path: AppRoutes.home,
-                  builder: (context, state) => MapPage(
+                  builder: (context, state) => HomeHubPage(
                     apiClient: apiClient,
                     routeProvider: routeProvider,
                   ),
@@ -69,6 +71,14 @@ class AppRouter {
                         : null,
                     apiClient: apiClient,
                   ),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: AppRoutes.wallet,
+                  builder: (context, state) => const WalletPage(),
                 ),
               ],
             ),

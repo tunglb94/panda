@@ -1,0 +1,27 @@
+{
+  "voucher_issued_count": 54,
+  "voucher_used_count": 29,
+  "voucher_kept_count": 175,
+  "voucher_still_held_at_end_count": 26,
+  "voucher_expired_count": 0,
+  "by_type": [
+    {
+      "type": "manual_coupon",
+      "redeemed_count": 28,
+      "total_cost_vnd": 162576,
+      "gmv_generated_vnd": 1625888,
+      "roi": 9.000787324082275,
+      "cost_per_redemption_vnd": 5806.285714285715,
+      "repeat_rate_percent": 96.42857142857143
+    },
+    {
+      "type": "first_ride",
+      "redeemed_count": 1,
+      "total_cost_vnd": 30000,
+      "gmv_generated_vnd": 81369,
+      "roi": 1.7123,
+      "cost_per_redemption_vnd": 30000,
+      "repeat_rate_percent": 100
+    }
+  ]
+}

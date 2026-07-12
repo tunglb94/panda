@@ -1,0 +1,180 @@
+{
+  "total_drivers": 15,
+  "online_at_end": 6,
+  "offline_at_end": 9,
+  "average_rating": 4.530739960062605,
+  "average_income_week_vnd": 1493920.4666666666,
+  "average_fatigue": 0.27048042437320513,
+  "account_type_counts": {
+    "bronze": 9,
+    "gold": 3,
+    "silver": 3
+  },
+  "drivers": [
+    {
+      "id": "driver-0005",
+      "account_type": "bronze",
+      "rating": 4.238169613331418,
+      "total_trips": 452,
+      "income_today_vnd": 36029,
+      "income_week_vnd": 783238,
+      "satisfaction": 0.6903776352463511,
+      "fatigue": 0.10799999999999998,
+      "online_at_end": true
+    },
+    {
+      "id": "driver-0006",
+      "account_type": "silver",
+      "rating": 4.532493604262247,
+      "total_trips": 1126,
+      "income_today_vnd": 264746,
+      "income_week_vnd": 2019124,
+      "satisfaction": 0.8877928759617156,
+      "fatigue": 0,
+      "online_at_end": false
+    },
+    {
+      "id": "driver-0013",
+      "account_type": "gold",
+      "rating": 4.753698607964669,
+      "total_trips": 837,
+      "income_today_vnd": 528192,
+      "income_week_vnd": 1372162,
+      "satisfaction": 0.8207486186597759,
+      "fatigue": 0.19919387725017348,
+      "online_at_end": false
+    },
+    {
+      "id": "driver-0000",
+      "account_type": "bronze",
+      "rating": 4.3642243677210395,
+      "total_trips": 198,
+      "income_today_vnd": 620838,
+      "income_week_vnd": 1320096,
+      "satisfaction": 0.690225791350533,
+      "fatigue": 0.3920000000000002,
+      "online_at_end": true
+    },
+    {
+      "id": "driver-0004",
+      "account_type": "bronze",
+      "rating": 4.385307490795289,
+      "total_trips": 2384,
+      "income_today_vnd": 557684,
+      "income_week_vnd": 1240507,
+      "satisfaction": 0.8884570310106146,
+      "fatigue": 0.37200000000000016,
+      "online_at_end": true
+    },
+    {
+      "id": "driver-0007",
+      "account_type": "bronze",
+      "rating": 4.471235937943055,
+      "total_trips": 780,
+      "income_today_vnd": 601914,
+      "income_week_vnd": 2201938,
+      "satisfaction": 0.7624786546995899,
+      "fatigue": 0.4180124883479013,
+      "online_at_end": true
+    },
+    {
+      "id": "driver-0011",
+      "account_type": "bronze",
+      "rating": 4.39875170328843,
+      "total_trips": 2646,
+      "income_today_vnd": 371017,
+      "income_week_vnd": 1385613,
+      "satisfaction": 0.6699963740821911,
+      "fatigue": 0.3240000000000002,
+      "online_at_end": false
+    },
+    {
+      "id": "driver-0014",
+      "account_type": "bronze",
+      "rating": 4.256215849047578,
+      "total_trips": 1056,
+      "income_today_vnd": 282686,
+      "income_week_vnd": 1248422,
+      "satisfaction": 0.8787448255394705,
+      "fatigue": 0.09599999999999999,
+      "online_at_end": true
+    },
+    {
+      "id": "driver-0003",
+      "account_type": "gold",
+      "rating": 4.717169602175378,
+      "total_trips": 2293,
+      "income_today_vnd": 520884,
+      "income_week_vnd": 1589770,
+      "satisfaction": 0.7308934019637168,
+      "fatigue": 0.4120000000000005,
+      "online_at_end": true
+    },
+    {
+      "id": "driver-0008",
+      "account_type": "silver",
+      "rating": 4.714222250684624,
+      "total_trips": 234,
+      "income_today_vnd": 595509,
+      "income_week_vnd": 1682393,
+      "satisfaction": 0.6843250159902305,
+      "fatigue": 0.28400000000000025,
+      "online_at_end": false
+    },
+    {
+      "id": "driver-0009",
+      "account_type": "bronze",
+      "rating": 4.7711520950073805,
+      "total_trips": 61,
+      "income_today_vnd": 111010,
+      "income_week_vnd": 1571474,
+      "satisfaction": 0.6367791698790436,
+      "fatigue": 0.4360000000000003,
+      "online_at_end": false
+    },
+    {
+      "id": "driver-0002",
+      "account_type": "bronze",
+      "rating": 4.482386381521297,
+      "total_trips": 2813,
+      "income_today_vnd": 182740,
+      "income_week_vnd": 1873699,
+      "satisfaction": 0.8902319448920077,
+      "fatigue": 0.20400000000000038,
+      "online_at_end": false
+    },
+    {
+      "id": "driver-0010",
+      "account_type": "gold",
+      "rating": 4.926986655525776,
+      "total_trips": 567,
+      "income_today_vnd": 367696,
+      "income_week_vnd": 953025,
+      "satisfaction": 0.6331728193294793,
+      "fatigue": 0.06800000000000007,
+      "online_at_end": false
+    },
+    {
+      "id": "driver-0012",
+      "account_type": "bronze",
+      "rating": 4.2095238201222145,
+      "total_trips": 1194,
+      "income_today_vnd": 437572,
+      "income_week_vnd": 1623507,
+      "satisfaction": 0.5745655446444304,
+      "fatigue": 0.32400000000000023,
+      "online_at_end": false
+    },
+    {
+      "id": "driver-0001",
+      "account_type": "silver",
+      "rating": 4.739561421548704,
+      "total_trips": 318,
+      "income_today_vnd": 122220,
+      "income_week_vnd": 1543839,
+      "satisfaction": 0.7330585549698767,
+      "fatigue": 0.4200000000000004,
+      "online_at_end": false
+    }
+  ]
+}

@@ -16,13 +16,20 @@ import (
 // Handler implements pricingpb.PricingServiceServer.
 type Handler struct {
 	pricingpb.UnimplementedPricingServiceServer
-	calc *app.FareCalculator
+	calc app.FareEstimator
 }
 
-// NewHandler creates a Handler from a FareCalculator.
-func NewHandler(calc *app.FareCalculator) *Handler {
+// NewHandler creates a Handler from a FareEstimator — either a plain
+// *app.FareCalculator (V2 only, e.g. in tests that don't care about the V3
+// feature flag) or an *app.VersionedFareCalculator (production, dispatches
+// to V2 or V3 per PRICING_VERSION — see cmd/server/main.go). Accepting the
+// interface rather than the concrete *app.FareCalculator is the only change
+// this sprint makes to this file — every existing caller passing
+// *app.FareCalculator keeps compiling unchanged, since it already satisfies
+// FareEstimator.
+func NewHandler(calc app.FareEstimator) *Handler {
 	if calc == nil {
-		panic("pricing grpc: FareCalculator must not be nil")
+		panic("pricing grpc: FareEstimator must not be nil")
 	}
 	return &Handler{calc: calc}
 }

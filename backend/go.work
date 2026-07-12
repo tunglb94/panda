@@ -18,4 +18,5 @@ use (
 	./services/review
 	./services/analytics
 	./services/admin
+	./tools/ai_simulation
 )

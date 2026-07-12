@@ -31,11 +31,26 @@ var cancellableStatuses = map[TripStatus]bool{
 	StatusDriverArrived:  true,
 }
 
-// Trip is the aggregate root for a FAIRRIDE ride request.
+// TripType discriminates what a Trip represents. See
+// docs/business/DELIVERY_V1_DESIGN.md Phần 1/2 — this is the single
+// discriminator the rest of the system needs to distinguish Ride from
+// Delivery; every other Delivery-specific field lives on the separate
+// Delivery aggregate (delivery.go), not on Trip itself.
+type TripType string
+
+const (
+	TripTypeRide     TripType = "ride"
+	TripTypeDelivery TripType = "delivery"
+)
+
+// Trip is the aggregate root for a FAIRRIDE ride or delivery request.
 // DriverID is empty until a driver is assigned.
 // CancellationReason is empty unless the trip is Cancelled.
 // FinalFareTotal and FareCurrency are set when the trip is Completed.
 // PaymentMethod is set when the rider pays (e.g. "cash", "wallet").
+// TripType is TripTypeRide for every trip created via NewTrip; DeliveryID is
+// empty ("nil") for Ride trips and only set for trips created via
+// NewDeliveryTrip (docs/business/DELIVERY_V1_DESIGN.md Phần 5 "Mapping Trip").
 type Trip struct {
 	TripID             string
 	RiderID            string
@@ -47,11 +62,16 @@ type Trip struct {
 	FinalFareTotal     int64  // 0 until Completed; smallest currency unit
 	FareCurrency       string // e.g. "USD"; empty until Completed
 	PaymentMethod      string // empty until paid
+	TripType           TripType
+	DeliveryID         string // empty for Ride trips ("nil")
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 }
 
-// NewTrip creates a validated Trip in StatusPending.
+// NewTrip creates a validated Ride Trip in StatusPending. Unchanged from
+// before Delivery was introduced: same signature, same validation, same
+// behavior for every existing caller — it now simply also stamps
+// TripType=TripTypeRide (DeliveryID stays "", i.e. nil) on the returned Trip.
 // riderID, pickupAddress, and dropoffAddress are required.
 func NewTrip(tripID, riderID, pickupAddress, dropoffAddress string, now time.Time) (*Trip, error) {
 	if tripID == "" {
@@ -72,9 +92,28 @@ func NewTrip(tripID, riderID, pickupAddress, dropoffAddress string, now time.Tim
 		Status:         StatusPending,
 		PickupAddress:  pickupAddress,
 		DropoffAddress: dropoffAddress,
+		TripType:       TripTypeRide,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}, nil
+}
+
+// NewDeliveryTrip creates a validated Delivery Trip in StatusPending. It is
+// additive alongside NewTrip (Phase 1 of docs/business/DELIVERY_V1_DESIGN.md)
+// — no existing caller of NewTrip is affected. deliveryID must reference an
+// already-created Delivery aggregate (see delivery.go); riderID here plays
+// the role of "Sender" for a delivery (Phần 2 of the design doc).
+func NewDeliveryTrip(tripID, riderID, pickupAddress, dropoffAddress, deliveryID string, now time.Time) (*Trip, error) {
+	if deliveryID == "" {
+		return nil, errors.InvalidArgument("delivery id must not be empty")
+	}
+	trip, err := NewTrip(tripID, riderID, pickupAddress, dropoffAddress, now)
+	if err != nil {
+		return nil, err
+	}
+	trip.TripType = TripTypeDelivery
+	trip.DeliveryID = deliveryID
+	return trip, nil
 }
 
 // ReconstituteTrip rebuilds a Trip from a persistence record. No validation.

@@ -59,6 +59,60 @@ func TestNewDriverProfile_InvalidVehicleType(t *testing.T) {
 	}
 }
 
+// TestNewDriverProfile_AllVehicleTypes locks in the driver-side VehicleType
+// allow-list: exactly the 3 physical vehicle values are accepted.
+func TestNewDriverProfile_AllVehicleTypes(t *testing.T) {
+	types := []entity.VehicleType{entity.VehicleTypeCar, entity.VehicleTypeMotorcycle, entity.VehicleTypeVan}
+	for _, vt := range types {
+		_, err := entity.NewDriverProfile("d1", "u1", "LIC-001", vt, "", "", "", "ABC-123", testNow)
+		if err != nil {
+			t.Errorf("type %s should be valid: %v", vt, err)
+		}
+	}
+}
+
+// TestSetServiceCapability_RequiresMatchingVehicleType locks in the
+// Vehicle/Service Catalog refactor's core rule: a ServiceType can only be
+// set on a driver whose VehicleType matches ServiceType.RequiredVehicleType.
+func TestSetServiceCapability_RequiresMatchingVehicleType(t *testing.T) {
+	d, err := entity.NewDriverProfile("d1", "u1", "LIC-001", entity.VehicleTypeMotorcycle, "", "", "", "ABC-123", testNow)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := d.SetServiceCapability(entity.ServiceTypeCarXL, true, false, testNow); !errors.IsCode(err, errors.CodeInvalidArgument) {
+		t.Errorf("expected InvalidArgument setting car_xl on a motorcycle profile, got %v", err)
+	}
+	if err := d.SetServiceCapability(entity.ServiceTypeBikePlus, true, true, testNow); err != nil {
+		t.Errorf("expected bike_plus on a motorcycle profile to succeed, got %v", err)
+	}
+	if d.ServiceType != entity.ServiceTypeBikePlus || !d.RideEnabled || !d.DeliveryEnabled {
+		t.Errorf("service capability not recorded: %+v", d)
+	}
+}
+
+// TestSetServiceCapability_AllServiceTypes locks in the 4-value ServiceType
+// allow-list against its correct required VehicleType.
+func TestSetServiceCapability_AllServiceTypes(t *testing.T) {
+	cases := []struct {
+		serviceType entity.ServiceType
+		vehicleType entity.VehicleType
+	}{
+		{entity.ServiceTypeBike, entity.VehicleTypeMotorcycle},
+		{entity.ServiceTypeBikePlus, entity.VehicleTypeMotorcycle},
+		{entity.ServiceTypeCar, entity.VehicleTypeCar},
+		{entity.ServiceTypeCarXL, entity.VehicleTypeVan},
+	}
+	for _, c := range cases {
+		d, err := entity.NewDriverProfile("d1", "u1", "LIC-001", c.vehicleType, "", "", "", "ABC-123", testNow)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if err := d.SetServiceCapability(c.serviceType, true, false, testNow); err != nil {
+			t.Errorf("service type %s on vehicle %s should be valid: %v", c.serviceType, c.vehicleType, err)
+		}
+	}
+}
+
 func TestNewDriverProfile_EmptyPlate(t *testing.T) {
 	_, err := entity.NewDriverProfile("d1", "u1", "LIC-001", entity.VehicleTypeCar, "", "", "", "  ", testNow)
 	if !errors.IsCode(err, errors.CodeInvalidArgument) {
@@ -302,6 +356,7 @@ func TestReconstituteDriverProfile(t *testing.T) {
 		"Toyota", "Camry", "White", "ABC-123",
 		entity.OnlineStatusOnline, entity.VerificationStatusVerified,
 		testNow, testNow,
+		entity.ServiceTypeCar, true, false,
 	)
 	if d.DriverID != "d1" || d.OnlineStatus != entity.OnlineStatusOnline {
 		t.Errorf("reconstitution failed: %+v", d)

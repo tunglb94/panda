@@ -8,18 +8,18 @@ enum DriverAvailabilityStatus { offline, goingOnline, online, goingOffline }
 
 extension DriverAvailabilityStatusX on DriverAvailabilityStatus {
   String get label => switch (this) {
-        DriverAvailabilityStatus.offline => 'Offline',
-        DriverAvailabilityStatus.goingOnline => 'Going Online',
-        DriverAvailabilityStatus.online => 'Online',
-        DriverAvailabilityStatus.goingOffline => 'Going Offline',
+        DriverAvailabilityStatus.offline => 'Ngoại tuyến',
+        DriverAvailabilityStatus.goingOnline => 'Đang bật trực tuyến',
+        DriverAvailabilityStatus.online => 'Trực tuyến',
+        DriverAvailabilityStatus.goingOffline => 'Đang tắt trực tuyến',
       };
 
   /// Prompt shown on the toggle itself.
   String get actionLabel => switch (this) {
-        DriverAvailabilityStatus.offline => "You're Offline — tap to go online",
-        DriverAvailabilityStatus.goingOnline => 'Going online…',
-        DriverAvailabilityStatus.online => "You're Online — tap to go offline",
-        DriverAvailabilityStatus.goingOffline => 'Going offline…',
+        DriverAvailabilityStatus.offline => "Bạn đang ngoại tuyến — chạm để bật trực tuyến",
+        DriverAvailabilityStatus.goingOnline => 'Đang bật trực tuyến…',
+        DriverAvailabilityStatus.online => "Bạn đang trực tuyến — chạm để tắt trực tuyến",
+        DriverAvailabilityStatus.goingOffline => 'Đang tắt trực tuyến…',
       };
 
   IconData get icon => switch (this) {

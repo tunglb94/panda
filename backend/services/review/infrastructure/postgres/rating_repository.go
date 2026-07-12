@@ -9,9 +9,9 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	domainerrors "github.com/fairride/shared/errors"
 	"github.com/fairride/review/domain/entity"
 	"github.com/fairride/review/domain/repository"
+	domainerrors "github.com/fairride/shared/errors"
 )
 
 // RatingRepository is the PostgreSQL implementation of repository.RatingRepository.
@@ -92,4 +92,20 @@ func (r *RatingRepository) FindByTripAndRole(ctx context.Context, tripID string,
 		return nil, domainerrors.Internal("rating: find failed").WithMeta("error", err.Error())
 	}
 	return entity.ReconstituteRating(ratingID, trip, rater, ratee, entity.Role(roleStr), stars, comment, createdAt.UTC()), nil
+}
+
+// FindAverageByRatee implements repository.RatingRepository.
+func (r *RatingRepository) FindAverageByRatee(ctx context.Context, rateeID string, role entity.Role) (float64, int32, error) {
+	const q = `
+		SELECT COALESCE(AVG(stars), 0), COUNT(*)
+		FROM ratings
+		WHERE ratee_id = $1 AND role = $2`
+	var (
+		avg   float64
+		count int32
+	)
+	if err := r.pool.QueryRow(ctx, q, rateeID, string(role)).Scan(&avg, &count); err != nil {
+		return 0, 0, domainerrors.Internal("rating: average failed").WithMeta("error", err.Error())
+	}
+	return avg, count, nil
 }

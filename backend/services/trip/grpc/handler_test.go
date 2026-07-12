@@ -11,9 +11,10 @@ import (
 	"github.com/fairride/shared/errors"
 	"github.com/fairride/trip/app"
 	"github.com/fairride/trip/domain/entity"
+	"github.com/fairride/trip/domain/repository"
 	tripgrpc "github.com/fairride/trip/grpc"
 	"github.com/fairride/trip/grpc/trippb"
-	"github.com/fairride/trip/domain/repository"
+	"github.com/fairride/trip/infrastructure/memory"
 )
 
 // ─── stub repo ───────────────────────────────────────────────────────────────
@@ -62,8 +63,18 @@ func (r *stubRepo) FindByDriverID(_ context.Context, driverID string) ([]*entity
 var testNow = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 func newHandler(repo *stubRepo) *tripgrpc.Handler {
+	return newHandlerWithDeliveryRepo(repo, memory.NewDeliveryRepository())
+}
+
+// newHandlerWithDeliveryRepo lets Delivery-lifecycle tests (Delivery V1
+// Phase 4, docs/business/DELIVERY_V1_DESIGN.md) share the same
+// DeliveryRepository instance the handler uses, so they can seed a
+// Delivery aggregate before calling PickupParcel/StartDelivery/
+// CompleteDelivery. newHandler above keeps its original signature for
+// every pre-existing (Ride) test — zero call sites needed updating.
+func newHandlerWithDeliveryRepo(repo *stubRepo, deliveryRepo *memory.DeliveryRepository) *tripgrpc.Handler {
 	return tripgrpc.NewHandler(
-		app.NewCreateTripUseCase(repo),
+		app.NewCreateTripUseCase(repo, deliveryRepo),
 		app.NewCancelTripUseCase(repo),
 		app.NewGetTripUseCase(repo),
 		app.NewMarkDriverArrivedUseCase(repo),
@@ -73,6 +84,10 @@ func newHandler(repo *stubRepo) *tripgrpc.Handler {
 		app.NewPayTripUseCase(repo),
 		app.NewListTripsByRiderUseCase(repo),
 		app.NewListTripsByDriverUseCase(repo),
+		app.NewPickupParcelUseCase(repo, deliveryRepo),
+		app.NewStartDeliveryUseCase(repo, deliveryRepo),
+		app.NewCompleteDeliveryUseCase(repo, deliveryRepo),
+		app.NewAcceptDeliveryUseCase(repo, deliveryRepo),
 	)
 }
 
@@ -342,5 +357,208 @@ func TestCompleteTrip_MissingCurrency(t *testing.T) {
 	s, _ := status.FromError(err)
 	if s.Code() != codes.InvalidArgument {
 		t.Errorf("code = %v, want InvalidArgument", s.Code())
+	}
+}
+
+// ─── Delivery lifecycle gRPC: PickupParcel / StartDelivery / CompleteDelivery ──
+// (Delivery V1 Phase 4, docs/business/DELIVERY_V1_DESIGN.md)
+
+// seedDeliveryTrip seeds a Trip (TripType=delivery, Status=driver_arrived)
+// and its linked Delivery aggregate at the given status, into repo/deliveryRepo.
+func seedDeliveryTrip(repo *stubRepo, deliveryRepo *memory.DeliveryRepository, tripID, deliveryID string, deliveryStatus entity.DeliveryStatus) {
+	trip := entity.ReconstituteTrip(tripID, "r1", "d1", entity.StatusDriverArrived, "pickup", "dropoff", "", 0, "", "", testNow, testNow)
+	trip.TripType = entity.TripTypeDelivery
+	trip.DeliveryID = deliveryID
+	_ = repo.Save(context.Background(), trip)
+
+	delivery := entity.ReconstituteDelivery(
+		deliveryID, "Nguyen Van A", "0912345678", "Tran Thi B", "0987654321",
+		"", "", entity.PackageTypeSmall, 1.5, false, false, 500000,
+		deliveryStatus, testNow, testNow,
+	)
+	_ = deliveryRepo.Save(context.Background(), delivery)
+}
+
+func TestPickupParcel_OK(t *testing.T) {
+	repo := newStub()
+	deliveryRepo := memory.NewDeliveryRepository()
+	seedDeliveryTrip(repo, deliveryRepo, "t1", "d1", entity.DeliveryStatusAccepted)
+
+	h := newHandlerWithDeliveryRepo(repo, deliveryRepo)
+	resp, err := h.PickupParcel(context.Background(), &trippb.GetTripRequest{TripId: "t1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetTrip().GetDeliveryStatus() != "PARCEL_PICKED_UP" {
+		t.Errorf("delivery_status = %q, want PARCEL_PICKED_UP", resp.GetTrip().GetDeliveryStatus())
+	}
+	if resp.GetTrip().GetStatus() != "in_progress" {
+		t.Errorf("trip status = %q, want in_progress (reused Trip.Start())", resp.GetTrip().GetStatus())
+	}
+}
+
+func TestPickupParcel_WrongStatus(t *testing.T) {
+	repo := newStub()
+	deliveryRepo := memory.NewDeliveryRepository()
+	seedDeliveryTrip(repo, deliveryRepo, "t1", "d1", entity.DeliveryStatusCreated) // Accepted skipped
+
+	h := newHandlerWithDeliveryRepo(repo, deliveryRepo)
+	_, err := h.PickupParcel(context.Background(), &trippb.GetTripRequest{TripId: "t1"})
+	s, _ := status.FromError(err)
+	if s.Code() != codes.FailedPrecondition {
+		t.Errorf("code = %v, want FailedPrecondition", s.Code())
+	}
+}
+
+func TestPickupParcel_RideTripRejected(t *testing.T) {
+	repo := newStub()
+	seedTrip(repo, "t1", "r1", entity.StatusDriverArrived) // plain Ride trip
+	h := newHandlerWithDeliveryRepo(repo, memory.NewDeliveryRepository())
+
+	_, err := h.PickupParcel(context.Background(), &trippb.GetTripRequest{TripId: "t1"})
+	s, _ := status.FromError(err)
+	if s.Code() != codes.InvalidArgument {
+		t.Errorf("code = %v, want InvalidArgument (Ride trip)", s.Code())
+	}
+}
+
+func TestPickupParcel_MissingTripID(t *testing.T) {
+	h := newHandlerWithDeliveryRepo(newStub(), memory.NewDeliveryRepository())
+	_, err := h.PickupParcel(context.Background(), &trippb.GetTripRequest{})
+	s, _ := status.FromError(err)
+	if s.Code() != codes.InvalidArgument {
+		t.Errorf("code = %v, want InvalidArgument", s.Code())
+	}
+}
+
+func TestStartDelivery_OK(t *testing.T) {
+	repo := newStub()
+	deliveryRepo := memory.NewDeliveryRepository()
+	seedDeliveryTrip(repo, deliveryRepo, "t1", "d1", entity.DeliveryStatusParcelPickedUp)
+
+	h := newHandlerWithDeliveryRepo(repo, deliveryRepo)
+	resp, err := h.StartDelivery(context.Background(), &trippb.GetTripRequest{TripId: "t1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetTrip().GetDeliveryStatus() != "IN_DELIVERY" {
+		t.Errorf("delivery_status = %q, want IN_DELIVERY", resp.GetTrip().GetDeliveryStatus())
+	}
+	// Trip.Status must be unaffected (seeded as driver_arrived).
+	if resp.GetTrip().GetStatus() != "driver_arrived" {
+		t.Errorf("trip status = %q, want unchanged (driver_arrived)", resp.GetTrip().GetStatus())
+	}
+}
+
+func TestStartDelivery_WrongStatus(t *testing.T) {
+	repo := newStub()
+	deliveryRepo := memory.NewDeliveryRepository()
+	seedDeliveryTrip(repo, deliveryRepo, "t1", "d1", entity.DeliveryStatusAccepted) // ParcelPickedUp skipped
+
+	h := newHandlerWithDeliveryRepo(repo, deliveryRepo)
+	_, err := h.StartDelivery(context.Background(), &trippb.GetTripRequest{TripId: "t1"})
+	s, _ := status.FromError(err)
+	if s.Code() != codes.FailedPrecondition {
+		t.Errorf("code = %v, want FailedPrecondition", s.Code())
+	}
+}
+
+func TestStartDelivery_RideTripRejected(t *testing.T) {
+	repo := newStub()
+	seedTrip(repo, "t1", "r1", entity.StatusInProgress)
+	h := newHandlerWithDeliveryRepo(repo, memory.NewDeliveryRepository())
+
+	_, err := h.StartDelivery(context.Background(), &trippb.GetTripRequest{TripId: "t1"})
+	s, _ := status.FromError(err)
+	if s.Code() != codes.InvalidArgument {
+		t.Errorf("code = %v, want InvalidArgument (Ride trip)", s.Code())
+	}
+}
+
+func TestCompleteDelivery_OK(t *testing.T) {
+	repo := newStub()
+	deliveryRepo := memory.NewDeliveryRepository()
+	seedDeliveryTrip(repo, deliveryRepo, "t1", "d1", entity.DeliveryStatusInDelivery)
+
+	h := newHandlerWithDeliveryRepo(repo, deliveryRepo)
+	resp, err := h.CompleteDelivery(context.Background(), &trippb.GetTripRequest{TripId: "t1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetTrip().GetDeliveryStatus() != "COMPLETED" {
+		t.Errorf("delivery_status = %q, want COMPLETED", resp.GetTrip().GetDeliveryStatus())
+	}
+}
+
+func TestCompleteDelivery_WrongStatus(t *testing.T) {
+	repo := newStub()
+	deliveryRepo := memory.NewDeliveryRepository()
+	seedDeliveryTrip(repo, deliveryRepo, "t1", "d1", entity.DeliveryStatusParcelPickedUp) // InDelivery skipped
+
+	h := newHandlerWithDeliveryRepo(repo, deliveryRepo)
+	_, err := h.CompleteDelivery(context.Background(), &trippb.GetTripRequest{TripId: "t1"})
+	s, _ := status.FromError(err)
+	if s.Code() != codes.FailedPrecondition {
+		t.Errorf("code = %v, want FailedPrecondition", s.Code())
+	}
+}
+
+func TestCompleteDelivery_RideTripRejected(t *testing.T) {
+	repo := newStub()
+	seedTrip(repo, "t1", "r1", entity.StatusInProgress)
+	h := newHandlerWithDeliveryRepo(repo, memory.NewDeliveryRepository())
+
+	_, err := h.CompleteDelivery(context.Background(), &trippb.GetTripRequest{TripId: "t1"})
+	s, _ := status.FromError(err)
+	if s.Code() != codes.InvalidArgument {
+		t.Errorf("code = %v, want InvalidArgument (Ride trip)", s.Code())
+	}
+}
+
+// TestDeliveryLifecycle_FullHappyPath_gRPC exercises PickupParcel ->
+// StartDelivery -> CompleteDelivery through the gRPC handler, exactly as a
+// driver app would call them in sequence.
+func TestDeliveryLifecycle_FullHappyPath_gRPC(t *testing.T) {
+	repo := newStub()
+	deliveryRepo := memory.NewDeliveryRepository()
+	seedDeliveryTrip(repo, deliveryRepo, "t1", "d1", entity.DeliveryStatusAccepted)
+	h := newHandlerWithDeliveryRepo(repo, deliveryRepo)
+	ctx := context.Background()
+
+	if _, err := h.PickupParcel(ctx, &trippb.GetTripRequest{TripId: "t1"}); err != nil {
+		t.Fatalf("PickupParcel: %v", err)
+	}
+	if _, err := h.StartDelivery(ctx, &trippb.GetTripRequest{TripId: "t1"}); err != nil {
+		t.Fatalf("StartDelivery: %v", err)
+	}
+	resp, err := h.CompleteDelivery(ctx, &trippb.GetTripRequest{TripId: "t1"})
+	if err != nil {
+		t.Fatalf("CompleteDelivery: %v", err)
+	}
+	if resp.GetTrip().GetDeliveryStatus() != "COMPLETED" {
+		t.Errorf("final delivery_status = %q, want COMPLETED", resp.GetTrip().GetDeliveryStatus())
+	}
+}
+
+// ─── Ride regression: existing RPCs unaffected by Delivery V1 Phase 4 ──────
+
+// TestRideRPCs_DeliveryStatusStaysEmpty confirms every existing (Ride) RPC
+// response still has an empty delivery_status — the new field defaults to
+// its proto3 zero value and no existing handler path was changed to
+// populate it.
+func TestRideRPCs_DeliveryStatusStaysEmpty(t *testing.T) {
+	repo := newStub()
+	seedTrip(repo, "t1", "r1", entity.StatusDriverAssigned)
+	h := newHandler(repo)
+
+	resp, err := h.StartTrip(context.Background(), &trippb.StartTripRequest{TripId: "t1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetTrip().GetDeliveryStatus() != "" {
+		t.Errorf("delivery_status = %q, want empty for a Ride trip", resp.GetTrip().GetDeliveryStatus())
+	}
+	if resp.GetTrip().GetTripType() != "" {
+		t.Errorf("trip_type = %q, want empty for a Ride trip created via seedTrip", resp.GetTrip().GetTripType())
 	}
 }

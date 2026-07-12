@@ -16,10 +16,10 @@ import (
 // ─── stub client ─────────────────────────────────────────────────────────────
 
 type stubAvailabilityClient struct {
-	goOnlineResp      *driverpb.AvailabilityResponse
-	goOfflineResp     *driverpb.AvailabilityResponse
+	goOnlineResp        *driverpb.AvailabilityResponse
+	goOfflineResp       *driverpb.AvailabilityResponse
 	getAvailabilityResp *driverpb.AvailabilityResponse
-	err               error
+	err                 error
 }
 
 func (s *stubAvailabilityClient) GoOnline(_ context.Context, _ *driverpb.GoOnlineRequest, _ ...grpc.CallOption) (*driverpb.AvailabilityResponse, error) {

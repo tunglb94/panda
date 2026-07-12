@@ -1,0 +1,103 @@
+{
+  "income_week_distribution": [
+    {
+      "range_label": "0k-500k",
+      "count": 2
+    },
+    {
+      "range_label": "500k-1000k",
+      "count": 18
+    },
+    {
+      "range_label": "1000k-1500k",
+      "count": 107
+    },
+    {
+      "range_label": "1500k-2000k",
+      "count": 159
+    },
+    {
+      "range_label": "2000k-2500k",
+      "count": 113
+    },
+    {
+      "range_label": "2500k-3000k",
+      "count": 63
+    },
+    {
+      "range_label": "3000k-3500k",
+      "count": 29
+    },
+    {
+      "range_label": "3500k-4000k",
+      "count": 8
+    },
+    {
+      "range_label": "4000k-4500k",
+      "count": 1
+    },
+    {
+      "range_label": "4500k-5000k",
+      "count": 0
+    },
+    {
+      "range_label": "5000k-5500k",
+      "count": 0
+    },
+    {
+      "range_label": "5500k+",
+      "count": 0
+    }
+  ],
+  "fatigue_distribution": [
+    {
+      "range_label": "0.0-0.1",
+      "count": 100
+    },
+    {
+      "range_label": "0.1-0.2",
+      "count": 94
+    },
+    {
+      "range_label": "0.2-0.3",
+      "count": 122
+    },
+    {
+      "range_label": "0.3-0.4",
+      "count": 109
+    },
+    {
+      "range_label": "0.4-0.5",
+      "count": 72
+    },
+    {
+      "range_label": "0.5-0.6",
+      "count": 3
+    },
+    {
+      "range_label": "0.6-0.7",
+      "count": 0
+    },
+    {
+      "range_label": "0.7-0.8",
+      "count": 0
+    },
+    {
+      "range_label": "0.8-0.9",
+      "count": 0
+    },
+    {
+      "range_label": "0.9+",
+      "count": 0
+    }
+  ],
+  "average_online_hours_total": 419.743,
+  "average_fuel_level": 0.6568549362460767,
+  "acceptance_rate_percent": 81.33142237656872,
+  "cancellation_rate_percent": 0,
+  "average_ride_trips_per_driver": 390.808,
+  "average_delivery_trips_per_driver": 140.348,
+  "ride_to_delivery_ratio": 2.784564083563713,
+  "retention_rate_percent": 98.48,
+  "average_satisfaction": 0.6994466576940818
+}

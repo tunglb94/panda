@@ -16,12 +16,17 @@ func NewDispatchAdapter(client dispatchpb.DispatchServiceClient) *DispatchAdapte
 	return &DispatchAdapter{client: client}
 }
 
-func (a *DispatchAdapter) RequestDispatch(ctx context.Context, tripID, riderID string, pickupLat, pickupLon float64) error {
+func (a *DispatchAdapter) RequestDispatch(ctx context.Context, tripID, riderID, tripType, serviceType string, pickupLat, pickupLon float64) error {
 	_, err := a.client.RequestDispatch(ctx, &dispatchpb.RequestDispatchRequest{
-		TripId:   tripID,
-		RiderId:  riderID,
+		TripId:    tripID,
+		RiderId:   riderID,
 		PickupLat: pickupLat,
 		PickupLon: pickupLon,
+		TripType:  tripType,
+		// The wire field is still named "vehicle_type" (added during an
+		// earlier Delivery phase) — its VALUE now carries a ServiceType.
+		// See dispatch/grpc/handler.go's matching comment.
+		VehicleType: serviceType,
 	})
 	return err
 }

@@ -11,31 +11,43 @@ import (
 // ─── stub clients ────────────────────────────────────────────────────────────
 
 type stubTrip struct {
-	trips      map[string]*app.TripInfo
-	nextID     string
-	createErr  error
-	startErr   error
-	cancelErr  error
-	cancelled  []string // IDs cancelled via CancelTrip
+	trips               map[string]*app.TripInfo
+	nextID              string
+	nextDeliveryID      string
+	createErr           error
+	startErr            error
+	cancelErr           error
+	cancelled           []string // IDs cancelled via CancelTrip
+	acceptDeliveryErr   error
+	acceptDeliveryCalls []string // IDs passed to AcceptDelivery
+	// lastCreateParams records the params passed to the most recent
+	// CreateTrip call, for asserting Booking correctly forwards Delivery
+	// fields (Delivery V1 Phase 2, docs/business/DELIVERY_V1_DESIGN.md).
+	lastCreateParams app.CreateTripParams
 }
 
 func newStubTrip() *stubTrip {
-	return &stubTrip{trips: make(map[string]*app.TripInfo), nextID: "trip-001"}
+	return &stubTrip{trips: make(map[string]*app.TripInfo), nextID: "trip-001", nextDeliveryID: "delivery-001"}
 }
 
-func (s *stubTrip) CreateTrip(_ context.Context, riderID, pickup, dropoff string) (string, error) {
+func (s *stubTrip) CreateTrip(_ context.Context, in app.CreateTripParams) (*app.CreateTripResult, error) {
+	s.lastCreateParams = in
 	if s.createErr != nil {
-		return "", s.createErr
+		return nil, s.createErr
 	}
 	id := s.nextID
 	s.trips[id] = &app.TripInfo{
 		TripID:         id,
-		RiderID:        riderID,
+		RiderID:        in.RiderID,
 		Status:         "pending",
-		PickupAddress:  pickup,
-		DropoffAddress: dropoff,
+		PickupAddress:  in.PickupAddress,
+		DropoffAddress: in.DropoffAddress,
 	}
-	return id, nil
+	result := &app.CreateTripResult{TripID: id}
+	if in.TripType == "delivery" {
+		result.DeliveryID = s.nextDeliveryID
+	}
+	return result, nil
 }
 
 func (s *stubTrip) StartTrip(_ context.Context, tripID string) error {
@@ -113,18 +125,28 @@ func (s *stubTrip) ListByDriver(_ context.Context, _ string) ([]app.TripSummary,
 	return nil, nil
 }
 
+func (s *stubTrip) AcceptDelivery(_ context.Context, tripID string) error {
+	s.acceptDeliveryCalls = append(s.acceptDeliveryCalls, tripID)
+	return s.acceptDeliveryErr
+}
+
 type stubDispatch struct {
 	jobs       map[string]*app.DispatchInfo
 	acceptErr  error
 	rejectErr  error
 	requestErr error
+	// lastTripType records the tripType passed to the most recent
+	// RequestDispatch call, for asserting Booking correctly forwards it
+	// (Delivery V1 Phase 3, docs/business/DELIVERY_V1_DESIGN.md).
+	lastTripType string
 }
 
 func newStubDispatch() *stubDispatch {
 	return &stubDispatch{jobs: make(map[string]*app.DispatchInfo)}
 }
 
-func (s *stubDispatch) RequestDispatch(_ context.Context, tripID, _ string, _, _ float64) error {
+func (s *stubDispatch) RequestDispatch(_ context.Context, tripID, _, tripType, _ string, _, _ float64) error {
+	s.lastTripType = tripType
 	if s.requestErr != nil {
 		return s.requestErr
 	}
@@ -231,6 +253,141 @@ func TestBookRide_CreateTripError(t *testing.T) {
 	}
 }
 
+// ─── BookRide — Delivery (Delivery V1 Phase 2, docs/business/DELIVERY_V1_DESIGN.md) ──
+//
+// BookRideUseCase does not itself validate receiver/pickup-contact/phone —
+// that logic lives once, in the Trip service's entity.NewDelivery (see
+// backend/services/trip/app/app_test.go's TestCreateTrip_Delivery_* tests
+// for that real validation coverage), reached here only through the
+// TripClient port. These tests instead verify Booking's actual job: the
+// same BookRideInput/Execute pipeline used for Ride correctly forwards
+// every Delivery field to TripClient.CreateTrip, returns DeliveryID when
+// present, and propagates a TripClient validation failure unchanged rather
+// than swallowing or duplicating it.
+
+func validDeliveryBookRideInput() app.BookRideInput {
+	return app.BookRideInput{
+		RiderID:            "r1",
+		PickupAddress:      "123 Main St",
+		DropoffAddress:     "456 Elm Ave",
+		PickupLat:          10.77,
+		PickupLon:          106.69,
+		TripType:           "delivery",
+		PickupContactName:  "Nguyen Van A",
+		PickupContactPhone: "0912345678",
+		ReceiverName:       "Tran Thi B",
+		ReceiverPhone:      "0987654321",
+		PackageNote:        "handle with care",
+		PackageValue:       500000,
+		PackageWeightKg:    1.5,
+	}
+}
+
+func TestBookRide_RideBookingPass(t *testing.T) {
+	// Same pipeline as Delivery, TripType left at its zero value — the
+	// literal "Ride booking hoạt động y chang hiện tại" requirement.
+	trip := newStubTrip()
+	dispatch := newStubDispatch()
+	uc := app.NewBookRideUseCase(trip, dispatch)
+
+	result, err := uc.Execute(context.Background(), app.BookRideInput{
+		RiderID:        "r1",
+		PickupAddress:  "123 Main St",
+		DropoffAddress: "456 Elm Ave",
+		PickupLat:      10.0,
+		PickupLon:      106.0,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.DeliveryID != "" {
+		t.Errorf("DeliveryID = %q, want empty for a Ride booking", result.DeliveryID)
+	}
+	if trip.lastCreateParams.TripType != "" {
+		t.Errorf("forwarded TripType = %q, want empty", trip.lastCreateParams.TripType)
+	}
+}
+
+func TestBookRide_DeliveryBookingPass(t *testing.T) {
+	trip := newStubTrip()
+	dispatch := newStubDispatch()
+	uc := app.NewBookRideUseCase(trip, dispatch)
+
+	result, err := uc.Execute(context.Background(), validDeliveryBookRideInput())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Status != "searching" {
+		t.Errorf("Status = %q, want searching", result.Status)
+	}
+	if result.DeliveryID != "delivery-001" {
+		t.Errorf("DeliveryID = %q, want delivery-001", result.DeliveryID)
+	}
+	// Every delivery field must have been forwarded to TripClient.CreateTrip unchanged.
+	got := trip.lastCreateParams
+	if got.TripType != "delivery" {
+		t.Errorf("forwarded TripType = %q, want delivery", got.TripType)
+	}
+	if got.PickupContactName != "Nguyen Van A" || got.PickupContactPhone != "0912345678" {
+		t.Errorf("pickup contact not forwarded correctly: %+v", got)
+	}
+	if got.ReceiverName != "Tran Thi B" || got.ReceiverPhone != "0987654321" {
+		t.Errorf("receiver not forwarded correctly: %+v", got)
+	}
+	if got.PackageNote != "handle with care" || got.PackageValue != 500000 || got.PackageWeightKg != 1.5 {
+		t.Errorf("package fields not forwarded correctly: %+v", got)
+	}
+	// Delivery V1 Phase 3: TripType must also reach Dispatch, via the same
+	// RequestDispatch call Ride uses (docs/business/DELIVERY_V1_DESIGN.md Phần 9).
+	if dispatch.lastTripType != "delivery" {
+		t.Errorf("forwarded TripType to Dispatch = %q, want delivery", dispatch.lastTripType)
+	}
+	// Delivery must reuse the exact same dispatch pipeline as Ride.
+	di, _ := dispatch.GetDispatchStatus(context.Background(), result.TripID)
+	if di.Status != "searching" {
+		t.Errorf("dispatch status = %q, want searching", di.Status)
+	}
+}
+
+func TestBookRide_Delivery_MissingReceiverFails(t *testing.T) {
+	trip := newStubTrip()
+	trip.createErr = errors.New("[INVALID_ARGUMENT] receiver name must not be empty")
+	uc := app.NewBookRideUseCase(trip, newStubDispatch())
+
+	in := validDeliveryBookRideInput()
+	in.ReceiverName = ""
+	_, err := uc.Execute(context.Background(), in)
+	if err == nil {
+		t.Fatal("expected error for missing receiver to propagate from TripClient")
+	}
+}
+
+func TestBookRide_Delivery_MissingPickupContactFails(t *testing.T) {
+	trip := newStubTrip()
+	trip.createErr = errors.New("[INVALID_ARGUMENT] sender name must not be empty")
+	uc := app.NewBookRideUseCase(trip, newStubDispatch())
+
+	in := validDeliveryBookRideInput()
+	in.PickupContactName = ""
+	_, err := uc.Execute(context.Background(), in)
+	if err == nil {
+		t.Fatal("expected error for missing pickup contact to propagate from TripClient")
+	}
+}
+
+func TestBookRide_Delivery_InvalidPhoneFails(t *testing.T) {
+	trip := newStubTrip()
+	trip.createErr = errors.New("[INVALID_ARGUMENT] receiver phone is not a valid phone number")
+	uc := app.NewBookRideUseCase(trip, newStubDispatch())
+
+	in := validDeliveryBookRideInput()
+	in.ReceiverPhone = "not-a-phone"
+	_, err := uc.Execute(context.Background(), in)
+	if err == nil {
+		t.Fatal("expected error for invalid phone to propagate from TripClient")
+	}
+}
+
 func TestBookRide_DispatchError(t *testing.T) {
 	trip := newStubTrip()
 	dispatch := newStubDispatch()
@@ -252,8 +409,9 @@ func TestBookRide_DispatchError(t *testing.T) {
 func TestAcceptDispatchOffer_Success(t *testing.T) {
 	dispatch := newStubDispatch()
 	dispatch.jobs["t1"] = &app.DispatchInfo{TripID: "t1", Status: "searching"}
+	trip := newStubTrip()
 
-	uc := app.NewAcceptDispatchOfferUseCase(dispatch)
+	uc := app.NewAcceptDispatchOfferUseCase(dispatch, trip)
 	if err := uc.Execute(context.Background(), "t1", "d1"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -261,15 +419,53 @@ func TestAcceptDispatchOffer_Success(t *testing.T) {
 	if di.AssignedDriverID != "d1" {
 		t.Errorf("AssignedDriverID = %q, want d1", di.AssignedDriverID)
 	}
+	// P0-1: a successful accept must also tell Trip to accept the linked
+	// Delivery, if any.
+	if len(trip.acceptDeliveryCalls) != 1 || trip.acceptDeliveryCalls[0] != "t1" {
+		t.Errorf("AcceptDelivery calls = %v, want exactly one call for t1", trip.acceptDeliveryCalls)
+	}
 }
 
 func TestAcceptDispatchOffer_DispatchError(t *testing.T) {
 	dispatch := newStubDispatch()
 	dispatch.acceptErr = errors.New("offer expired")
+	trip := newStubTrip()
 
-	uc := app.NewAcceptDispatchOfferUseCase(dispatch)
+	uc := app.NewAcceptDispatchOfferUseCase(dispatch, trip)
 	if err := uc.Execute(context.Background(), "t1", "d1"); err == nil {
 		t.Fatal("expected error, got nil")
+	}
+	// Dispatch failed first — AcceptDelivery must never have been reached.
+	if len(trip.acceptDeliveryCalls) != 0 {
+		t.Errorf("AcceptDelivery must not be called when dispatch.AcceptTrip fails, got calls: %v", trip.acceptDeliveryCalls)
+	}
+}
+
+func TestAcceptDispatchOffer_AcceptDeliveryErrorPropagates(t *testing.T) {
+	// P0-1: if Trip rejects the Delivery-acceptance step (e.g. a genuine
+	// state conflict), the driver's accept must surface that error — never
+	// silently succeed and leave the delivery stuck.
+	dispatch := newStubDispatch()
+	dispatch.jobs["t1"] = &app.DispatchInfo{TripID: "t1", Status: "searching"}
+	trip := newStubTrip()
+	trip.acceptDeliveryErr = errors.New("delivery service unavailable")
+
+	uc := app.NewAcceptDispatchOfferUseCase(dispatch, trip)
+	if err := uc.Execute(context.Background(), "t1", "d1"); err == nil {
+		t.Fatal("expected AcceptDelivery's error to propagate, got nil")
+	}
+}
+
+func TestAcceptDispatchOffer_NilTripClientIsSafe(t *testing.T) {
+	// Nil-safe: callers that don't care about Delivery keep working
+	// unchanged (also covers the production wiring's other call sites
+	// that predate this fix, if any still exist).
+	dispatch := newStubDispatch()
+	dispatch.jobs["t1"] = &app.DispatchInfo{TripID: "t1", Status: "searching"}
+
+	uc := app.NewAcceptDispatchOfferUseCase(dispatch, nil)
+	if err := uc.Execute(context.Background(), "t1", "d1"); err != nil {
+		t.Fatalf("unexpected error with nil trip client: %v", err)
 	}
 }
 
@@ -478,7 +674,7 @@ func TestFullBookingFlow(t *testing.T) {
 	dispatchClient.jobs[tripID].Status = "searching"
 
 	// Step 3: Driver accepts offer
-	acceptUC := app.NewAcceptDispatchOfferUseCase(dispatchClient)
+	acceptUC := app.NewAcceptDispatchOfferUseCase(dispatchClient, tripClient)
 	if err := acceptUC.Execute(ctx, tripID, "driver-1"); err != nil {
 		t.Fatalf("step 3 AcceptDispatchOffer: %v", err)
 	}
@@ -598,7 +794,7 @@ func TestAcceptDispatchOffer_DuplicateIdempotentRequest(t *testing.T) {
 	dispatch := newStubDispatch()
 	dispatch.jobs["t1"] = &app.DispatchInfo{TripID: "t1", Status: "searching"}
 	store := app.NewMemoryIdempotencyStore()
-	uc := app.NewAcceptDispatchOfferUseCase(dispatch).WithIdempotency(store)
+	uc := app.NewAcceptDispatchOfferUseCase(dispatch, nil).WithIdempotency(store)
 
 	// First accept succeeds.
 	if err := uc.Execute(context.Background(), "t1", "d1"); err != nil {

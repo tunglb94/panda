@@ -1,0 +1,80 @@
+[
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0752",
+    "severity": 3388.385,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0524",
+    "severity": 3161.055,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0102",
+    "severity": 3117.274,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0275",
+    "severity": 3101.873,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0248",
+    "severity": 3051.324,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0197",
+    "severity": 3042.132,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0962",
+    "severity": 2894.098,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0069",
+    "severity": 2842.217,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0107",
+    "severity": 2813.208,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0052",
+    "severity": 2810.627,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "hospital",
+    "severity": 670.8608946756959,
+    "detail": "Khu vực hospital có tỉ lệ cầu/cung trung bình 44.72x — thiếu tài xế nghiêm trọng."
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "airport",
+    "severity": 656.6772962083138,
+    "detail": "Khu vực airport có tỉ lệ cầu/cung trung bình 43.78x — thiếu tài xế nghiêm trọng."
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "school",
+    "severity": 647.7889279772749,
+    "detail": "Khu vực school có tỉ lệ cầu/cung trung bình 43.19x — thiếu tài xế nghiêm trọng."
+  }
+]

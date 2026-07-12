@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 
+import 'package:rider/shared/widgets/app_button.dart';
+import 'package:rider/shared/widgets/app_dialog.dart';
+
 /// Cancel Ride action, shown only before the trip has actually started
 /// (searching / assigned / arriving — see `RiderTripStatus.isCancellable`).
 ///
-/// Confirms with the rider first; this never sends a cancellation request to
-/// any backend — [onCancel] is a purely local, UI-level callback.
+/// Confirms with the rider first. [onCancel] is a plain callback — in the
+/// real wiring (`trip_lifecycle_page.dart`) it calls the real
+/// `TripRepository.cancelRide(tripId)`, i.e. a real `POST /rides/{id}/cancel`
+/// request. Fixed during the Closed Beta polish pass: this widget's
+/// confirmation dialog used to tell the rider "this is just a UI mock, no
+/// request is sent" — inaccurate and actively misleading once the real
+/// cancel flow was wired up, since a rider reading that text would not
+/// realize confirming actually cancels their ride and notifies the driver.
 class CancelRideButton extends StatelessWidget {
   const CancelRideButton({super.key, required this.onCancel});
 
@@ -12,39 +21,22 @@ class CancelRideButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
+    return AppButton.danger(
+      label: 'Hủy chuyến',
+      icon: Icons.close,
       onPressed: () => _confirmCancel(context),
-      icon: const Icon(Icons.close),
-      label: const Text('Cancel Ride'),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.red.shade600,
-        side: BorderSide(color: Colors.red.shade200),
-        minimumSize: const Size.fromHeight(52),
-      ),
     );
   }
 
   Future<void> _confirmCancel(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Cancel this ride?'),
-        content: const Text(
-          'This is a UI-only mock — no cancellation request is sent to the '
-          'backend yet.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep ride'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Cancel ride'),
-          ),
-        ],
-      ),
+    final confirmed = await AppDialog.confirm(
+      context,
+      title: 'Hủy chuyến xe này?',
+      message: 'Chuyến đi sẽ được hủy và tài xế sẽ được thông báo ngay lập tức.',
+      confirmLabel: 'Hủy chuyến',
+      cancelLabel: 'Giữ chuyến',
+      isDestructive: true,
     );
-    if (confirmed == true) onCancel();
+    if (confirmed) onCancel();
   }
 }

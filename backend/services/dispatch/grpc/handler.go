@@ -5,6 +5,7 @@ import (
 	"context"
 
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -76,6 +77,10 @@ func (h *Handler) RequestDispatch(ctx context.Context, req *dispatchpb.RequestDi
 	if req.GetRiderId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "rider_id is required")
 	}
+	tripType := entity.TripTypeRide
+	if req.GetTripType() == string(entity.TripTypeDelivery) {
+		tripType = entity.TripTypeDelivery
+	}
 	job, err := h.requestDispatch.Execute(ctx, app.RequestDispatchInput{
 		TripID:          req.GetTripId(),
 		RiderID:         req.GetRiderId(),
@@ -83,6 +88,14 @@ func (h *Handler) RequestDispatch(ctx context.Context, req *dispatchpb.RequestDi
 		PickupLon:       req.GetPickupLon(),
 		OfferTimeoutSec: int(req.GetOfferTimeoutSec()),
 		MaxAttempts:     int(req.GetMaxAttempts()),
+		TripType:        tripType,
+		// The wire field is still named "vehicle_type" (added during an
+		// earlier Delivery phase, before this catalog existed) — its VALUE
+		// now carries a ServiceType. Renaming the proto field itself would
+		// need a compiled-descriptor change this environment can't safely
+		// make (see delivery_fields_smoke_test.go); reinterpreting an
+		// existing string field is wire-compatible and needs none.
+		ServiceType: entity.ServiceType(req.GetVehicleType()),
 	})
 	if err != nil {
 		return nil, toGRPCError(err)
@@ -121,11 +134,35 @@ func (h *Handler) RejectTrip(ctx context.Context, req *dispatchpb.RejectTripRequ
 }
 
 // UpdateDriverLocation implements DispatchServiceServer.UpdateDriverLocation.
+//
+// service_type/ride_enabled/delivery_enabled are NOT fields on
+// UpdateDriverLocationRequest — adding one would require regenerating the
+// message's compiled descriptor, which this environment has no protoc/buf
+// toolchain for. Instead the gateway carries them as outgoing gRPC
+// metadata ("x-service-type"/"x-ride-enabled"/"x-delivery-enabled", see
+// gateway/http/handlers/location_handler.go), which needs no schema change
+// at all and is equally wire-safe. Absent metadata (older gateway build, or
+// a driver who hasn't reported yet) resolves to
+// serviceType=""/rideEnabled=true/deliveryEnabled=false — matching
+// migration 008's DB column defaults — fully backward compatible.
 func (h *Handler) UpdateDriverLocation(ctx context.Context, req *dispatchpb.UpdateDriverLocationRequest) (*dispatchpb.UpdateDriverLocationResponse, error) {
 	if req.GetDriverId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "driver_id is required")
 	}
-	if err := h.updateDriverLocation.Execute(ctx, req.GetDriverId(), req.GetLat(), req.GetLon()); err != nil {
+	var serviceType entity.ServiceType
+	rideEnabled, deliveryEnabled := true, false
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if vals := md.Get("x-service-type"); len(vals) > 0 {
+			serviceType = entity.ServiceType(vals[0])
+		}
+		if vals := md.Get("x-ride-enabled"); len(vals) > 0 {
+			rideEnabled = vals[0] == "1"
+		}
+		if vals := md.Get("x-delivery-enabled"); len(vals) > 0 {
+			deliveryEnabled = vals[0] == "1"
+		}
+	}
+	if err := h.updateDriverLocation.Execute(ctx, req.GetDriverId(), req.GetLat(), req.GetLon(), serviceType, rideEnabled, deliveryEnabled); err != nil {
 		return nil, toGRPCError(err)
 	}
 	return &dispatchpb.UpdateDriverLocationResponse{}, nil
