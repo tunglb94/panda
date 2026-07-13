@@ -13,32 +13,43 @@ class ApiException implements Exception {
 }
 
 class ApiClient {
-  ApiClient({required String baseUrl, required AuthState authState})
+  /// [httpClient] is injectable so tests can substitute
+  /// `package:http/testing.dart`'s `MockClient` without a real backend
+  /// running. Production call sites never pass it, so behavior is
+  /// unchanged — a fresh [http.Client] is created and reused for the
+  /// lifetime of this [ApiClient]. Mirrors `apps/rider`'s `ApiClient`.
+  ApiClient({required String baseUrl, required AuthState authState, http.Client? httpClient})
       : _baseUrl = baseUrl,
-        _authState = authState;
+        _authState = authState,
+        _httpClient = httpClient ?? http.Client();
 
   final String _baseUrl;
   final AuthState _authState;
+  final http.Client _httpClient;
   static const _timeout = Duration(seconds: 15);
 
   Future<Map<String, dynamic>> post(String path,
-      {Map<String, dynamic>? body}) async {
+      {Map<String, dynamic>? body, Duration? timeout}) async {
     final uri = Uri.parse('$_baseUrl$path');
-    final response = await http
+    final response = await _httpClient
         .post(
           uri,
           headers: _headers(),
           body: body != null ? jsonEncode(body) : null,
         )
-        .timeout(_timeout, onTimeout: _throwTimeout);
+        .timeout(timeout ?? _timeout, onTimeout: _throwTimeout);
     return _parse(response);
   }
 
-  Future<Map<String, dynamic>> get(String path) async {
+  /// [timeout] overrides the default 15s — used by the chat feature's
+  /// long-poll `GET .../messages?poll=true`, which the server deliberately
+  /// holds open for up to ~25s (see notificationapp.DefaultPollTimeout on
+  /// the backend) waiting for a new message before responding empty.
+  Future<Map<String, dynamic>> get(String path, {Duration? timeout}) async {
     final uri = Uri.parse('$_baseUrl$path');
-    final response = await http
+    final response = await _httpClient
         .get(uri, headers: _headers())
-        .timeout(_timeout, onTimeout: _throwTimeout);
+        .timeout(timeout ?? _timeout, onTimeout: _throwTimeout);
     return _parse(response);
   }
 

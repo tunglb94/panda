@@ -14,16 +14,12 @@ import '../widgets/notification_tile.dart';
 enum _QuickFilter { all, unread, tripUpdate, payment, promotion, system }
 
 /// Notification Center — grouped by recency (Hôm nay/Hôm qua/7 ngày/Cũ
-/// hơn), filterable, searchable. List content is real (derived from actual
-/// trip history — see `NotificationRepository`); categories with no
-/// backend source (Hệ thống/Thưởng/Khuyến mãi/Cập nhật/Cảnh báo/Hỗ trợ)
-/// simply have zero entries rather than fabricated ones — filtering to one
-/// of those categories today will honestly show "Không có thông báo".
-///
-/// Read/unread state is tracked in-memory for this session only (there is
-/// no notification-read-state backend to persist it), matching the exact
-/// pattern `apps/rider`'s NotificationCenterPage already uses for the same
-/// reason.
+/// hơn), filterable, searchable. Real data from the Communication Module's
+/// `GET /api/v1/notifications` (Part 3 — no more mock/derived data);
+/// categories with no backend source (Hệ thống/Thưởng/Khuyến mãi/Cập nhật/
+/// Cảnh báo/Hỗ trợ) simply have zero entries rather than fabricated ones —
+/// filtering to one of those categories today will honestly show "Không có
+/// thông báo".
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key, required this.apiClient});
 
@@ -56,9 +52,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   void _load() {
     setState(() {
-      _future = _repo.fetchAll().then((items) {
-        _items = items;
-        return items;
+      _future = _repo.fetchAll().then((feed) {
+        _items = feed.items;
+        return feed.items;
       });
     });
   }
@@ -67,21 +63,26 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   void _markRead(DriverNotification n) {
     final items = _items;
-    if (items == null) return;
+    if (items == null || n.isRead) return;
     setState(() {
       final i = items.indexWhere((x) => x.id == n.id);
       if (i != -1) items[i] = items[i].copyWith(isRead: true);
     });
+    _repo.markRead(n.id).catchError((_) {});
   }
 
   void _markAllRead() {
     final items = _items;
     if (items == null) return;
+    final unread = items.where((n) => !n.isRead).toList();
     setState(() {
       for (var i = 0; i < items.length; i++) {
         items[i] = items[i].copyWith(isRead: true);
       }
     });
+    for (final n in unread) {
+      _repo.markRead(n.id).catchError((_) {});
+    }
   }
 
   List<DriverNotification> _applyFilters(List<DriverNotification> items) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -8,6 +9,7 @@ import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/mascot_image.dart';
 import '../../data/active_trip_repository.dart';
 import '../../domain/models/delivery_status.dart';
+import 'passenger_info_card.dart';
 
 /// Delivery lifecycle card — a distinct widget from Ride's
 /// `_TripExecutionCard`/`_AwaitingPaymentCard`/`_TripCompletedCard`. Drives
@@ -20,6 +22,7 @@ class DeliveryExecutionCard extends StatelessWidget {
   const DeliveryExecutionCard({
     super.key,
     required this.trip,
+    required this.apiClient,
     required this.hasArrived,
     required this.onArrived,
     required this.onPickupParcel,
@@ -29,6 +32,7 @@ class DeliveryExecutionCard extends StatelessWidget {
   });
 
   final ActiveTrip trip;
+  final ApiClient apiClient;
   final bool hasArrived;
   final VoidCallback onArrived;
   final VoidCallback onPickupParcel;
@@ -51,6 +55,8 @@ class DeliveryExecutionCard extends StatelessWidget {
         children: [
           _DeliveryTimeline(status: _status, hasArrived: hasArrived),
           const SizedBox(height: AppSpacing.lg),
+          PassengerInfoCard(tripId: trip.tripId, apiClient: apiClient),
+          const SizedBox(height: AppSpacing.md),
           AppCard(
             padding: const EdgeInsets.all(AppSpacing.xl),
             child: Column(

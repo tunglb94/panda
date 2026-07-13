@@ -624,6 +624,7 @@ class _TripPageState extends State<TripPage> with WidgetsBindingObserver {
       _PageState.activeTrip => _activeTrip!.isDelivery
           ? DeliveryExecutionCard(
               trip: _activeTrip!,
+              apiClient: widget.apiClient,
               hasArrived: _hasArrived,
               onArrived: () => _onArrived(),
               onPickupParcel: _onPickupParcel,
@@ -633,12 +634,13 @@ class _TripPageState extends State<TripPage> with WidgetsBindingObserver {
             )
           : _TripExecutionCard(
               trip: _activeTrip!,
+              apiClient: widget.apiClient,
               hasArrived: _hasArrived,
               onArrived: () => _onArrived(),
               onStartTrip: _onStartTrip,
               onFinishTrip: _onFinishTripTapped,
             ),
-      _PageState.awaitingPayment => _AwaitingPaymentCard(trip: _activeTrip!),
+      _PageState.awaitingPayment => _AwaitingPaymentCard(trip: _activeTrip!, apiClient: widget.apiClient),
       _PageState.completed => _TripCompletedCard(
           trip: _activeTrip!,
           onSubmitRating: _submitDriverRating,
@@ -826,6 +828,7 @@ class _CountdownBadge extends StatelessWidget {
 class _TripExecutionCard extends StatelessWidget {
   const _TripExecutionCard({
     required this.trip,
+    required this.apiClient,
     required this.hasArrived,
     required this.onArrived,
     required this.onStartTrip,
@@ -833,6 +836,7 @@ class _TripExecutionCard extends StatelessWidget {
   });
 
   final ActiveTrip trip;
+  final ApiClient apiClient;
   final bool hasArrived;
   final VoidCallback onArrived;
   final VoidCallback onStartTrip;
@@ -854,7 +858,7 @@ class _TripExecutionCard extends StatelessWidget {
                 : TripTimelineStage.pickup,
           ),
           const SizedBox(height: AppSpacing.lg),
-          const PassengerInfoCard(),
+          PassengerInfoCard(tripId: trip.tripId, apiClient: apiClient),
           const SizedBox(height: AppSpacing.md),
           AppCard(
             padding: const EdgeInsets.all(AppSpacing.xl),
@@ -997,9 +1001,10 @@ class _ActionButton extends StatelessWidget {
 }
 
 class _AwaitingPaymentCard extends StatelessWidget {
-  const _AwaitingPaymentCard({required this.trip});
+  const _AwaitingPaymentCard({required this.trip, required this.apiClient});
 
   final ActiveTrip trip;
+  final ApiClient apiClient;
 
   @override
   Widget build(BuildContext context) {
@@ -1025,7 +1030,7 @@ class _AwaitingPaymentCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.xl),
           const TripTimeline(current: TripTimelineStage.inTrip),
           const SizedBox(height: AppSpacing.xl),
-          const PassengerInfoCard(),
+          PassengerInfoCard(tripId: trip.tripId, apiClient: apiClient),
           const SizedBox(height: AppSpacing.lg),
           AppCard(
             padding: const EdgeInsets.all(AppSpacing.xl),
