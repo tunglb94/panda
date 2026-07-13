@@ -5,11 +5,14 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/fairride/booking/grpc/bookingpb"
 	"github.com/fairride/dispatch/grpc/dispatchpb"
+	driverapp "github.com/fairride/driver/app"
 	"github.com/fairride/driver/grpc/driverpb"
+	driverlocalstore "github.com/fairride/driver/infrastructure/localstore"
 	driverpostgres "github.com/fairride/driver/infrastructure/postgres"
 	httpgateway "github.com/fairride/gateway/http"
 	"github.com/fairride/gateway/http/handlers"
@@ -18,6 +21,7 @@ import (
 	identitypostgres "github.com/fairride/identity/infrastructure/postgres"
 	notificationapp "github.com/fairride/notification/app"
 	notificationpostgres "github.com/fairride/notification/infrastructure/postgres"
+	"github.com/fairride/pricing/grpc/pricingpb"
 	reviewapp "github.com/fairride/review/app"
 	"github.com/fairride/review/grpc/reviewpb"
 	reviewpostgres "github.com/fairride/review/infrastructure/postgres"
@@ -25,6 +29,8 @@ import (
 	"github.com/fairride/shared/database"
 	"github.com/fairride/shared/logger"
 	"github.com/fairride/trip/grpc/trippb"
+	walletapp "github.com/fairride/wallet/app"
+	walletpostgres "github.com/fairride/wallet/infrastructure/postgres"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -70,7 +76,8 @@ func main() {
 	}
 	dh := handlers.NewDeliveryHandler(tripClient)
 
-	bh := handlers.NewBookingHandler(bookingpb.NewBookingServiceClient(bookingConn), tripClient)
+	bookingClient := bookingpb.NewBookingServiceClient(bookingConn)
+	bh := handlers.NewBookingHandler(bookingClient, tripClient)
 
 	// Shared Postgres pool: Auth (identity+driver reads) and the entire
 	// Communication Module (chat/call/notification) + Review's new
@@ -137,7 +144,12 @@ func main() {
 
 		avgRating := reviewapp.NewGetAverageRatingUseCase(reviewpostgres.NewRatingRepository(pool))
 		recordCall := notificationapp.NewRecordCallUseCase(callRepo, createNotify)
-		cah = handlers.NewCallHandler(tripClient, identitypostgres.NewUserRepository(pool), driverpostgres.NewDriverRepository(pool), avgRating, recordCall)
+		cah = handlers.NewCallHandler(
+			tripClient, identitypostgres.NewUserRepository(pool), driverpostgres.NewDriverRepository(pool), avgRating, recordCall,
+			driverapp.NewGetDriverVerificationUseCase(driverpostgres.NewDriverVerificationRepository(pool)),
+			driverapp.NewGetVehicleVerificationUseCase(driverpostgres.NewVehicleVerificationRepository(pool)),
+			bookingClient,
+		)
 
 		nh = handlers.NewNotificationHandler(
 			notificationapp.NewListNotificationsUseCase(notifRepo),
@@ -150,13 +162,118 @@ func main() {
 		ch = handlers.NewChatHandler(nil, nil, nil, nil, nil, nil)
 	}
 	if cah == nil {
-		cah = handlers.NewCallHandler(nil, nil, nil, nil, nil)
+		cah = handlers.NewCallHandler(nil, nil, nil, nil, nil, nil, nil, nil)
 	}
 	if nh == nil {
 		nh = handlers.NewNotificationHandler(nil, nil)
 	}
 	bh.SetNotifier(tripNotifier)
 	dh.SetNotifier(tripNotifier)
+
+	// Driver KYC + Vehicle Verification (driver-facing + admin review).
+	// Local disk document storage only (Phần 4 — no cloud upload); base
+	// directory configurable via KYC_STORAGE_DIR, defaulting to a relative
+	// ./data/kyc so a fresh dev checkout works with zero extra setup.
+	var kh *handlers.KYCHandler
+	var akh *handlers.AdminKYCHandler
+	if pool != nil {
+		driverVerificationRepo := driverpostgres.NewDriverVerificationRepository(pool)
+		vehicleVerificationRepo := driverpostgres.NewVehicleVerificationRepository(pool)
+		documentRepo := driverpostgres.NewKYCDocumentRepository(pool)
+		licenseCapabilityRepo := driverpostgres.NewLicenseCapabilityRepository(pool)
+		auditLogRepo := driverpostgres.NewAuditLogRepository(pool)
+		storageDir := envOrDefault("KYC_STORAGE_DIR", "./data/kyc")
+		documentStore := driverlocalstore.NewDocumentStore(storageDir)
+
+		kh = handlers.NewKYCHandler(
+			driverapp.NewSubmitDriverVerificationUseCase(driverVerificationRepo, documentRepo, auditLogRepo),
+			driverapp.NewUpdateDriverVerificationUseCase(driverVerificationRepo, auditLogRepo),
+			driverapp.NewGetDriverVerificationUseCase(driverVerificationRepo),
+			driverapp.NewSubmitVehicleVerificationUseCase(vehicleVerificationRepo, documentRepo, licenseCapabilityRepo, auditLogRepo),
+			driverapp.NewUpdateVehicleVerificationUseCase(vehicleVerificationRepo, licenseCapabilityRepo, auditLogRepo),
+			driverapp.NewGetVehicleVerificationUseCase(vehicleVerificationRepo),
+			driverapp.NewUploadKYCDocumentUseCase(documentRepo, driverVerificationRepo, vehicleVerificationRepo, auditLogRepo, documentStore),
+			driverapp.NewListKYCDocumentsUseCase(documentRepo),
+			driverapp.NewListKYCDocumentVersionsUseCase(documentRepo),
+		)
+		akh = handlers.NewAdminKYCHandler(
+			driverapp.NewListDriverVerificationsUseCase(driverVerificationRepo),
+			driverapp.NewReviewDriverVerificationUseCase(driverVerificationRepo, auditLogRepo),
+			driverapp.NewGetDriverVerificationUseCase(driverVerificationRepo),
+			driverapp.NewListVehicleVerificationsUseCase(vehicleVerificationRepo),
+			driverapp.NewReviewVehicleVerificationUseCase(vehicleVerificationRepo, auditLogRepo),
+			driverapp.NewGetVehicleVerificationUseCase(vehicleVerificationRepo),
+			driverapp.NewListKYCDocumentsUseCase(documentRepo),
+			driverapp.NewGetKYCDocumentUseCase(documentRepo),
+			documentStore,
+			driverapp.NewListAuditLogsUseCase(auditLogRepo),
+			driverapp.NewGetKYCSummaryUseCase(driverVerificationRepo),
+			driverpostgres.NewDriverRepository(pool),
+			identitypostgres.NewUserRepository(pool),
+		)
+	}
+	if kh == nil {
+		kh = handlers.NewKYCHandler(nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	}
+	if akh == nil {
+		akh = handlers.NewAdminKYCHandler(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	}
+
+	// Driver Finance / Settlement Engine (Financial Core). Shares the same
+	// pool as KYC — in-process, no gRPC surface (same reasoning as above).
+	// SETTLEMENT_COMMISSION_RATE/PAYOUT_MIN_AMOUNT_CENTS are optional env
+	// overrides for the Financial Core's own placeholder commission rate
+	// and minimum payout floor (see wallet/app/settlement_engine.go and
+	// payout_request.go's doc comments for why these are not read from
+	// Pricing).
+	var wh *handlers.WalletHandler
+	var awh *handlers.AdminWalletHandler
+	var settlementEngine *handlers.SettlementEngine
+	if pool != nil {
+		walletRepo := walletpostgres.NewWalletRepository(pool)
+		ledgerRepo := walletpostgres.NewLedgerEntryRepository(pool)
+		txRepo := walletpostgres.NewTransactionRepository(pool)
+		settlementRepo := walletpostgres.NewSettlementRepository(pool)
+		bankAccountRepo := walletpostgres.NewBankAccountRepository(pool)
+		payoutRequestRepo := walletpostgres.NewPayoutRequestRepository(pool)
+		walletAuditRepo := walletpostgres.NewAuditLogRepository(pool)
+
+		getOrCreateWallet := walletapp.NewGetOrCreateWalletUseCase(walletRepo)
+		walletSummary := walletapp.NewGetWalletSummaryUseCase(walletRepo, ledgerRepo, txRepo, payoutRequestRepo)
+		commissionRate := envFloatOrDefault("SETTLEMENT_COMMISSION_RATE", walletapp.DefaultCommissionRate)
+		minPayoutCents := envInt64OrDefault("PAYOUT_MIN_AMOUNT_CENTS", walletapp.DefaultMinimumPayoutCents)
+
+		createSettlement := walletapp.NewCreateSettlementUseCase(settlementRepo, getOrCreateWallet, ledgerRepo, txRepo, walletAuditRepo, commissionRate)
+		settlementEngine = handlers.NewSettlementEngine(bookingClient, tripClient, createSettlement)
+
+		wh = handlers.NewWalletHandler(
+			walletSummary,
+			walletapp.NewGetStatementUseCase(settlementRepo, walletSummary),
+			walletapp.NewListWalletTransactionsUseCase(walletRepo, ledgerRepo, txRepo),
+			walletapp.NewGetBankAccountUseCase(bankAccountRepo),
+			walletapp.NewSetBankAccountUseCase(bankAccountRepo, walletAuditRepo),
+			walletapp.NewCreatePayoutRequestUseCase(payoutRequestRepo, bankAccountRepo, walletSummary, getOrCreateWallet, ledgerRepo, txRepo, walletAuditRepo, minPayoutCents),
+			walletapp.NewListMyPayoutRequestsUseCase(payoutRequestRepo),
+			driverapp.NewGetDriverVerificationUseCase(driverpostgres.NewDriverVerificationRepository(pool)),
+		)
+		awh = handlers.NewAdminWalletHandler(
+			walletapp.NewListSettlementsUseCase(settlementRepo),
+			walletapp.NewGetSettlementDetailUseCase(settlementRepo),
+			walletapp.NewListOutstandingDriversUseCase(ledgerRepo),
+			walletapp.NewListPayoutRequestsUseCase(payoutRequestRepo),
+			walletapp.NewApprovePayoutRequestUseCase(payoutRequestRepo, walletAuditRepo),
+			walletapp.NewRejectPayoutRequestUseCase(payoutRequestRepo, getOrCreateWallet, ledgerRepo, txRepo, walletAuditRepo),
+			walletapp.NewMarkPayoutPaidUseCase(payoutRequestRepo, getOrCreateWallet, ledgerRepo, txRepo, walletAuditRepo),
+			walletapp.NewManualAdjustmentUseCase(getOrCreateWallet, ledgerRepo, txRepo, walletAuditRepo),
+		)
+	}
+	if wh == nil {
+		wh = handlers.NewWalletHandler(nil, nil, nil, nil, nil, nil, nil, nil)
+	}
+	if awh == nil {
+		awh = handlers.NewAdminWalletHandler(nil, nil, nil, nil, nil, nil, nil, nil)
+	}
+	bh.SetSettlementEngine(settlementEngine)
 
 	// Driver availability: proxies to the driver gRPC service.
 	// If DRIVER_ADDR is unset or the connection fails, availability returns 503 gracefully.
@@ -206,6 +323,24 @@ func main() {
 		dph = handlers.NewDriverProfileHandler(nil)
 	}
 
+	// Pricing service: pre-booking fare estimate (Rider's BookingForm sends
+	// only pickup/destination/service_type — Backend is the fare Single
+	// Source of Truth, no client-side fare math).
+	// If PRICING_ADDR is unset, estimate-fare returns 503 gracefully.
+	var ph *handlers.PricingHandler
+	if pricingAddr := os.Getenv("PRICING_ADDR"); pricingAddr != "" {
+		pricingConn, connErr := grpc.NewClient(pricingAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if connErr != nil {
+			log.Warn().Err(connErr).Str("addr", pricingAddr).Msg("gateway: pricing service connection failed — estimate-fare will return 503")
+		} else {
+			defer pricingConn.Close()
+			ph = handlers.NewPricingHandler(pricingpb.NewPricingServiceClient(pricingConn))
+		}
+	}
+	if ph == nil {
+		ph = handlers.NewPricingHandler(nil)
+	}
+
 	// Review service: submit and fetch trip ratings.
 	// If REVIEW_ADDR is unset, rating endpoints return 503 gracefully.
 	var rh *handlers.RatingHandler
@@ -223,7 +358,7 @@ func main() {
 	}
 
 	authMW := middleware.Auth(tokenSvc)
-	router := httpgateway.NewRouter(bh, ah, avh, lh, dph, rh, dh, ch, cah, nh, authMW, log)
+	router := httpgateway.NewRouter(bh, ah, avh, lh, dph, rh, dh, ch, cah, nh, kh, akh, wh, awh, ph, authMW, log)
 
 	addr := cfg.HTTP.Addr
 	srv := &http.Server{
@@ -250,6 +385,24 @@ func mustEnv(key string) string {
 func envOrDefault(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return def
+}
+
+func envFloatOrDefault(key string, def float64) float64 {
+	if v := os.Getenv(key); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
+		}
+	}
+	return def
+}
+
+func envInt64OrDefault(key string, def int64) int64 {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+			return n
+		}
 	}
 	return def
 }

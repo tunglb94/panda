@@ -43,6 +43,7 @@ type BookingHandler struct {
 	client     BookingClient
 	tripClient TripStatusClient
 	notifier   *TripEventNotifier
+	settlement *SettlementEngine
 }
 
 func NewBookingHandler(client BookingClient, tripClient TripStatusClient) *BookingHandler {
@@ -55,6 +56,14 @@ func NewBookingHandler(client BookingClient, tripClient TripStatusClient) *Booki
 // behavior.
 func (h *BookingHandler) SetNotifier(n *TripEventNotifier) {
 	h.notifier = n
+}
+
+// SetSettlementEngine wires the Settlement Engine (Financial Core, Phần 2).
+// Additive and optional — nil (the default) means PayRide behaves exactly
+// as before this phase; the hook only fires after PayRide's existing gRPC
+// call has already succeeded.
+func (h *BookingHandler) SetSettlementEngine(s *SettlementEngine) {
+	h.settlement = s
 }
 
 // ─── POST /api/v1/rides ───────────────────────────────────────────────────────
@@ -355,19 +364,35 @@ func (h *BookingHandler) PayRide(w http.ResponseWriter, r *http.Request) {
 		writeBadRequest(w, "invalid request body")
 		return
 	}
-	resp, err := h.client.PayRide(r.Context(), &bookingpb.StartTripRequest{
+	method := req.PaymentMethod
+	if method == "" {
+		method = "cash" // matches PayRideUseCase's own default (booking/app/pay_ride.go)
+	}
+	// payment_method has no field on StartTripRequest (reused across
+	// Start/Pay) — forwarded as outgoing metadata, same pattern as
+	// x-service-type, so Booking/Trip persist the rider's ACTUAL choice
+	// instead of always defaulting to "cash".
+	ctx := metadata.AppendToOutgoingContext(r.Context(), "x-payment-method", method)
+	resp, err := h.client.PayRide(ctx, &bookingpb.StartTripRequest{
 		TripId: tripID,
 	})
 	if err != nil {
 		writeGRPCError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	body := map[string]any{
 		"trip_id":    resp.GetTripId(),
 		"status":     resp.GetStatus(),
 		"final_fare": resp.GetFinalFare(),
 		"currency":   resp.GetCurrency(),
-	})
+	}
+	if h.settlement != nil {
+		result := h.settlement.Settle(r.Context(), tripID, resp.GetFinalFare(), resp.GetCurrency(), method)
+		if result.Error != "" {
+			body["settlement_error"] = result.Error
+		}
+	}
+	writeJSON(w, http.StatusOK, body)
 }
 
 // ─── POST /api/v1/rides/{tripID}/arrive ──────────────────────────────────────

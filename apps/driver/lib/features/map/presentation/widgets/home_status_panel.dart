@@ -36,6 +36,7 @@ class HomeStatusPanel extends StatelessWidget {
     this.dropoffAddress,
     this.countdownSeconds,
     this.fareLabel,
+    this.canGoOnline = true,
     required this.onToggleOnline,
     required this.onViewTrip,
   });
@@ -51,6 +52,11 @@ class HomeStatusPanel extends StatelessWidget {
   final String? dropoffAddress;
   final int? countdownSeconds;
   final String? fareLabel;
+
+  /// Phần 7 (Driver KYC) — false when Driver KYC + Vehicle Verification
+  /// aren't both Approved yet. Only gates going *online*: a driver who
+  /// somehow already has an active session can always go offline.
+  final bool canGoOnline;
   final VoidCallback onToggleOnline;
 
   /// Navigates to the Trips tab, where the real action buttons for the
@@ -119,12 +125,13 @@ class HomeStatusPanel extends StatelessWidget {
       HomePhase.offline => _AvailabilityRow(
           isOnline: false,
           isBusy: isBusy,
+          canToggle: canGoOnline,
           onToggle: onToggleOnline,
         ),
       HomePhase.online => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _AvailabilityRow(isOnline: true, isBusy: isBusy, onToggle: onToggleOnline),
+            _AvailabilityRow(isOnline: true, isBusy: isBusy, canToggle: true, onToggle: onToggleOnline),
             const SizedBox(height: AppSpacing.md),
             const _SearchingRow(),
           ],
@@ -184,14 +191,21 @@ class HomeStatusPanel extends StatelessWidget {
 // ─── Offline / Online / Searching ─────────────────────────────────────────────
 
 class _AvailabilityRow extends StatelessWidget {
-  const _AvailabilityRow({required this.isOnline, required this.isBusy, required this.onToggle});
+  const _AvailabilityRow({
+    required this.isOnline,
+    required this.isBusy,
+    required this.onToggle,
+    this.canToggle = true,
+  });
 
   final bool isOnline;
   final bool isBusy;
+  final bool canToggle;
   final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
+    final blocked = !isOnline && !canToggle;
     return Row(
       children: [
         if (isBusy)
@@ -220,7 +234,19 @@ class _AvailabilityRow extends StatelessWidget {
             style: Theme.of(context).textTheme.titleMedium,
           ),
         ),
-        Switch(value: isOnline, onChanged: isBusy ? null : (_) => onToggle()),
+        // Phần 7: disabled + tooltip when Driver KYC / Vehicle Verification
+        // aren't both Approved yet — Semantics carries the same reason to
+        // screen readers, not just the visual Tooltip.
+        Tooltip(
+          message: blocked ? 'Cần hoàn thành xác minh.' : (isOnline ? 'Chuyển sang offline' : 'Chuyển sang online'),
+          child: Semantics(
+            label: blocked ? 'Không thể bật online — cần hoàn thành xác minh' : null,
+            child: Switch(
+              value: isOnline,
+              onChanged: (isBusy || blocked) ? null : (_) => onToggle(),
+            ),
+          ),
+        ),
       ],
     );
   }

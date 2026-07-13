@@ -1,0 +1,18 @@
+{
+  "rule_engine_decisions": 19240,
+  "ai_decisions": 2182,
+  "ai_decision_percent": 10.185790309028102,
+  "ai_calls": 0,
+  "cache_hits": 0,
+  "cache_hit_percent": 0,
+  "cache_size": 0,
+  "rule_fallback_used": 2182,
+  "ai_timeouts": 0,
+  "avg_ai_latency_ms": 0,
+  "circuit_open_at_end": false,
+  "ticks_processed": 7200,
+  "trips_processed": 4181,
+  "wall_clock_seconds": 0.1584427,
+  "ticks_per_second": 45442.29554280507,
+  "peak_alloc_mb": 7.048881530761719
+}

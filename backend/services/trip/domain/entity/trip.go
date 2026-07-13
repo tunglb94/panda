@@ -66,6 +66,28 @@ type Trip struct {
 	DeliveryID         string // empty for Ride trips ("nil")
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
+
+	// Commission detail computed by Pricing V3 at Complete() time — Settlement
+	// must read these instead of inventing its own commission rate.
+	// HasCommissionDetail is false (and the *Cents/*Rate fields are 0) when
+	// Pricing was running V2, which does not compute this detail at all.
+	HasCommissionDetail  bool
+	CommissionCents      int64
+	DriverIncomeCents    int64
+	VoucherDiscountCents int64
+	CommissionRate       float64
+}
+
+// CompleteFinancials carries the commission detail Pricing V3 computed for
+// this trip's final fare (see pricing/app/feature_flag.go's
+// CalculateFinalDetailed). Zero value means "no detail available" (Pricing
+// running V2) — HasCommissionDetail distinguishes that from a real 0.
+type CompleteFinancials struct {
+	HasCommissionDetail  bool
+	CommissionCents      int64
+	DriverIncomeCents    int64
+	VoucherDiscountCents int64
+	CommissionRate       float64
 }
 
 // NewTrip creates a validated Ride Trip in StatusPending. Unchanged from
@@ -124,20 +146,26 @@ func ReconstituteTrip(
 	finalFareTotal int64, fareCurrency string,
 	paymentMethod string,
 	createdAt, updatedAt time.Time,
+	fin CompleteFinancials,
 ) *Trip {
 	return &Trip{
-		TripID:             tripID,
-		RiderID:            riderID,
-		DriverID:           driverID,
-		Status:             status,
-		PickupAddress:      pickupAddress,
-		DropoffAddress:     dropoffAddress,
-		CancellationReason: cancellationReason,
-		FinalFareTotal:     finalFareTotal,
-		FareCurrency:       fareCurrency,
-		PaymentMethod:      paymentMethod,
-		CreatedAt:          createdAt,
-		UpdatedAt:          updatedAt,
+		TripID:               tripID,
+		RiderID:              riderID,
+		DriverID:             driverID,
+		Status:               status,
+		PickupAddress:        pickupAddress,
+		DropoffAddress:       dropoffAddress,
+		CancellationReason:   cancellationReason,
+		FinalFareTotal:       finalFareTotal,
+		FareCurrency:         fareCurrency,
+		PaymentMethod:        paymentMethod,
+		CreatedAt:            createdAt,
+		UpdatedAt:            updatedAt,
+		HasCommissionDetail:  fin.HasCommissionDetail,
+		CommissionCents:      fin.CommissionCents,
+		DriverIncomeCents:    fin.DriverIncomeCents,
+		VoucherDiscountCents: fin.VoucherDiscountCents,
+		CommissionRate:       fin.CommissionRate,
 	}
 }
 
@@ -183,13 +211,18 @@ func (t *Trip) Start(now time.Time) error {
 
 // Complete transitions the trip from InProgress to Completed and records the fare.
 // Returns CodePreconditionFailed if the trip is not InProgress.
-func (t *Trip) Complete(finalFareTotal int64, fareCurrency string, now time.Time) error {
+func (t *Trip) Complete(finalFareTotal int64, fareCurrency string, fin CompleteFinancials, now time.Time) error {
 	if t.Status != StatusInProgress {
 		return errors.PreconditionFailed("trip cannot be completed from status: " + string(t.Status))
 	}
 	t.Status = StatusCompleted
 	t.FinalFareTotal = finalFareTotal
 	t.FareCurrency = fareCurrency
+	t.HasCommissionDetail = fin.HasCommissionDetail
+	t.CommissionCents = fin.CommissionCents
+	t.DriverIncomeCents = fin.DriverIncomeCents
+	t.VoucherDiscountCents = fin.VoucherDiscountCents
+	t.CommissionRate = fin.CommissionRate
 	t.UpdatedAt = now
 	return nil
 }

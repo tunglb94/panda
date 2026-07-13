@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:rider/core/network/api_client.dart';
 import 'package:rider/features/map/domain/models/trip_selection.dart';
 
+import '../../domain/models/vehicle_option.dart';
 import 'booking_form_body.dart';
 
 /// Modal presentation of the booking form, invoked from the Map page once
@@ -18,6 +19,7 @@ class BookingBottomSheet {
     required TripSelection tripSelection,
     required ApiClient apiClient,
     void Function(String driverId)? onDriverAssigned,
+    VehicleCategory? initialCategory,
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -56,6 +58,7 @@ class BookingBottomSheet {
                     tripSelection: tripSelection,
                     apiClient: apiClient,
                     onDriverAssigned: onDriverAssigned,
+                    initialCategory: initialCategory,
                   ),
                 ],
               ),

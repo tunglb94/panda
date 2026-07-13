@@ -6,19 +6,19 @@
     "model": "phi4:14b"
   },
   "dispatch": {
-    "requested": 586,
-    "accepted": 546,
-    "rejected": 37,
-    "cancelled": 3,
-    "completed": 546
+    "requested": 743,
+    "accepted": 521,
+    "rejected": 218,
+    "cancelled": 4,
+    "completed": 521
   },
   "financial": {
-    "platform_revenue_vnd": 6389488,
-    "driver_revenue_vnd": 24296658,
-    "passenger_saving_vnd": 100642,
-    "commission_vnd": 6389488,
+    "platform_revenue_vnd": 6840836,
+    "driver_revenue_vnd": 26428488,
+    "passenger_saving_vnd": 89622,
+    "commission_vnd": 6840836,
     "promotion_cost_vnd": 0,
-    "voucher_cost_vnd": 100642,
-    "gmv_vnd": 30786788
+    "voucher_cost_vnd": 89622,
+    "gmv_vnd": 33358946
   }
 }

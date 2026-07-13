@@ -14,33 +14,33 @@ h1{color:#1A8C4E;margin-bottom:4px} .subtitle{color:#9CA3AF;margin-top:0;margin-
 </style></head><body>
 <h1>Panda — Executive Dashboard</h1>
 <p class="subtitle">30 drivers · 200 riders · 2 simulated day(s) · model phi4:14b</p><div class="cards">
-  <div class="card big"><div class="v">38,768,795</div><div class="l">GMV (VND)</div></div>
-  <div class="card big"><div class="v">7,941,603</div><div class="l">Net Revenue (VND)</div></div>
-  <div class="card big"><div class="v">6,511,015</div><div class="l">Estimated Profit (VND)</div></div>
-  <div class="card"><div class="v">8,055,885</div><div class="l">Platform Revenue (VND)</div></div>
-  <div class="card"><div class="v">30,598,628</div><div class="l">Driver Revenue (VND)</div></div>
-  <div class="card"><div class="v">20.8%</div><div class="l">Platform Margin</div></div>
-  <div class="card"><div class="v">114,282</div><div class="l">Voucher Cost (VND)</div></div>
+  <div class="card big"><div class="v">33,358,946</div><div class="l">GMV (VND)</div></div>
+  <div class="card big"><div class="v">6,751,214</div><div class="l">Net Revenue (VND)</div></div>
+  <div class="card big"><div class="v">5,546,131</div><div class="l">Estimated Profit (VND)</div></div>
+  <div class="card"><div class="v">6,840,836</div><div class="l">Platform Revenue (VND)</div></div>
+  <div class="card"><div class="v">26,428,488</div><div class="l">Driver Revenue (VND)</div></div>
+  <div class="card"><div class="v">20.5%</div><div class="l">Platform Margin</div></div>
+  <div class="card"><div class="v">89,622</div><div class="l">Voucher Cost (VND)</div></div>
   <div class="card"><div class="v">0</div><div class="l">Promotion Cost (VND)</div></div>
-  <div class="card"><div class="v">68.3%</div><div class="l">Driver Retention</div></div>
-  <div class="card"><div class="v">81.0%</div><div class="l">Passenger Retention</div></div>
-  <div class="card"><div class="v">28,756,557</div><div class="l">Ride Revenue (VND)</div></div>
-  <div class="card"><div class="v">10,012,238</div><div class="l">Delivery Revenue (VND)</div></div>
-  <div class="card"><div class="v">73.8%</div><div class="l">Ride %</div></div>
-  <div class="card"><div class="v">26.2%</div><div class="l">Delivery %</div></div>
-  <div class="card"><div class="v">61,847</div><div class="l">Average Fare (VND)</div></div>
-  <div class="card"><div class="v">26.6 min</div><div class="l">Average ETA</div></div>
-  <div class="card"><div class="v">93.8%</div><div class="l">Acceptance Rate</div></div>
-  <div class="card"><div class="v">0.3%</div><div class="l">Cancellation Rate</div></div>
+  <div class="card"><div class="v">76.7%</div><div class="l">Driver Retention</div></div>
+  <div class="card"><div class="v">84.0%</div><div class="l">Passenger Retention</div></div>
+  <div class="card"><div class="v">29,137,382</div><div class="l">Ride Revenue (VND)</div></div>
+  <div class="card"><div class="v">4,221,564</div><div class="l">Delivery Revenue (VND)</div></div>
+  <div class="card"><div class="v">85.0%</div><div class="l">Ride %</div></div>
+  <div class="card"><div class="v">15.0%</div><div class="l">Delivery %</div></div>
+  <div class="card"><div class="v">63,856</div><div class="l">Average Fare (VND)</div></div>
+  <div class="card"><div class="v">32.5 min</div><div class="l">Average ETA</div></div>
+  <div class="card"><div class="v">70.1%</div><div class="l">Acceptance Rate</div></div>
+  <div class="card"><div class="v">0.5%</div><div class="l">Cancellation Rate</div></div>
 </div><div class="grid"><div class="chart-box"><h3>Revenue Waterfall (Bar)</h3><canvas id="revenueWaterfall"></canvas></div><div class="chart-box"><h3>Ride vs Delivery (Pie)</h3><canvas id="rideDeliverySplit"></canvas></div></div><script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
 new Chart(document.getElementById('revenueWaterfall'), {type:'bar', data:{
   labels: ['GMV', 'Platform Revenue', 'Driver Revenue', 'Voucher Cost', 'Promotion Cost', 'Net Revenue', 'Est. Profit'],
-  datasets: [{data: [38768795,8055885,30598628,114282,0,7941603,6511015], backgroundColor: ['#1A8C4E','#2563EB','#F59E0B','#DC2626','#DC2626','#0F5C33','#22C55E']}]
+  datasets: [{data: [33358946,6840836,26428488,89622,0,6751214,5546131], backgroundColor: ['#1A8C4E','#2563EB','#F59E0B','#DC2626','#DC2626','#0F5C33','#22C55E']}]
 }, options: {plugins:{legend:{display:false}}}});
 
 new Chart(document.getElementById('rideDeliverySplit'), {type:'pie', data:{
   labels: ['Ride', 'Delivery'],
-  datasets: [{data: [73.76,26.24], backgroundColor: ['#1A8C4E','#2563EB']}]
+  datasets: [{data: [85.03,14.97], backgroundColor: ['#1A8C4E','#2563EB']}]
 }});
 </script></body></html>

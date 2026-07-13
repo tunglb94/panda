@@ -74,16 +74,23 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.tokenSvc.GenerateAccessToken(driver.DriverID, string(user.Type), user.RoleID, time.Now())
+	now := time.Now()
+	token, err := h.tokenSvc.GenerateAccessToken(driver.DriverID, string(user.Type), user.RoleID, now)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	refreshTok, err := h.tokenSvc.GenerateRefreshToken(driver.DriverID, string(user.Type), user.RoleID, now)
 	if err != nil {
 		writeDomainError(w, err)
 		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{
-		"access_token": token,
-		"driver_id":    driver.DriverID,
-		"user_id":      user.ID,
+		"access_token":  token,
+		"refresh_token": refreshTok.Token,
+		"driver_id":     driver.DriverID,
+		"user_id":       user.ID,
 	})
 }
 
@@ -119,14 +126,125 @@ func (h *AuthHandler) RiderLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.tokenSvc.GenerateAccessToken(user.ID, string(user.Type), user.RoleID, time.Now())
+	now := time.Now()
+	token, err := h.tokenSvc.GenerateAccessToken(user.ID, string(user.Type), user.RoleID, now)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	refreshTok, err := h.tokenSvc.GenerateRefreshToken(user.ID, string(user.Type), user.RoleID, now)
 	if err != nil {
 		writeDomainError(w, err)
 		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{
-		"access_token": token,
-		"rider_id":     user.ID,
+		"access_token":  token,
+		"refresh_token": refreshTok.Token,
+		"rider_id":      user.ID,
+	})
+}
+
+// AdminLogin handles POST /api/v1/auth/admin/login. Same phone-lookup
+// pattern as RiderLogin, gated on identityentity.TypeAdmin instead —
+// backs the RequireAdmin-gated KYC review dashboard endpoints (Phần 11).
+// No admin-provisioning UI exists in this phase; an admin User row must
+// already exist (e.g. seeded) for this to succeed.
+func (h *AuthHandler) AdminLogin(w http.ResponseWriter, r *http.Request) {
+	if h.users == nil {
+		writeJSON(w, http.StatusServiceUnavailable,
+			errorResponse{Error: "authentication service not configured"})
+		return
+	}
+
+	var req loginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeBadRequest(w, "invalid request body")
+		return
+	}
+	req.Phone = strings.TrimSpace(req.Phone)
+	if req.Phone == "" {
+		writeBadRequest(w, "phone is required")
+		return
+	}
+
+	user, err := h.users.FindByPhone(r.Context(), req.Phone)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	if user.Type != identityentity.TypeAdmin {
+		writeDomainError(w, domainerrors.NotFound("admin not found"))
+		return
+	}
+
+	now := time.Now()
+	token, err := h.tokenSvc.GenerateAccessToken(user.ID, string(user.Type), user.RoleID, now)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	refreshTok, err := h.tokenSvc.GenerateRefreshToken(user.ID, string(user.Type), user.RoleID, now)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"access_token":  token,
+		"refresh_token": refreshTok.Token,
+		"admin_id":      user.ID,
+	})
+}
+
+type refreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+// Refresh handles POST /api/v1/auth/refresh — exchanges a still-valid
+// refresh token for a new access token (and a new refresh token, extending
+// the session) without requiring the phone-lookup login flow again. Access
+// tokens are short-lived (15 min, see identity/infrastructure/jwt/config.go)
+// specifically so this endpoint has to exist — every authenticated request
+// otherwise starts failing with 401 the moment the access token expires,
+// with no way for the client to recover short of a full re-login.
+//
+// UserType/RoleID are read directly from the refresh token's own claims
+// (embedded at issuance) rather than re-queried from identity/driver
+// repositories — this endpoint has no dependency on either, by design.
+func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
+	var req refreshRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeBadRequest(w, "invalid request body")
+		return
+	}
+	req.RefreshToken = strings.TrimSpace(req.RefreshToken)
+	if req.RefreshToken == "" {
+		writeBadRequest(w, "refresh_token is required")
+		return
+	}
+
+	claims, err := h.tokenSvc.ValidateRefreshToken(req.RefreshToken)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	now := time.Now()
+	accessTok, err := h.tokenSvc.GenerateAccessToken(claims.UserID, claims.UserType, claims.RoleID, now)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	refreshTok, err := h.tokenSvc.GenerateRefreshToken(claims.UserID, claims.UserType, claims.RoleID, now)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"access_token":  accessTok,
+		"refresh_token": refreshTok.Token,
 	})
 }

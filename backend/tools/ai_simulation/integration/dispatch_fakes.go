@@ -168,11 +168,25 @@ func sortCandidatesByDistance(c []locationCandidate) {
 	// Simple insertion sort — candidate lists are small (search radius +
 	// driver-count bounded), no need for sort.Slice's reflection overhead
 	// on a hot simulation path.
+	//
+	// Tie-break by id when dist is equal (drivers in the same zone share
+	// the exact same city-plane coordinates, so exact ties are common) —
+	// c is built by ranging over a map (see FindNearby), whose iteration
+	// order Go randomizes per-process, so without this secondary key the
+	// same --seed picks a different "nearest" driver among tied
+	// candidates on every run (the --seed determinism bug).
 	for i := 1; i < len(c); i++ {
-		for j := i; j > 0 && c[j].dist < c[j-1].dist; j-- {
+		for j := i; j > 0 && less(c[j], c[j-1]); j-- {
 			c[j], c[j-1] = c[j-1], c[j]
 		}
 	}
+}
+
+func less(a, b locationCandidate) bool {
+	if a.dist != b.dist {
+		return a.dist < b.dist
+	}
+	return a.id < b.id
 }
 
 func (r *fakeDriverLocationRepository) IsActive(_ context.Context, driverID string) (bool, error) {

@@ -38,7 +38,7 @@ class DriverInfoCard extends StatelessWidget {
                 ),
                 child: const Icon(Icons.two_wheeler, color: AppColors.primary, size: AppIconSize.xl),
               ),
-              if (driver.isVerified)
+              if (contact?.isVerified ?? false)
                 Positioned(
                   right: -2,
                   bottom: -2,
@@ -73,18 +73,34 @@ class DriverInfoCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(driver.vehicleColor, style: Theme.of(context).textTheme.bodySmall),
                 ],
-                if (contact != null && contact!.hasRating) ...[
+                if ((contact != null && contact!.hasRating) || (contact?.tripCount ?? 0) > 0) ...[
                   const SizedBox(height: 3),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.star, size: 14, color: Colors.amber),
-                      const SizedBox(width: 2),
-                      Text(
-                        contact!.rating.toStringAsFixed(1),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-                      ),
+                      if (contact != null && contact!.hasRating) ...[
+                        const Icon(Icons.star, size: 14, color: Colors.amber),
+                        const SizedBox(width: 2),
+                        Text(
+                          contact!.rating.toStringAsFixed(1),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                      if (contact != null && contact!.hasRating && (contact?.tripCount ?? 0) > 0)
+                        const SizedBox(width: 8),
+                      if ((contact?.tripCount ?? 0) > 0)
+                        Text(
+                          '${contact!.tripCount} chuyến',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                     ],
+                  ),
+                ],
+                if (contact?.joinedAt != null) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    'Tham gia từ ${contact!.joinedAt!.year}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
                   ),
                 ],
               ],

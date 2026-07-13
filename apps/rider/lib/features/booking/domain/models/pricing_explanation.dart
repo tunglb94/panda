@@ -1,4 +1,6 @@
-import 'mock_fare_calculator.dart';
+import 'package:rider/shared/utils/currency_format.dart';
+
+import 'fare_estimate.dart';
 import 'surge_info.dart';
 import 'voucher.dart';
 
@@ -38,7 +40,7 @@ class PricingExplanationLine {
 /// fact and separately confirms no surge was applied to this estimate.
 abstract final class PricingExplanation {
   static List<PricingExplanationLine> build({
-    required MockFareBreakdown fare,
+    required FareEstimate fare,
     required double distanceKm,
     required double durationMin,
     required DateTime requestTime,
@@ -46,7 +48,7 @@ abstract final class PricingExplanation {
     SurgeInfo? surge,
   }) {
     final lines = <PricingExplanationLine>[
-      PricingExplanationLine('Giá cơ bản ${fare.format(fare.baseFareCents)}'),
+      PricingExplanationLine('Giá cơ bản ${formatMoney(fare.baseFare, fare.currencyCode)}'),
       PricingExplanationLine('${distanceKm.toStringAsFixed(1)} km'),
       PricingExplanationLine('${durationMin.round()} phút'),
       PricingExplanationLine(
@@ -56,8 +58,11 @@ abstract final class PricingExplanation {
         PricingExplanationLine('Áp dụng ${surge.label}', isPositive: false)
       else
         const PricingExplanationLine('Không áp dụng Surge'),
+      // No promotion engine is wired to any RPC yet — the backend never
+      // returns a discount amount, so applying a voucher can only be stated
+      // as a fact (the code was sent), never with a fabricated amount.
       if (voucher != null)
-        PricingExplanationLine('Voucher ${voucher.code} -${fare.format(fare.discountCents)}')
+        PricingExplanationLine('Áp dụng mã ${voucher.code}')
       else
         const PricingExplanationLine('Không áp dụng voucher'),
     ];

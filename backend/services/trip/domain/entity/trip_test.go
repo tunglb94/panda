@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fairride/trip/domain/entity"
 	domainerrors "github.com/fairride/shared/errors"
+	"github.com/fairride/trip/domain/entity"
 )
 
 var testNow = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -65,7 +65,7 @@ func TestNewTrip_EmptyDropoff(t *testing.T) {
 // ─── Cancel ──────────────────────────────────────────────────────────────────
 
 func tripAt(status entity.TripStatus) *entity.Trip {
-	return entity.ReconstituteTrip("t1", "r1", "", status, "pickup", "dropoff", "", 0, "", "", testNow, testNow)
+	return entity.ReconstituteTrip("t1", "r1", "", status, "pickup", "dropoff", "", 0, "", "", testNow, testNow, entity.CompleteFinancials{})
 }
 
 func TestCancel_FromPending(t *testing.T) {
@@ -177,7 +177,7 @@ func TestStart_FromInProgressFails(t *testing.T) {
 
 func TestComplete_FromInProgress(t *testing.T) {
 	trip := tripAt(entity.StatusInProgress)
-	if err := trip.Complete(325, "USD", testNow); err != nil {
+	if err := trip.Complete(325, "USD", entity.CompleteFinancials{}, testNow); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if trip.Status != entity.StatusCompleted {
@@ -193,7 +193,7 @@ func TestComplete_FromInProgress(t *testing.T) {
 
 func TestComplete_FromPendingFails(t *testing.T) {
 	trip := tripAt(entity.StatusPending)
-	err := trip.Complete(100, "USD", testNow)
+	err := trip.Complete(100, "USD", entity.CompleteFinancials{}, testNow)
 	if !domainerrors.IsCode(err, domainerrors.CodePreconditionFailed) {
 		t.Errorf("expected PreconditionFailed, got %v", err)
 	}
@@ -201,7 +201,7 @@ func TestComplete_FromPendingFails(t *testing.T) {
 
 func TestComplete_FromCompletedFails(t *testing.T) {
 	trip := tripAt(entity.StatusCompleted)
-	err := trip.Complete(100, "USD", testNow)
+	err := trip.Complete(100, "USD", entity.CompleteFinancials{}, testNow)
 	if !domainerrors.IsCode(err, domainerrors.CodePreconditionFailed) {
 		t.Errorf("expected PreconditionFailed, got %v", err)
 	}
@@ -211,7 +211,7 @@ func TestComplete_FromCompletedFails(t *testing.T) {
 
 func TestReconstituteTrip_NoValidation(t *testing.T) {
 	// Should not panic or error even with empty fields
-	trip := entity.ReconstituteTrip("", "", "", entity.StatusCompleted, "", "", "some reason", 0, "", "", testNow, testNow)
+	trip := entity.ReconstituteTrip("", "", "", entity.StatusCompleted, "", "", "some reason", 0, "", "", testNow, testNow, entity.CompleteFinancials{})
 	if trip == nil {
 		t.Fatal("expected non-nil trip")
 	}

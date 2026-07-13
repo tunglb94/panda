@@ -1,0 +1,24 @@
+{
+  "config": {
+    "drivers": 50,
+    "riders": 500,
+    "days": 2,
+    "model": "phi4:14b"
+  },
+  "dispatch": {
+    "requested": 1532,
+    "accepted": 1341,
+    "rejected": 182,
+    "cancelled": 9,
+    "completed": 1341
+  },
+  "financial": {
+    "platform_revenue_vnd": 15254239,
+    "driver_revenue_vnd": 56587277,
+    "passenger_saving_vnd": 339022,
+    "commission_vnd": 15254239,
+    "promotion_cost_vnd": 19156,
+    "voucher_cost_vnd": 319866,
+    "gmv_vnd": 72180538
+  }
+}

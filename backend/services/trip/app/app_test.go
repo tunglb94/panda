@@ -269,7 +269,7 @@ func TestCreateTrip_Delivery_DoesNotPersistTripOnDeliveryValidationFailure(t *te
 func seedDeliveryTrip(t *testing.T, tripRepo *stubRepo, deliveryRepo *memory.DeliveryRepository, tripID, deliveryID string, deliveryStatus entity.DeliveryStatus) {
 	t.Helper()
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	trip := entity.ReconstituteTrip(tripID, "rider1", "driver1", entity.StatusDriverArrived, "pickup", "dropoff", "", 0, "", "", now, now)
+	trip := entity.ReconstituteTrip(tripID, "rider1", "driver1", entity.StatusDriverArrived, "pickup", "dropoff", "", 0, "", "", now, now, entity.CompleteFinancials{})
 	trip.TripType = entity.TripTypeDelivery
 	trip.DeliveryID = deliveryID
 	if err := tripRepo.Save(context.Background(), trip); err != nil {
@@ -638,7 +638,7 @@ func TestDeliveryLifecycle_FromRealAcceptThroughCompletion(t *testing.T) {
 
 func makeTrip(repo *stubRepo, tripID, riderID string, status entity.TripStatus) *entity.Trip {
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	trip := entity.ReconstituteTrip(tripID, riderID, "", status, "pickup", "dropoff", "", 0, "", "", now, now)
+	trip := entity.ReconstituteTrip(tripID, riderID, "", status, "pickup", "dropoff", "", 0, "", "", now, now, entity.CompleteFinancials{})
 	_ = repo.Save(context.Background(), trip)
 	return trip
 }

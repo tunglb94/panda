@@ -19,6 +19,7 @@ import 'package:rider/features/delivery/presentation/pages/delivery_form_page.da
 import 'package:rider/features/map/data/driver_tracking_repository.dart';
 import 'package:rider/features/map/domain/models/trip_selection.dart';
 import 'package:rider/features/map/presentation/widgets/place_search_field.dart';
+import 'package:rider/features/booking/domain/models/vehicle_option.dart';
 import 'package:rider/shared/widgets/mascot_image.dart';
 
 // ─── Location resolution state machine ───────────────────────────────────────
@@ -46,10 +47,17 @@ class MapPage extends StatefulWidget {
     super.key,
     required this.apiClient,
     required this.routeProvider,
+    this.initialVehicleCategory,
   });
 
   final ApiClient apiClient;
   final RouteProvider routeProvider;
+
+  /// Pre-selects a vehicle tier in the booking form once pickup/destination
+  /// are confirmed — set when Home's Bike/Car quick-pick cards launched this
+  /// page, so the tap the rider already made carries through instead of
+  /// always landing back on Car.
+  final VehicleCategory? initialVehicleCategory;
 
   @override
   State<MapPage> createState() => MapPageState();
@@ -423,6 +431,12 @@ class MapPageState extends State<MapPage> {
       destination: _destinationPoint!,
       pickupAddress: _pickupAddress,
       destinationAddress: _destinationAddress,
+      // Real road-route distance/duration, when the Directions fetch has
+      // completed — the fare preview must use this instead of a straight-
+      // line estimate. Null (not yet loaded / failed) is a legitimate
+      // value; BookingFormBody falls back to straight-line itself.
+      routeDistanceMeters: _routeInfo?.distanceMeters,
+      routeDurationSeconds: _routeInfo?.durationSeconds,
     );
   }
 
@@ -484,6 +498,16 @@ class MapPageState extends State<MapPage> {
           padding: const EdgeInsets.only(bottom: 240),
         ),
         if (showPin) const _CenterPin(),
+        // Visible way back to Home — only relevant when this page was
+        // pushed on top of something (Home's Bike/Car cards); hidden when
+        // it's the bottom-nav "Đặt xe" tab root, where there's nothing to
+        // pop and the tab bar itself is the way to navigate away.
+        if (Navigator.of(context).canPop())
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 12,
+            left: 12,
+            child: _MapBackButton(onTap: () => Navigator.of(context).pop()),
+          ),
         // Delivery entry point — only shown before the rider starts picking
         // a Ride pickup point, so it never overlaps or interferes with the
         // Ride pickup/destination selection flow below.
@@ -516,7 +540,13 @@ class MapPageState extends State<MapPage> {
             onEditPickup: _editPickup,
             onEditDestination: _editDestination,
             onBookRide: _tripSelection != null
-                ? () => BookingBottomSheet.show(context, tripSelection: _tripSelection!, apiClient: widget.apiClient, onDriverAssigned: startTracking)
+                ? () => BookingBottomSheet.show(
+                      context,
+                      tripSelection: _tripSelection!,
+                      apiClient: widget.apiClient,
+                      onDriverAssigned: startTracking,
+                      initialCategory: widget.initialVehicleCategory,
+                    )
                 : null,
             routeDistanceText: _routeInfo?.distanceText,
             routeDurationText: _routeInfo?.durationText,
@@ -525,6 +555,31 @@ class MapPageState extends State<MapPage> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Back-to-Home button ─────────────────────────────────────────────────────
+
+class _MapBackButton extends StatelessWidget {
+  const _MapBackButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      elevation: 3,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: const Padding(
+          padding: EdgeInsets.all(10),
+          child: Icon(Icons.arrow_back, size: 20, color: Colors.black87),
+        ),
+      ),
     );
   }
 }

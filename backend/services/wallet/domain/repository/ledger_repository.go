@@ -20,4 +20,18 @@ type LedgerEntryRepository interface {
 	// FindByTransactionID returns all ledger entries that belong to a transaction.
 	// Returns an empty slice (not an error) when none exist.
 	FindByTransactionID(ctx context.Context, transactionID string) ([]entity.LedgerEntry, error)
+
+	// ListOutstandingDrivers aggregates every driver wallet's net
+	// TypeCommission entries (debit - credit) and returns those still
+	// greater than zero (Phần 10 — admin "Outstanding Drivers" view).
+	// Reads only from the ledger (Phần 13 — "Wallet không được tự tính.
+	// Mọi số liệu phải đọc từ Ledger."), never from Settlement directly.
+	ListOutstandingDrivers(ctx context.Context, limit int) ([]OutstandingDriver, error)
+}
+
+// OutstandingDriver is one row of the admin Outstanding Drivers report.
+type OutstandingDriver struct {
+	DriverID         string
+	OutstandingCents int64
+	Currency         string
 }

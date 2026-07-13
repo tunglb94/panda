@@ -60,7 +60,7 @@ func (uc *FinishTripUseCase) Execute(ctx context.Context, in FinishTripInput) (*
 	if err != nil {
 		return nil, err
 	}
-	_, err = uc.trip.CompleteTrip(ctx, in.TripID, fare.Total, fare.CurrencyCode)
+	_, err = uc.trip.CompleteTrip(ctx, in.TripID, *fare)
 	if err != nil {
 		return nil, err
 	}

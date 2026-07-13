@@ -1,0 +1,26 @@
+[
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0002",
+    "severity": 3257.214,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "hospital",
+    "severity": 98.36996816831892,
+    "detail": "Khu vực hospital có tỉ lệ cầu/cung trung bình 6.56x — thiếu tài xế nghiêm trọng."
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "cbd",
+    "severity": 57.996441586503,
+    "detail": "Khu vực cbd có tỉ lệ cầu/cung trung bình 3.87x — thiếu tài xế nghiêm trọng."
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "school",
+    "severity": 55.014365792836884,
+    "detail": "Khu vực school có tỉ lệ cầu/cung trung bình 3.67x — thiếu tài xế nghiêm trọng."
+  }
+]

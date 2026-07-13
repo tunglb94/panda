@@ -103,6 +103,7 @@ class _LoginPageState extends State<LoginPage> {
       final result = await repo.loginRider(phone);
       await widget.authState.login(
         accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
         riderId: result.riderId,
         storage: widget.tokenStorage,
       );

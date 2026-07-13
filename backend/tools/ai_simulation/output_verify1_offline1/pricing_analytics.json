@@ -1,0 +1,76 @@
+{
+  "categories": [
+    {
+      "category": "Ride Bike",
+      "trip_count": 264,
+      "average_fare_vnd": 37855.416666666664,
+      "average_commission_vnd": 8285.390151515152,
+      "average_driver_income_vnd": 29570.026515151516,
+      "average_profit_vnd": 6456.851136363637,
+      "average_market_saving_vnd": 127.73863636363636
+    },
+    {
+      "category": "Ride Bike Plus",
+      "trip_count": 114,
+      "average_fare_vnd": 45803.71052631579,
+      "average_commission_vnd": 9424.166666666666,
+      "average_driver_income_vnd": 36379.54385964912,
+      "average_profit_vnd": 7481.75,
+      "average_market_saving_vnd": 224.60526315789474
+    },
+    {
+      "category": "Ride Car",
+      "trip_count": 553,
+      "average_fare_vnd": 58751.87703435805,
+      "average_commission_vnd": 12497.867992766727,
+      "average_driver_income_vnd": 46254.00904159132,
+      "average_profit_vnd": 10248.081193490054,
+      "average_market_saving_vnd": 287.9566003616637
+    },
+    {
+      "category": "Ride Car XL",
+      "trip_count": 149,
+      "average_fare_vnd": 85494.40268456376,
+      "average_commission_vnd": 17317.798657718122,
+      "average_driver_income_vnd": 68176.60402684564,
+      "average_profit_vnd": 14586.01879194631,
+      "average_market_saving_vnd": 533.2885906040268
+    },
+    {
+      "category": "Delivery Bike",
+      "trip_count": 204,
+      "average_fare_vnd": 39138.455882352944,
+      "average_commission_vnd": 8585.45588235294,
+      "average_driver_income_vnd": 30553,
+      "average_profit_vnd": 6726.910294117646,
+      "average_market_saving_vnd": 185.48039215686273
+    },
+    {
+      "category": "Delivery Bike Plus",
+      "trip_count": 0,
+      "average_fare_vnd": 0,
+      "average_commission_vnd": 0,
+      "average_driver_income_vnd": 0,
+      "average_profit_vnd": 0,
+      "average_market_saving_vnd": 0
+    },
+    {
+      "category": "Delivery Car",
+      "trip_count": 57,
+      "average_fare_vnd": 59883.57894736842,
+      "average_commission_vnd": 13147.982456140351,
+      "average_driver_income_vnd": 46735.59649122807,
+      "average_profit_vnd": 10833.184210526317,
+      "average_market_saving_vnd": 55.36842105263158
+    },
+    {
+      "category": "Delivery Car XL",
+      "trip_count": 0,
+      "average_fare_vnd": 0,
+      "average_commission_vnd": 0,
+      "average_driver_income_vnd": 0,
+      "average_profit_vnd": 0,
+      "average_market_saving_vnd": 0
+    }
+  ]
+}

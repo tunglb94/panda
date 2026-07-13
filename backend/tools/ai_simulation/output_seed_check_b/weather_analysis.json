@@ -1,0 +1,32 @@
+{
+  "by_weather": [
+    {
+      "weather": "heavy_rain",
+      "demand_count": 364,
+      "cancelled_count": 4,
+      "cancel_rate_percent": 1.098901098901099,
+      "average_eta_minutes": 34.13672415451427,
+      "average_fare_vnd": 66001.3187250996,
+      "drivers_active_count": 29
+    },
+    {
+      "weather": "light_rain",
+      "demand_count": 379,
+      "cancelled_count": 0,
+      "cancel_rate_percent": 0,
+      "average_eta_minutes": 30.913759074583155,
+      "average_fare_vnd": 61862.93703703704,
+      "drivers_active_count": 29
+    }
+  ],
+  "assumptions": [
+    {
+      "Title": "\"Driver Online\" theo thời tiết",
+      "Detail": "Simulation không lưu số tài xế online tại từng thời điểm theo thời tiết cụ thể — dùng proxy \"số tài xế có ít nhất 1 chuyến hoàn tất trong điều kiện thời tiết này\" thay vì bịa số liệu online tức thời."
+    },
+    {
+      "Title": "\"Supply\" theo thời tiết không tách riêng",
+      "Detail": "heatmap.json's Supply layer lấy mẫu theo zone/giờ, không theo thời tiết — không tổng hợp lại thành 1 số riêng cho từng loại thời tiết vì sẽ trộn lẫn nhiều ngày có thời tiết khác nhau ở cùng khung giờ, dễ gây hiểu lầm."
+    }
+  ]
+}

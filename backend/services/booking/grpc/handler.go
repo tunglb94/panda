@@ -214,7 +214,16 @@ func (h *Handler) PayRide(ctx context.Context, req *bookingpb.StartTripRequest) 
 	if req.GetTripId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "trip_id is required")
 	}
-	result, err := h.payRide.Execute(ctx, app.PayRideInput{TripID: req.GetTripId()})
+	// payment_method is not a field on StartTripRequest (reused across
+	// Start/Pay) — same proto-extension constraint as x-service-type above;
+	// the gateway carries the rider's actual choice as incoming metadata.
+	var paymentMethod string
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if vals := md.Get("x-payment-method"); len(vals) > 0 {
+			paymentMethod = vals[0]
+		}
+	}
+	result, err := h.payRide.Execute(ctx, app.PayRideInput{TripID: req.GetTripId(), PaymentMethod: paymentMethod})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

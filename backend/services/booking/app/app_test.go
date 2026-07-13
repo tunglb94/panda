@@ -62,14 +62,14 @@ func (s *stubTrip) StartTrip(_ context.Context, tripID string) error {
 	return nil
 }
 
-func (s *stubTrip) CompleteTrip(_ context.Context, tripID string, fare int64, currency string) (*app.TripInfo, error) {
+func (s *stubTrip) CompleteTrip(_ context.Context, tripID string, fare app.FareInfo) (*app.TripInfo, error) {
 	t, ok := s.trips[tripID]
 	if !ok {
 		return nil, errors.New("trip not found")
 	}
 	t.Status = "completed"
-	t.FinalFareTotal = fare
-	t.FareCurrency = currency
+	t.FinalFareTotal = fare.Total
+	t.FareCurrency = fare.CurrencyCode
 	return t, nil
 }
 

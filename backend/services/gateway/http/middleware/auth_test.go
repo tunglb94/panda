@@ -106,6 +106,42 @@ func TestAuth_ValidToken_ClaimsInContext(t *testing.T) {
 	}
 }
 
+func TestRequireAdmin_RejectsNonAdmin(t *testing.T) {
+	svc := newTestTokenService(t)
+	token, _ := svc.GenerateAccessToken("d-1", "driver", "r-1", time.Now())
+
+	handler := middleware.Auth(svc)(middleware.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("non-admin should be rejected, want 401, got %d", w.Code)
+	}
+}
+
+func TestRequireAdmin_AllowsAdmin(t *testing.T) {
+	svc := newTestTokenService(t)
+	token, _ := svc.GenerateAccessToken("a-1", "admin", "r-1", time.Now())
+
+	handler := middleware.Auth(svc)(middleware.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("admin should be allowed, want 200, got %d", w.Code)
+	}
+}
+
 func TestAuth_BearerCaseInsensitive(t *testing.T) {
 	svc := newTestTokenService(t)
 	token, _ := svc.GenerateAccessToken("u-1", "rider", "r-1", time.Now())

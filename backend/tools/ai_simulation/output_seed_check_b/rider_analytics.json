@@ -1,17 +1,17 @@
 {
-  "average_ride_trips": 2.11,
-  "average_deliveries": 0.62,
-  "total_voucher_saved_vnd": 100642,
+  "average_ride_trips": 2.215,
+  "average_deliveries": 0.39,
+  "total_voucher_saved_vnd": 89622,
   "total_promotion_used_count": 0,
-  "average_fare_vnd": 56201.7326007326,
-  "average_price_sensitivity": 0.5057891720410773,
+  "average_fare_vnd": 63856.6679462572,
+  "average_price_sensitivity": 0.5006264796308855,
   "membership_counts": {
     "diamond": 5,
-    "free": 138,
-    "gold": 15,
-    "silver": 42
+    "free": 139,
+    "gold": 13,
+    "silver": 43
   },
-  "retention_rate_percent": 78.5,
-  "cancelled_requests_total": 3,
-  "cancellation_rate_percent": 0.5119453924914675
+  "retention_rate_percent": 84,
+  "cancelled_requests_total": 4,
+  "cancellation_rate_percent": 0.5383580080753702
 }

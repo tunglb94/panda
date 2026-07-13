@@ -8,10 +8,12 @@ import 'package:rider/core/theme/app_colors.dart';
 import 'package:rider/core/theme/app_icon_sizes.dart';
 import 'package:rider/core/theme/app_radius.dart';
 import 'package:rider/core/theme/app_spacing.dart';
+import 'package:rider/features/booking/domain/models/vehicle_option.dart';
 import 'package:rider/features/delivery/presentation/pages/delivery_form_page.dart';
 import 'package:rider/features/history/presentation/pages/trip_history_page.dart';
 import 'package:rider/features/map/presentation/pages/map_page.dart';
 import 'package:rider/shared/widgets/app_card.dart';
+import 'package:rider/shared/widgets/app_snackbar.dart';
 
 /// The "Trang chủ" tab's content — a service hub (search bar + primary
 /// service cards + a grid of secondary services), styled after Be/Xanh
@@ -21,18 +23,26 @@ import 'package:rider/shared/widgets/app_card.dart';
 /// reference apps' "hub picks the service, then a dedicated flow opens"
 /// pattern instead of dropping straight into the map on every app launch.
 ///
-/// Only lists services Panda actually has today (Đặt xe, Gửi hàng, Ví,
-/// Lịch sử, Hồ sơ) — deliberately omits reference-app tiles for services
-/// Panda doesn't offer (đặt đồ ăn, thuê xe, vé xe buýt...).
+/// Bike/Car are surfaced directly as quick picks (real vehicle artwork, see
+/// `assets/vehicles/`) so a rider can jump straight into booking a specific
+/// tier from Home instead of always landing on the generic map flow. "Đặt đồ
+/// ăn" is a demo-only tile — Panda has no food-ordering feature yet; it just
+/// shows what's coming next (per product ask), not a real entry point.
 class HomeHubPage extends StatelessWidget {
   const HomeHubPage({super.key, required this.apiClient, required this.routeProvider});
 
   final ApiClient apiClient;
   final RouteProvider routeProvider;
 
-  void _openMap(BuildContext context) {
+  void _openMap(BuildContext context, {VehicleCategory? category}) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => MapPage(apiClient: apiClient, routeProvider: routeProvider)),
+      MaterialPageRoute(
+        builder: (_) => MapPage(
+          apiClient: apiClient,
+          routeProvider: routeProvider,
+          initialVehicleCategory: category,
+        ),
+      ),
     );
   }
 
@@ -48,6 +58,10 @@ class HomeHubPage extends StatelessWidget {
     );
   }
 
+  void _showComingSoon(BuildContext context, String label) {
+    AppSnackbar.show(context, '$label chưa khả dụng — sẽ ra mắt trong giai đoạn tiếp theo.');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -61,19 +75,41 @@ class HomeHubPage extends StatelessWidget {
               children: [
                 Expanded(
                   child: _PrimaryServiceCard(
-                    icon: Icons.directions_car,
-                    label: 'Đặt xe',
+                    imageAsset: 'assets/vehicles/bike.png',
+                    label: 'Bike',
                     color: AppColors.primary,
-                    onTap: () => _openMap(context),
+                    onTap: () => _openMap(context, category: VehicleCategory.motorcycle),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: _PrimaryServiceCard(
-                    icon: Icons.local_shipping_outlined,
+                    imageAsset: 'assets/vehicles/car.png',
+                    label: 'Car',
+                    color: AppColors.primary,
+                    onTap: () => _openMap(context, category: VehicleCategory.car),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                Expanded(
+                  child: _PrimaryServiceCard(
+                    imageAsset: 'assets/services/send_package.png',
                     label: 'Gửi hàng',
                     color: AppColors.info,
                     onTap: () => _openDelivery(context),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: _PrimaryServiceCard(
+                    imageAsset: 'assets/services/order_food.png',
+                    label: 'Đặt đồ ăn',
+                    color: AppColors.info,
+                    onTap: () => _showComingSoon(context, 'Đặt đồ ăn'),
                   ),
                 ),
               ],
@@ -106,6 +142,8 @@ class HomeHubPage extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: AppSpacing.xl),
+            const _HomeBanner(),
           ],
         ),
       ),
@@ -143,9 +181,9 @@ class _SearchBar extends StatelessWidget {
 }
 
 class _PrimaryServiceCard extends StatelessWidget {
-  const _PrimaryServiceCard({required this.icon, required this.label, required this.color, required this.onTap});
+  const _PrimaryServiceCard({required this.imageAsset, required this.label, required this.color, required this.onTap});
 
-  final IconData icon;
+  final String imageAsset;
   final String label;
   final Color color;
   final VoidCallback onTap;
@@ -158,10 +196,13 @@ class _PrimaryServiceCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: AppRadius.mdAll),
-            child: Icon(icon, color: color, size: AppIconSize.md),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Image.asset(imageAsset, fit: BoxFit.contain),
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(label, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700)),
@@ -201,6 +242,25 @@ class _ServiceTile extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Fills the empty space at the bottom of Home with a promo banner. Purely
+/// decorative today — no tap action, since nothing it could link to exists
+/// yet (no promotions feature).
+class _HomeBanner extends StatelessWidget {
+  const _HomeBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: AppRadius.lgAll,
+      child: Image.asset(
+        'assets/banners/home_banner.jpg',
+        width: double.infinity,
+        fit: BoxFit.cover,
       ),
     );
   }

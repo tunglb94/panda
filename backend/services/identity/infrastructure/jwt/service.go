@@ -26,8 +26,14 @@ type AccessClaims struct {
 }
 
 // RefreshClaims holds the verified claims extracted from a valid refresh token.
+// UserType/RoleID are carried so a refresh can re-mint an access token
+// without a database round-trip (they mirror whatever was passed to
+// GenerateRefreshToken at issuance — the same values the original access
+// token was minted with).
 type RefreshClaims struct {
 	UserID    string
+	UserType  string
+	RoleID    string
 	TokenID   string
 	Family    string // token family ID for future rotation tracking
 	ExpiresAt time.Time
@@ -87,9 +93,10 @@ func (s *TokenService) GenerateAccessToken(userID, userType, roleID string, now 
 }
 
 // GenerateRefreshToken creates a signed HS256 refresh token for the given user.
-// now is the issuance time; expiry is now + Config.RefreshTokenTTL.
-// The returned RefreshToken carries metadata the application layer should persist.
-func (s *TokenService) GenerateRefreshToken(userID string, now time.Time) (*RefreshToken, error) {
+// now is the issuance time; expiry is now + Config.RefreshTokenTTL. userType/
+// roleID are embedded in the token so a later refresh can re-mint an access
+// token directly from RefreshClaims, with no database lookup.
+func (s *TokenService) GenerateRefreshToken(userID, userType, roleID string, now time.Time) (*RefreshToken, error) {
 	jti, err := generateID()
 	if err != nil {
 		return nil, err
@@ -106,6 +113,8 @@ func (s *TokenService) GenerateRefreshToken(userID string, now time.Time) (*Refr
 		Jti:    jti,
 		TknTyp: tokenKindRefresh,
 		Fam:    family,
+		UType:  userType,
+		RID:    roleID,
 	}
 	token, err := encodeToken(p, s.refreshSecret)
 	if err != nil {
@@ -167,6 +176,8 @@ func (s *TokenService) ValidateRefreshToken(token string) (*RefreshClaims, error
 	}
 	return &RefreshClaims{
 		UserID:    p.Sub,
+		UserType:  p.UType,
+		RoleID:    p.RID,
 		TokenID:   p.Jti,
 		Family:    p.Fam,
 		ExpiresAt: time.Unix(p.Exp, 0).UTC(),
@@ -204,8 +215,10 @@ type refreshPayload struct {
 	Exp    int64  `json:"exp"`
 	Iat    int64  `json:"iat"`
 	Jti    string `json:"jti"`
-	TknTyp string `json:"tkt"` // token kind discriminator
-	Fam    string `json:"fam"` // token family ID for rotation
+	TknTyp string `json:"tkt"`   // token kind discriminator
+	Fam    string `json:"fam"`   // token family ID for rotation
+	UType  string `json:"utype"` // user type — so a refresh can re-mint an access token with no DB lookup
+	RID    string `json:"rid"`   // role ID — same reason
 }
 
 // encodeToken serialises payload to JSON and produces a signed HS256 JWT string.

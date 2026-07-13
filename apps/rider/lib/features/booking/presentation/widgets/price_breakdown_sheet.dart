@@ -3,21 +3,22 @@ import 'package:flutter/material.dart';
 import 'package:rider/core/theme/app_colors.dart';
 import 'package:rider/core/theme/app_spacing.dart';
 import 'package:rider/shared/widgets/app_bottom_sheet.dart';
+import 'package:rider/shared/utils/currency_format.dart';
 
-import '../../domain/models/mock_fare_calculator.dart';
+import '../../domain/models/fare_estimate.dart';
 import '../../domain/models/promotion_info.dart';
 import '../../domain/models/surge_info.dart';
 import '../../domain/models/voucher.dart';
 
 /// Full itemised price breakdown bottom sheet. Every row here maps to a
-/// real field on [MockFareBreakdown] (which mirrors `backend/services/
-/// pricing`'s formula 1:1) — a component with no backing data source (or
-/// worth exactly 0) is omitted entirely rather than shown as a permanent
+/// real field on [FareEstimate] (the exact value the backend's Pricing
+/// service returned) — a component with no backing data source (or worth
+/// exactly 0) is omitted entirely rather than shown as a permanent
 /// placeholder row, per the production-polish "no placeholder rows" rule.
 abstract final class PriceBreakdownSheet {
   static Future<void> show(
     BuildContext context, {
-    required MockFareBreakdown fare,
+    required FareEstimate fare,
     Voucher? voucher,
     PromotionInfo? promotion,
     SurgeInfo? surge,
@@ -44,33 +45,34 @@ class _PriceBreakdownBody extends StatelessWidget {
     this.surge,
   });
 
-  final MockFareBreakdown fare;
+  final FareEstimate fare;
   final Voucher? voucher;
   final PromotionInfo? promotion;
   final SurgeInfo? surge;
 
   @override
   Widget build(BuildContext context) {
+    String money(int amount) => formatMoney(amount, fare.currencyCode);
+
     // A component that is exactly 0 (e.g. no booking fee configured for
     // this vehicle) or has no backing data source at all (airport/toll/
-    // pickup-distance surcharges — no field exists on [MockFareBreakdown])
-    // is omitted entirely, never shown as "0 đ" or a permanent placeholder
+    // pickup-distance surcharges — no field exists on [FareEstimate]) is
+    // omitted entirely, never shown as "0 đ" or a permanent placeholder
     // row — no line should ever suggest a charge that isn't real.
     final baseRows = <Widget>[
-      if (fare.baseFareCents != 0) _Row(label: 'Giá mở cửa', value: fare.format(fare.baseFareCents)),
-      if (fare.distanceFareCents != 0) _Row(label: 'Quãng đường', value: fare.format(fare.distanceFareCents)),
-      if (fare.timeFareCents != 0) _Row(label: 'Thời gian', value: fare.format(fare.timeFareCents)),
-      if (fare.bookingFeeCents != 0) _Row(label: 'Phí đặt xe', value: fare.format(fare.bookingFeeCents)),
+      if (fare.baseFare != 0) _Row(label: 'Giá mở cửa', value: money(fare.baseFare)),
+      if (fare.distanceFare != 0) _Row(label: 'Quãng đường', value: money(fare.distanceFare)),
+      if (fare.timeFare != 0) _Row(label: 'Thời gian', value: money(fare.timeFare)),
+      if (fare.bookingFee != 0) _Row(label: 'Phí đặt xe', value: money(fare.bookingFee)),
     ];
 
+    // No promotion engine is wired to any RPC yet — the backend never
+    // returns a discount amount, so a voucher can only be stated as applied
+    // (the code was sent), never with a fabricated discount.
     final adjustmentRows = <Widget>[
       if (surge != null) _Row(label: 'Giá surge', value: surge!.label, valueColor: AppColors.warning),
-      if (voucher != null && fare.discountCents != 0)
-        _Row(
-          label: 'Voucher',
-          value: '-${fare.format(fare.discountCents)} (${voucher!.title})',
-          valueColor: AppColors.primary,
-        ),
+      if (voucher != null)
+        _Row(label: 'Voucher', value: 'Đã áp dụng (${voucher!.title})', valueColor: AppColors.primary),
       if (promotion != null)
         _Row(label: 'Khuyến mãi', value: promotion!.title, valueColor: AppColors.primary),
     ];
@@ -86,7 +88,7 @@ class _PriceBreakdownBody extends StatelessWidget {
           const _Divider(),
           _Row(
             label: 'Tổng cộng',
-            value: fare.format(fare.totalCents),
+            value: money(fare.total),
             isTotal: true,
           ),
         ],

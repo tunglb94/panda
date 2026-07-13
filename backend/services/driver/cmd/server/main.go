@@ -3,15 +3,15 @@ package main
 import (
 	"context"
 
-	sharedconfig "github.com/fairride/shared/config"
-	sharedgrpc "github.com/fairride/shared/grpc"
-	sharedrds "github.com/fairride/shared/redis"
-	"github.com/fairride/shared/server"
 	"github.com/fairride/driver/app"
 	drivergrpc "github.com/fairride/driver/grpc"
 	"github.com/fairride/driver/grpc/driverpb"
 	"github.com/fairride/driver/infrastructure/postgres"
 	driverredis "github.com/fairride/driver/infrastructure/redis"
+	sharedconfig "github.com/fairride/shared/config"
+	sharedgrpc "github.com/fairride/shared/grpc"
+	sharedrds "github.com/fairride/shared/redis"
+	"github.com/fairride/shared/server"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -59,8 +59,13 @@ func register(srv *sharedgrpc.Server, ready *server.ReadinessTracker) {
 	ready.Set("redis", redisErr == nil)
 	if redisErr == nil {
 		availRepo := driverredis.NewAvailabilityRepository(redisClient)
+		driverVerificationRepo := postgres.NewDriverVerificationRepository(pool)
+		vehicleVerificationRepo := postgres.NewVehicleVerificationRepository(pool)
+		documentRepo := postgres.NewKYCDocumentRepository(pool)
+		licenseCapabilityRepo := postgres.NewLicenseCapabilityRepository(pool)
+		auditLogRepo := postgres.NewAuditLogRepository(pool)
 		availHandler := drivergrpc.NewAvailabilityHandler(
-			app.NewGoOnlineUseCase(availRepo),
+			app.NewGoOnlineUseCase(availRepo, driverVerificationRepo, vehicleVerificationRepo, documentRepo, licenseCapabilityRepo, auditLogRepo),
 			app.NewGoOfflineUseCase(availRepo),
 			app.NewHeartbeatUseCase(availRepo),
 			app.NewGetAvailabilityUseCase(availRepo),

@@ -1,0 +1,21 @@
+{
+  "total_surged_trips": 521,
+  "tier_counts": {
+    "x1.2": 303,
+    "x1.5": 21,
+    "x2": 0,
+    "x3": 0
+  },
+  "average_episode_hours": 3.5625,
+  "episode_count": 32,
+  "revenue_uplift_vnd": 7140389,
+  "driver_surge_chase_count": 0,
+  "driver_surge_stay_count": 0,
+  "driver_chase_rate_percent": 0,
+  "assumptions": [
+    {
+      "Title": "Surge episode duration",
+      "Detail": "Suy ra từ heatmap.json (chuỗi giờ liên tiếp có average_surge_multiplier \u003e 1.2 trong cùng 1 khu vực) — simulation không có khái niệm \"sự kiện surge\" với thời điểm bắt đầu/kết thúc rõ ràng như production thật, đây là proxy hợp lý nhất từ dữ liệu tick-level hiện có."
+    }
+  ]
+}

@@ -66,9 +66,10 @@ class Voucher {
   /// hides the progress row entirely rather than showing a fake 0%.
   final double? budgetUsedRatio;
 
-  /// Percent discount this voucher applies to [MockFareBreakdown.calculate]
-  /// — the same client-side estimate formula the booking screen already
-  /// uses. Real backend-computed discount amounts will replace this once
-  /// the Promotion Engine has an API.
+  /// Display-only percent discount — there is no Promotion Engine API to
+  /// apply this to a real fare (see class doc comment); the backend's
+  /// EstimateFare response never carries a discount, so this value is
+  /// never used in any fare calculation, only shown in the voucher's own
+  /// badge/detail UI.
   final int discountPercent;
 }

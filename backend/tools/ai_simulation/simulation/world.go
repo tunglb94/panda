@@ -23,6 +23,17 @@ type World struct {
 	Drivers map[string]*entity.DriverAgent
 	Riders  map[string]*entity.RiderAgent
 
+	// DriverIDs/RiderIDs are Drivers/Riders' keys, sorted once after
+	// seeding — Go randomizes map iteration order per-process, so any
+	// per-tick loop that both ranges over Drivers/Riders AND draws from
+	// Rand (processTick's rider loop, evaluateDriverState's driver loop)
+	// must iterate these slices instead of the maps directly, or the same
+	// --seed produces a different draw sequence (and therefore different
+	// results) on every run. Populated once in NewEngine; never mutated
+	// after (no driver/rider is added or removed mid-run).
+	DriverIDs []string
+	RiderIDs  []string
+
 	Weather   entity.Weather
 	Traffic   entity.Traffic
 	Scenarios entity.ActiveScenarios

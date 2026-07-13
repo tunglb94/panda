@@ -6,75 +6,48 @@ import 'package:rider/features/map/domain/models/trip_selection.dart';
 import 'payment_method.dart';
 import 'vehicle_option.dart';
 
-/// Central mock data source for the Booking UI module.
-///
-/// Every value here is a placeholder pending real backend wiring:
-/// - vehicle rates mirror `backend/services/pricing` `DefaultFareConfig`,
-///   i.e. Business Rule Bible v1.0 §2.2.1-§2.2.5 (Standard→car, XL→van;
-///   BRB v1.0 defines no motorcycle rate, so those figures are an interim
-///   estimate only — see the comment on `DefaultFareConfig` in
-///   `backend/services/pricing/domain/entity/fare.go`). Pricing service
-///   already exists — real network wiring is Roadmap stage R4.
-/// - payment methods stand in for the not-yet-started Wallet/Payment
-///   services (Roadmap stage R6)
-/// - [sampleTripSelection] stands in for a real `TripSelection` when the
+/// Static product catalog data for the Booking UI module — **not** a pricing
+/// mock. Fare calculation has been removed entirely from Flutter (see
+/// `PricingRepository.estimateFare`); everything left here is legitimate
+/// static config Panda controls directly:
+/// - [vehicles]: the tier identities/artwork/capacity Panda offers (no fare
+///   fields — those come from the backend for every quote).
+/// - [paymentMethods]: stands in for the not-yet-started Wallet/Payment
+///   services (Roadmap stage R6).
+/// - [sampleTripSelection]: stands in for a real `TripSelection` when the
 ///   Booking tab is opened directly from the bottom nav, without coming
-///   from the Map's pickup/destination flow first
+///   from the Map's pickup/destination flow first.
 class MockBookingCatalog {
   const MockBookingCatalog._();
 
-  // Vehicle Catalog Expansion (backend): Bike (motorcycle) and Car keep
-  // their original BRB-derived rates below. Bike Plus / Car XL are
-  // recognized by the backend's VehicleType allow-list but have no
-  // BRB-approved fare config yet (pricing_v3.default.yaml's placeholder
-  // comment) — shown here with isAvailable: false and zero rate fields
-  // (never read/displayed) rather than an invented price.
   static const List<VehicleOption> vehicles = [
     VehicleOption(
       category: VehicleCategory.motorcycle,
       label: 'Bike',
       icon: Icons.two_wheeler,
+      imageAsset: 'assets/vehicles/bike.png',
       capacity: 1,
-      baseFareCents: 5000,
-      perKmCents: 1600,
-      perMinuteCents: 200,
-      minimumFareCents: 12000,
-      bookingFeeCents: 2000,
     ),
     VehicleOption(
       category: VehicleCategory.bikePlus,
       label: 'Bike Plus',
       icon: Icons.two_wheeler,
+      imageAsset: 'assets/vehicles/bike_plus.png',
       capacity: 1,
-      baseFareCents: 0,
-      perKmCents: 0,
-      perMinuteCents: 0,
-      minimumFareCents: 0,
-      bookingFeeCents: 0,
-      isAvailable: false,
     ),
     VehicleOption(
       category: VehicleCategory.car,
       label: 'Car',
       icon: Icons.directions_car,
+      imageAsset: 'assets/vehicles/car.png',
       capacity: 4,
-      baseFareCents: 10000,
-      perKmCents: 4000,
-      perMinuteCents: 400,
-      minimumFareCents: 25000,
-      bookingFeeCents: 2000,
     ),
     VehicleOption(
       category: VehicleCategory.carXL,
       label: 'Car XL',
       icon: Icons.airport_shuttle,
+      imageAsset: 'assets/vehicles/car_xl.png',
       capacity: 7,
-      baseFareCents: 0,
-      perKmCents: 0,
-      perMinuteCents: 0,
-      minimumFareCents: 0,
-      bookingFeeCents: 0,
-      isAvailable: false,
     ),
   ];
 

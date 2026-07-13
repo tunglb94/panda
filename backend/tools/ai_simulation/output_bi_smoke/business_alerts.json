@@ -1,0 +1,86 @@
+{
+  "alerts": [
+    {
+      "text": "⚠ Airport thiếu tài xế — tỉ lệ cầu/cung trung bình 12.4x.",
+      "severity": 124.46824532748495
+    },
+    {
+      "text": "⚠ Surge quá nhiều — 82.7% tổng số chuyến bị surge.",
+      "severity": 82.73140397034203
+    },
+    {
+      "text": "⚠ Voucher ROI thấp — chương trình \"first_ride\" chỉ đạt 1.5x.",
+      "severity": 15.251029353167748
+    },
+    {
+      "text": "⚠ ETA vượt ngưỡng 12 phút — trung bình hiện tại 29.6 phút.",
+      "severity": 29.59715749239865
+    }
+  ],
+  "realism_score": {
+    "categories": [
+      {
+        "category": "pricing",
+        "score": 100,
+        "engine_reuse_basis": "Gọi trực tiếp FareCalculator/Dynamic Pricing Engine thật (BRB §2.2.1-§2.2.13), không viết lại công thức.",
+        "assumption_count": 0
+      },
+      {
+        "category": "promotion",
+        "score": 100,
+        "engine_reuse_basis": "Gọi trực tiếp Promotion Engine thật (backend/services/promotion), voucher/campaign BRB-sourced.",
+        "assumption_count": 0
+      },
+      {
+        "category": "dispatch",
+        "score": 100,
+        "engine_reuse_basis": "Gọi trực tiếp RequestDispatchUseCase/AcceptTripUseCase thật, thuật toán offerNextDriver không đổi.",
+        "assumption_count": 0
+      },
+      {
+        "category": "delivery",
+        "score": 96,
+        "engine_reuse_basis": "Chạy qua đúng state machine Delivery thật (backend/services/trip) — Created→Accepted→...→Completed.",
+        "assumption_count": 1
+      },
+      {
+        "category": "driver_economy",
+        "score": 59,
+        "engine_reuse_basis": "Code MỚI (không có trong production) nhưng số liệu lấy từ BRB §7.1/§7.2 công bố — không phải suy đoán tự do.",
+        "assumption_count": 4
+      },
+      {
+        "category": "demand",
+        "score": 46,
+        "engine_reuse_basis": "Công thức sinh nhu cầu (baseProb, demand multiplier theo giờ/scenario) là thiết kế mô phỏng thuần tuý, không hiệu chỉnh theo dữ liệu Panda thật.",
+        "assumption_count": 1
+      },
+      {
+        "category": "supply",
+        "score": 30,
+        "engine_reuse_basis": "Xác suất online/offline, tryStartShift là hằng số thiết kế, không có dữ liệu ca làm việc tài xế thật.",
+        "assumption_count": 5
+      },
+      {
+        "category": "passenger_behavior",
+        "score": 42,
+        "engine_reuse_basis": "Habit/PriceSensitivity/SwitchApp là mô hình hành vi giả định, không có dữ liệu hành vi khách thật.",
+        "assumption_count": 2
+      },
+      {
+        "category": "traffic",
+        "score": 50,
+        "engine_reuse_basis": "3 mức traffic xác suất đơn giản, không dùng dữ liệu GPS/giao thông thật.",
+        "assumption_count": 0
+      },
+      {
+        "category": "weather",
+        "score": 42,
+        "engine_reuse_basis": "Xác suất thời tiết cố định, không theo mùa/khí hậu VN thật.",
+        "assumption_count": 2
+      }
+    ],
+    "overall_score": 66,
+    "methodology": "Score = EngineReuseBasis (0-60, gọi engine production thật hay không) + (40 - 4*số ASSUMPTION đã công bố cho hạng mục đó, tối thiểu 0). Không phải phép đo khách quan tuyệt đối — là quy ước chấm điểm riêng của package này, không có chuẩn ngành để đối chiếu."
+  }
+}

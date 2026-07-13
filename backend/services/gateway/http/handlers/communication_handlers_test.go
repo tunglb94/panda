@@ -313,8 +313,20 @@ func (f fakeAvgRating) Execute(_ context.Context, _ string, _ reviewentity.Role)
 	return f.avg, f.count, nil
 }
 
+type fakeApprovedDriverVerification struct{}
+
+func (fakeApprovedDriverVerification) Execute(_ context.Context, driverID string) (*driverentity.DriverVerification, error) {
+	return &driverentity.DriverVerification{DriverID: driverID, Status: driverentity.KYCApproved}, nil
+}
+
+type fakeApprovedVehicleVerification struct{}
+
+func (fakeApprovedVehicleVerification) Execute(_ context.Context, driverID string) (*driverentity.VehicleVerification, error) {
+	return &driverentity.VehicleVerification{DriverID: driverID, Status: driverentity.KYCApproved}, nil
+}
+
 func TestCallHandler_ServiceUnavailableWhenNotConfigured(t *testing.T) {
-	h := handlers.NewCallHandler(nil, nil, nil, nil, nil)
+	h := handlers.NewCallHandler(nil, nil, nil, nil, nil, nil, nil, nil)
 	w := httptest.NewRecorder()
 	r := authedRequest(t, http.MethodGet, "/api/v1/rides/trip1/contact", nil)
 	r.SetPathValue("tripID", "trip1")
@@ -334,7 +346,10 @@ func TestCallHandler_GetContact_ReturnsMaskedPhoneNotRealNumber(t *testing.T) {
 	drivers := &fakeDriverByID{profiles: map[string]*driverentity.DriverProfile{
 		"driverX": {DriverID: "driverX", UserID: "user-of-driverX", VehicleType: driverentity.VehicleTypeMotorcycle, PlateNumber: "59-A1 12345"},
 	}}
-	h := handlers.NewCallHandler(tripStub, users, drivers, fakeAvgRating{avg: 4.8, count: 12}, nil)
+	h := handlers.NewCallHandler(
+		tripStub, users, drivers, fakeAvgRating{avg: 4.8, count: 12}, nil,
+		fakeApprovedDriverVerification{}, fakeApprovedVehicleVerification{}, nil,
+	)
 
 	w := httptest.NewRecorder()
 	r := authedRequest(t, http.MethodGet, "/api/v1/rides/trip1/contact", nil)

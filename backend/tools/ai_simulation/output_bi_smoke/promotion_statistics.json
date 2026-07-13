@@ -1,0 +1,11 @@
+{
+  "trips_with_promotion": 3,
+  "total_promotion_cost_vnd": 75290,
+  "average_discount_vnd": 25096.666666666668,
+  "cost_by_type_vnd": {
+    "first_ride": 75290
+  },
+  "count_by_type": {
+    "first_ride": 3
+  }
+}

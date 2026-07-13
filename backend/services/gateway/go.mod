@@ -8,6 +8,7 @@ require (
 	github.com/fairride/driver v0.0.0
 	github.com/fairride/identity v0.0.0
 	github.com/fairride/notification v0.0.0
+	github.com/fairride/pricing v0.0.0
 	github.com/fairride/review v0.0.0
 	github.com/fairride/shared v0.0.0
 	github.com/fairride/trip v0.0.0

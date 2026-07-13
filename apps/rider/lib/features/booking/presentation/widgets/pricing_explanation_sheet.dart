@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:rider/core/theme/app_colors.dart';
 import 'package:rider/core/theme/app_spacing.dart';
 import 'package:rider/shared/widgets/app_bottom_sheet.dart';
+import 'package:rider/shared/utils/currency_format.dart';
 
-import '../../domain/models/mock_fare_calculator.dart';
+import '../../domain/models/fare_estimate.dart';
 import '../../domain/models/pricing_explanation.dart';
 import '../../domain/models/surge_info.dart';
 import '../../domain/models/voucher.dart';
@@ -16,7 +17,7 @@ import '../../domain/models/voucher.dart';
 abstract final class PricingExplanationSheet {
   static Future<void> show(
     BuildContext context, {
-    required MockFareBreakdown fare,
+    required FareEstimate fare,
     required double distanceKm,
     required double durationMin,
     Voucher? voucher,
@@ -42,7 +43,7 @@ class _PricingExplanationBody extends StatelessWidget {
   const _PricingExplanationBody({required this.lines, required this.fare});
 
   final List<PricingExplanationLine> lines;
-  final MockFareBreakdown fare;
+  final FareEstimate fare;
 
   @override
   Widget build(BuildContext context) {
@@ -104,7 +105,7 @@ class _PricingExplanationBody extends StatelessWidget {
             Text('Tổng cộng', style: theme.textTheme.titleSmall),
             Flexible(
               child: Text(
-                fare.format(fare.totalCents),
+                formatMoney(fare.total, fare.currencyCode),
                 textAlign: TextAlign.right,
                 style: theme.textTheme.titleLarge?.copyWith(color: AppColors.primary),
               ),

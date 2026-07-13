@@ -10,11 +10,9 @@ import 'package:rider/core/theme/app_radius.dart';
 /// than extending `MapPage` keeps Ride's map untouched.
 ///
 /// The polyline is a straight line between the two points, not a routed
-/// path — this app has no routing/directions backend (see
-/// `MockTripMetrics`'s doc comment on the same limitation for distance/
-/// duration), so drawing a fake routed polyline would misrepresent the
-/// actual road path. A straight line honestly shows only what's known:
-/// the two endpoints.
+/// path — this app has no routing/directions backend for Delivery, so
+/// drawing a fake routed polyline would misrepresent the actual road path.
+/// A straight line honestly shows only what's known: the two endpoints.
 class DeliveryMapView extends StatelessWidget {
   const DeliveryMapView({
     super.key,

@@ -8,12 +8,12 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	domainerrors "github.com/fairride/shared/errors"
 	"github.com/fairride/wallet/app"
 	"github.com/fairride/wallet/domain/entity"
 	"github.com/fairride/wallet/domain/repository"
 	walletgrpc "github.com/fairride/wallet/grpc"
 	"github.com/fairride/wallet/grpc/walletpb"
-	domainerrors "github.com/fairride/shared/errors"
 )
 
 var (
@@ -83,6 +83,9 @@ func (r *stubLedgerRepo) FindByTransactionID(_ context.Context, txID string) ([]
 	}
 	return out, nil
 }
+func (r *stubLedgerRepo) ListOutstandingDrivers(_ context.Context, limit int) ([]repository.OutstandingDriver, error) {
+	return nil, nil
+}
 
 type stubTxRepo struct {
 	byID map[string]*entity.Transaction
@@ -104,6 +107,15 @@ func (r *stubTxRepo) FindByID(_ context.Context, id string) (*entity.Transaction
 }
 func (r *stubTxRepo) FindByReferenceID(_ context.Context, _ string) ([]*entity.Transaction, error) {
 	return nil, nil
+}
+func (r *stubTxRepo) FindByIDs(_ context.Context, ids []string) (map[string]*entity.Transaction, error) {
+	out := map[string]*entity.Transaction{}
+	for _, id := range ids {
+		if tx, ok := r.byID[id]; ok {
+			out[id] = tx
+		}
+	}
+	return out, nil
 }
 
 // ─── handler factory ─────────────────────────────────────────────────────────
@@ -138,7 +150,7 @@ func seedEntry(t *testing.T, r *stubLedgerRepo, walletID, txID string, dir entit
 
 func seedTx(t *testing.T, r *stubTxRepo) *entity.Transaction {
 	t.Helper()
-	tx, err := entity.NewTransaction("tx1", entity.TypeTripPayment, "trip-1", "USD", "", now)
+	tx, err := entity.NewTransaction("tx1", entity.TypeTripPayment, "trip-1", "", "USD", "", now)
 	if err != nil {
 		t.Fatal(err)
 	}

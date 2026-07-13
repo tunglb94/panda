@@ -9,11 +9,13 @@ import 'package:rider/core/theme/app_spacing.dart';
 import 'package:rider/features/booking/data/booking_repository.dart';
 import 'package:rider/features/map/domain/models/trip_selection.dart';
 import 'package:rider/features/trip/presentation/pages/trip_lifecycle_page.dart';
+import 'package:rider/shared/utils/currency_format.dart';
+import 'package:rider/shared/widgets/app_button.dart';
 import 'package:rider/shared/widgets/app_card.dart';
 
+import '../../data/pricing_repository.dart';
+import '../../domain/models/fare_estimate.dart';
 import '../../domain/models/mock_booking_catalog.dart';
-import '../../domain/models/mock_fare_calculator.dart';
-import '../../domain/models/mock_trip_metrics.dart';
 import '../../domain/models/payment_method.dart';
 import '../../domain/models/vehicle_option.dart';
 import '../../domain/models/voucher.dart';
@@ -27,6 +29,12 @@ import 'voucher_list_sheet.dart';
 /// Composes the full booking configuration form: trip summary, vehicle
 /// choice, fare preview, payment method, voucher picker, and the Book Ride CTA.
 ///
+/// The fare shown is always the real backend quote from
+/// `PricingRepository.estimateFare` (`POST /api/v1/rides/estimate-fare`) —
+/// Flutter performs no fare math of its own. Backend is the single source
+/// of truth: a failed quote shows an error, never a locally-computed
+/// fallback number.
+///
 /// Reused by both `BookingPage` (full-page, bottom-nav entry) and
 /// `BookingBottomSheet` (modal, invoked from the Map's confirmed selection).
 class BookingFormBody extends StatefulWidget {
@@ -35,49 +43,70 @@ class BookingFormBody extends StatefulWidget {
     required this.tripSelection,
     required this.apiClient,
     this.onDriverAssigned,
+    this.initialCategory,
   });
 
   final TripSelection tripSelection;
   final ApiClient apiClient;
   final void Function(String driverId)? onDriverAssigned;
 
+  /// Pre-selects a vehicle tier — set when the rider already tapped Bike or
+  /// Car from Home before reaching this form. Null keeps the previous
+  /// default (Car).
+  final VehicleCategory? initialCategory;
+
   @override
   State<BookingFormBody> createState() => _BookingFormBodyState();
 }
 
 class _BookingFormBodyState extends State<BookingFormBody> {
-  VehicleCategory _selectedCategory = VehicleCategory.car;
+  late VehicleCategory _selectedCategory;
   PaymentMethod _selectedPayment = MockBookingCatalog.paymentMethods.first;
   Voucher? _selectedVoucher;
   String? _bookingError;
 
-  late final double _distanceKm;
-  late final double _durationMin;
+  FareEstimate? _fareEstimate;
+  bool _loadingFare = true;
 
   @override
   void initState() {
     super.initState();
-    _distanceKm = MockTripMetrics.distanceKm(
-      widget.tripSelection.pickup,
-      widget.tripSelection.destination,
-    );
-    _durationMin = MockTripMetrics.estimateDurationMinutes(_distanceKm);
+    _selectedCategory = widget.initialCategory ?? VehicleCategory.car;
+    _loadFare();
   }
 
-  VehicleOption get _selectedVehicle => MockBookingCatalog.vehicles
-      .firstWhere((v) => v.category == _selectedCategory);
+  VehicleOption get _selectedVehicle =>
+      MockBookingCatalog.vehicles.firstWhere((v) => v.category == _selectedCategory);
 
-  MockFareBreakdown get _fare => MockFareBreakdown.calculate(
-        vehicle: _selectedVehicle,
-        distanceKm: _distanceKm,
-        durationMin: _durationMin,
-        discountPercent: _selectedVoucher?.discountPercent ?? 0,
+  Future<void> _loadFare() async {
+    setState(() => _loadingFare = true);
+    try {
+      final estimate = await PricingRepository(widget.apiClient).estimateFare(
+        pickup: widget.tripSelection.pickup,
+        destination: widget.tripSelection.destination,
+        serviceType: _selectedCategory.backendKey,
+        tripType: 'ride',
+        promoCode: _selectedVoucher?.code ?? '',
       );
+      if (!mounted) return;
+      setState(() {
+        _fareEstimate = estimate;
+        _loadingFare = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _fareEstimate = null;
+        _loadingFare = false;
+      });
+    }
+  }
 
   Future<void> _pickVoucher() async {
     final result = await VoucherListSheet.show(context, selected: _selectedVoucher);
     if (!mounted) return;
     setState(() => _selectedVoucher = result);
+    _loadFare();
   }
 
   Future<void> _pickVehicle() async {
@@ -85,11 +114,14 @@ class _BookingFormBodyState extends State<BookingFormBody> {
       context,
       options: MockBookingCatalog.vehicles,
       selected: _selectedCategory,
-      distanceKm: _distanceKm,
-      durationMin: _durationMin,
+      pickup: widget.tripSelection.pickup,
+      destination: widget.tripSelection.destination,
+      tripType: 'ride',
+      apiClient: widget.apiClient,
     );
     if (!mounted || result == null) return;
     setState(() => _selectedCategory = result);
+    _loadFare();
   }
 
   Future<void> _handleBookRide() async {
@@ -135,7 +167,7 @@ class _BookingFormBodyState extends State<BookingFormBody> {
   @override
   Widget build(BuildContext context) {
     final trip = widget.tripSelection;
-    final fare = _fare;
+    final fare = _fareEstimate;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -152,23 +184,33 @@ class _BookingFormBodyState extends State<BookingFormBody> {
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: AppSpacing.md),
-        _VehicleSummaryRow(vehicle: _selectedVehicle, fare: fare, onTap: _pickVehicle),
+        _VehicleSummaryRow(
+          vehicle: _selectedVehicle,
+          fare: fare,
+          loading: _loadingFare,
+          onTap: _pickVehicle,
+        ),
         const SizedBox(height: AppSpacing.lg),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 250),
-          child: FareSummaryCard(
-            key: ValueKey('$_selectedCategory-${_selectedVoucher?.id}'),
-            breakdown: fare,
-            distanceKm: _distanceKm,
-            durationMin: _durationMin,
-            voucher: _selectedVoucher,
-            // No promotion or surge data source exists anywhere in the
-            // backend today (see PromotionInfo/SurgeInfo doc comments) —
-            // both stay null rather than being fabricated.
-            promotion: null,
-            surge: null,
-            cheaperThanCompetitorLabel: null,
-          ),
+          child: _loadingFare
+              ? const _FareLoadingSkeleton(key: ValueKey('fare-loading'))
+              : fare != null
+                  ? FareSummaryCard(
+                      key: ValueKey('$_selectedCategory-${_selectedVoucher?.id}'),
+                      breakdown: fare,
+                      distanceKm: fare.distanceKm,
+                      durationMin: fare.durationMinutes,
+                      voucher: _selectedVoucher,
+                      // No promotion or surge data source exists anywhere in
+                      // the backend today (see PromotionInfo/SurgeInfo doc
+                      // comments) — both stay null rather than being
+                      // fabricated.
+                      promotion: null,
+                      surge: null,
+                      cheaperThanCompetitorLabel: null,
+                    )
+                  : _FareErrorView(key: const ValueKey('fare-error'), onRetry: _loadFare),
         ),
         const SizedBox(height: AppSpacing.lg),
         PaymentMethodCard(
@@ -188,12 +230,74 @@ class _BookingFormBodyState extends State<BookingFormBody> {
         const SizedBox(height: AppSpacing.xl),
         SizedBox(
           width: double.infinity,
-          child: BookRideButton(
-            label: 'Đặt ${_selectedVehicle.label} · ${fare.format(fare.totalCents)}',
-            onConfirm: _handleBookRide,
-          ),
+          child: fare != null
+              ? BookRideButton(
+                  label: 'Đặt ${_selectedVehicle.label} · ${formatMoney(fare.total, fare.currencyCode)}',
+                  onConfirm: _handleBookRide,
+                )
+              : AppButton.primary(
+                  label: 'Đặt ${_selectedVehicle.label}',
+                  isLoading: _loadingFare,
+                  onPressed: null,
+                ),
         ),
       ],
+    );
+  }
+}
+
+/// Shown in place of the [FareSummaryCard] while the real quote is loading
+/// — never a placeholder price, just a shape.
+class _FareLoadingSkeleton extends StatelessWidget {
+  const _FareLoadingSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: SizedBox(
+        height: 96,
+        child: Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown when the fare estimate call fails — the backend is the single
+/// source of truth for price, so a failure is reported honestly instead of
+/// falling back to any locally-computed number.
+class _FareErrorView extends StatelessWidget {
+  const _FareErrorView({super.key, required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Không thể tính giá',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppColors.error),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Vui lòng kiểm tra kết nối và thử lại.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(onPressed: onRetry, child: const Text('Thử lại')),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -203,15 +307,22 @@ class _BookingFormBodyState extends State<BookingFormBody> {
 /// always-visible horizontal-scroll picker with a Be/Xanh SM-style
 /// "tap to open the full list" interaction.
 class _VehicleSummaryRow extends StatelessWidget {
-  const _VehicleSummaryRow({required this.vehicle, required this.fare, required this.onTap});
+  const _VehicleSummaryRow({
+    required this.vehicle,
+    required this.fare,
+    required this.loading,
+    required this.onTap,
+  });
 
   final VehicleOption vehicle;
-  final MockFareBreakdown fare;
+  final FareEstimate? fare;
+  final bool loading;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final priceText = loading ? 'Đang tính giá…' : (fare != null ? formatMoney(fare!.total, fare!.currencyCode) : '—');
     return AppCard(
       animateIn: false,
       onTap: onTap,
@@ -222,7 +333,12 @@ class _VehicleSummaryRow extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(color: AppColors.surfaceAlt, borderRadius: AppRadius.mdAll),
-            child: Icon(vehicle.icon, color: AppColors.textPrimary, size: AppIconSize.lg),
+            child: vehicle.imageAsset != null
+                ? Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Image.asset(vehicle.imageAsset!, fit: BoxFit.contain),
+                  )
+                : Icon(vehicle.icon, color: AppColors.textPrimary, size: AppIconSize.lg),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -230,7 +346,7 @@ class _VehicleSummaryRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(vehicle.label, style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700)),
-                Text(fare.format(fare.totalCents), style: textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
+                Text(priceText, style: textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
               ],
             ),
           ),

@@ -20,6 +20,7 @@ func makeTrip(tripID, riderID string, status entity.TripStatus) *entity.Trip {
 		"123 Pickup St", "456 Dropoff Ave", "",
 		0, "", "",
 		testNow, testNow,
+		entity.CompleteFinancials{},
 	)
 }
 

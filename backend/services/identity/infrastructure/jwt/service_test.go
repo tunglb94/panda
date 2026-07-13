@@ -276,7 +276,7 @@ func TestValidateAccessToken_Malformed_TwoParts(t *testing.T) {
 func TestValidateAccessToken_RefreshTokenRejected(t *testing.T) {
 	svc := mustService(t, testConfig())
 	// A refresh token signed with the refresh secret must not validate as an access token.
-	rt, _ := svc.GenerateRefreshToken("user-1", time.Now())
+	rt, _ := svc.GenerateRefreshToken("user-1", "driver", "role-1", time.Now())
 	_, err := svc.ValidateAccessToken(rt.Token)
 	if err == nil {
 		t.Fatal("expected error when using refresh token as access token, got nil")
@@ -290,7 +290,7 @@ func TestValidateAccessToken_RefreshTokenRejected(t *testing.T) {
 
 func TestGenerateRefreshToken_ValidStructure(t *testing.T) {
 	svc := mustService(t, testConfig())
-	rt, err := svc.GenerateRefreshToken("user-1", testNow)
+	rt, err := svc.GenerateRefreshToken("user-1", "driver", "role-1", testNow)
 	if err != nil {
 		t.Fatalf("GenerateRefreshToken: %v", err)
 	}
@@ -314,8 +314,8 @@ func TestGenerateRefreshToken_ValidStructure(t *testing.T) {
 
 func TestGenerateRefreshToken_UniquePerCall(t *testing.T) {
 	svc := mustService(t, testConfig())
-	r1, _ := svc.GenerateRefreshToken("user-1", testNow)
-	r2, _ := svc.GenerateRefreshToken("user-1", testNow)
+	r1, _ := svc.GenerateRefreshToken("user-1", "driver", "role-1", testNow)
+	r2, _ := svc.GenerateRefreshToken("user-1", "driver", "role-1", testNow)
 	if r1.Token == r2.Token {
 		t.Error("expected unique tokens per call, got identical tokens")
 	}
@@ -331,7 +331,7 @@ func TestGenerateRefreshToken_UniquePerCall(t *testing.T) {
 
 func TestValidateRefreshToken_Valid(t *testing.T) {
 	svc := mustService(t, testConfig())
-	rt, err := svc.GenerateRefreshToken("user-1", time.Now())
+	rt, err := svc.GenerateRefreshToken("user-1", "driver", "role-1", time.Now())
 	if err != nil {
 		t.Fatalf("GenerateRefreshToken: %v", err)
 	}
@@ -347,13 +347,19 @@ func TestValidateRefreshToken_Valid(t *testing.T) {
 func TestValidateRefreshToken_Claims(t *testing.T) {
 	svc := mustService(t, testConfig())
 	now := time.Now().UTC()
-	rt, _ := svc.GenerateRefreshToken("user-99", now)
+	rt, _ := svc.GenerateRefreshToken("user-99", "driver", "role-1", now)
 	claims, err := svc.ValidateRefreshToken(rt.Token)
 	if err != nil {
 		t.Fatalf("ValidateRefreshToken: %v", err)
 	}
 	if claims.UserID != "user-99" {
 		t.Errorf("UserID: got %q, want %q", claims.UserID, "user-99")
+	}
+	if claims.UserType != "driver" {
+		t.Errorf("UserType: got %q, want %q", claims.UserType, "driver")
+	}
+	if claims.RoleID != "role-1" {
+		t.Errorf("RoleID: got %q, want %q", claims.RoleID, "role-1")
 	}
 	if claims.TokenID != rt.TokenID {
 		t.Errorf("TokenID: got %q, want %q", claims.TokenID, rt.TokenID)
@@ -372,7 +378,7 @@ func TestValidateRefreshToken_Claims(t *testing.T) {
 func TestValidateRefreshToken_Expired(t *testing.T) {
 	svc := mustService(t, testConfig())
 	pastNow := time.Now().Add(-testConfig().RefreshTokenTTL - time.Second)
-	rt, _ := svc.GenerateRefreshToken("user-1", pastNow)
+	rt, _ := svc.GenerateRefreshToken("user-1", "driver", "role-1", pastNow)
 
 	_, err := svc.ValidateRefreshToken(rt.Token)
 	if err == nil {
@@ -385,7 +391,7 @@ func TestValidateRefreshToken_Expired(t *testing.T) {
 
 func TestValidateRefreshToken_WrongSecret(t *testing.T) {
 	svc := mustService(t, testConfig())
-	rt, _ := svc.GenerateRefreshToken("user-1", time.Now())
+	rt, _ := svc.GenerateRefreshToken("user-1", "driver", "role-1", time.Now())
 
 	altCfg := testConfig()
 	altCfg.RefreshSecret = "different-refresh-secret-32-byte"

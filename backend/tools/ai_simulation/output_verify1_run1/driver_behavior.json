@@ -1,0 +1,14 @@
+{
+  "continue_driving_count": 6017,
+  "stop_count": 163,
+  "surge_chase_count": 0,
+  "surge_stay_count": 0,
+  "offer_accepted_count": 932,
+  "offer_rejected_count": 257,
+  "assumptions": [
+    {
+      "Title": "\"Tắt app\" và \"Đi nghỉ\" gộp chung",
+      "Detail": "ruleengine.FatigueDecision chỉ có 2 kết quả: Continue hoặc Stop — không phân biệt tài xế chủ động nghỉ ngơi khỏi việc tắt app hẳn. StopCount là tổng cả hai."
+    }
+  ]
+}

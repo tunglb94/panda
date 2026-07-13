@@ -13,15 +13,9 @@ const (
 	VehicleTypeCar        VehicleType = "car"
 	VehicleTypeMotorcycle VehicleType = "motorcycle"
 	VehicleTypeVan        VehicleType = "van"
+	VehicleTypeBikePlus   VehicleType = "bike_plus"
+	VehicleTypeCarXL      VehicleType = "car_xl"
 )
-
-// NOTE (Vehicle/Service Catalog refactor): Pricing is explicitly out of
-// scope for this refactor ("Không thay đổi Pricing") — it keeps rating by
-// VehicleType only, exactly as before. This means Bike and Bike Plus (both
-// VehicleType=motorcycle) currently price identically, and Car XL
-// (VehicleType=van, see driver's ServiceType.RequiredVehicleType) prices
-// the same as a plain Van/XL booking — there is no Bike-Plus-specific or
-// Car-XL-specific rate card. See the refactor's report, "Known Gap".
 
 // VehicleRates holds the per-vehicle-type fare parameters.
 // All monetary fields are in the smallest unit of the configured currency.
@@ -48,34 +42,48 @@ type FareConfig struct {
 	Rates map[VehicleType]VehicleRates
 }
 
-// DefaultFareConfig returns the launch-market rates from the Business Rule
-// Bible v1.0 (docs/business/business-rule-bible-v1.0.md §2.2.1-§2.2.5). VND
-// has no decimal subunit (§2.2.9), so amounts here are whole VND, not cents.
+// DefaultFareConfig returns the launch-market rates. VND has no decimal
+// subunit (BRB v1.0 §2.2.9), so amounts here are whole VND, not cents.
 //
-// VehicleTypeCar uses the BRB "Standard (4-seat)" row and VehicleTypeVan uses
-// "XL (7-seat)" — the closest match for each of this service's three
-// VehicleType values. BRB v1.0 defines no motorcycle-specific rates; the
-// VehicleTypeMotorcycle figures below are an interim estimate (~40% of the
-// Standard car rate, roughly matching observed market bike/car ratios) and
-// are NOT sourced from the BRB — replace once product defines an official
-// motorcycle rate.
+// Car/Motorcycle/BikePlus/CarXL are calibrated to undercut Be/Xanh SM by
+// ~10-20% on a real ~11.2km reference route (R7 Phú Mỹ Hưng → Ga T3 Tân
+// Sơn Nhất) rather than taken from BRB §2.2.1-§2.2.5 verbatim — the BRB
+// Standard/XL rows priced noticeably above that competitor band once
+// checked against real fares. BikePlus/CarXL are new rate cards (~1.2x
+// Bike, ~1.35x Car) so they no longer alias Motorcycle/Van pricing.
+// VehicleTypeVan keeps its original BRB XL row — it's legacy, not part of
+// the rider-facing catalog (CarXL replaced it there).
 func DefaultFareConfig() FareConfig {
 	return FareConfig{
 		CurrencyCode: "VND",
 		Rates: map[VehicleType]VehicleRates{
-			VehicleTypeCar: {
-				BaseFare:      10_000, // BRB §2.2.1 Standard
-				PerKmRate:     4_000,  // BRB §2.2.2 Standard
-				PerMinuteRate: 400,    // BRB §2.2.3 Standard
-				MinimumFare:   25_000, // BRB §2.2.4 Standard
-				BookingFee:    2_000,  // BRB §2.2.5 (flat, all classes)
-			},
 			VehicleTypeMotorcycle: {
-				BaseFare:      5_000,  // interim estimate — not in BRB v1.0
-				PerKmRate:     1_600,  // interim estimate — not in BRB v1.0
-				PerMinuteRate: 200,    // interim estimate — not in BRB v1.0
-				MinimumFare:   12_000, // interim estimate — not in BRB v1.0
-				BookingFee:    2_000,  // BRB §2.2.5 (flat, all classes)
+				BaseFare:      8_000,
+				PerKmRate:     2_800,
+				PerMinuteRate: 200,
+				MinimumFare:   15_000,
+				BookingFee:    2_000,
+			},
+			VehicleTypeBikePlus: {
+				BaseFare:      10_000,
+				PerKmRate:     3_400,
+				PerMinuteRate: 250,
+				MinimumFare:   18_000,
+				BookingFee:    2_000,
+			},
+			VehicleTypeCar: {
+				BaseFare:      15_000,
+				PerKmRate:     6_500,
+				PerMinuteRate: 400,
+				MinimumFare:   30_000,
+				BookingFee:    2_000,
+			},
+			VehicleTypeCarXL: {
+				BaseFare:      22_000,
+				PerKmRate:     8_500,
+				PerMinuteRate: 550,
+				MinimumFare:   45_000,
+				BookingFee:    2_000,
 			},
 			VehicleTypeVan: {
 				BaseFare:      18_000, // BRB §2.2.1 XL

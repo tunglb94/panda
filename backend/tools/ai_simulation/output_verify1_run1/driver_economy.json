@@ -1,0 +1,157 @@
+{
+  "segments": [
+    {
+      "category": "part_time",
+      "driver_count": 0,
+      "average_income_per_day_vnd": 0,
+      "average_income_per_month_vnd": 0,
+      "trips_per_day": 0,
+      "km_per_day": 0,
+      "online_hours_per_day": 0,
+      "driving_hours_per_day": 0,
+      "waiting_hours_per_day": 0,
+      "idle_percent": 0,
+      "fuel_cost_per_day_vnd": 0,
+      "phone_cost_per_day_vnd": 0,
+      "net_income_per_day_vnd": 0,
+      "gross_income_per_day_vnd": 0,
+      "roi": 0,
+      "acceptance_rate_percent": 0,
+      "cancel_rate_percent": 0,
+      "average_rating": 0,
+      "average_fatigue": 0,
+      "retention_percent": 0
+    },
+    {
+      "category": "regular",
+      "driver_count": 0,
+      "average_income_per_day_vnd": 0,
+      "average_income_per_month_vnd": 0,
+      "trips_per_day": 0,
+      "km_per_day": 0,
+      "online_hours_per_day": 0,
+      "driving_hours_per_day": 0,
+      "waiting_hours_per_day": 0,
+      "idle_percent": 0,
+      "fuel_cost_per_day_vnd": 0,
+      "phone_cost_per_day_vnd": 0,
+      "net_income_per_day_vnd": 0,
+      "gross_income_per_day_vnd": 0,
+      "roi": 0,
+      "acceptance_rate_percent": 0,
+      "cancel_rate_percent": 0,
+      "average_rating": 0,
+      "average_fatigue": 0,
+      "retention_percent": 0
+    },
+    {
+      "category": "full_time",
+      "driver_count": 0,
+      "average_income_per_day_vnd": 0,
+      "average_income_per_month_vnd": 0,
+      "trips_per_day": 0,
+      "km_per_day": 0,
+      "online_hours_per_day": 0,
+      "driving_hours_per_day": 0,
+      "waiting_hours_per_day": 0,
+      "idle_percent": 0,
+      "fuel_cost_per_day_vnd": 0,
+      "phone_cost_per_day_vnd": 0,
+      "net_income_per_day_vnd": 0,
+      "gross_income_per_day_vnd": 0,
+      "roi": 0,
+      "acceptance_rate_percent": 0,
+      "cancel_rate_percent": 0,
+      "average_rating": 0,
+      "average_fatigue": 0,
+      "retention_percent": 0
+    },
+    {
+      "category": "hardcore",
+      "driver_count": 50,
+      "average_income_per_day_vnd": 504146.746835443,
+      "average_income_per_month_vnd": 15124402.40506329,
+      "trips_per_day": 11.79746835443038,
+      "km_per_day": 104.75614771685613,
+      "online_hours_per_day": 21.17,
+      "driving_hours_per_day": 3.9289052844070187,
+      "waiting_hours_per_day": 17.241094715592983,
+      "idle_percent": 81.44116540195078,
+      "fuel_cost_per_day_vnd": 172638.1314373789,
+      "phone_cost_per_day_vnd": 31755.000000000004,
+      "net_income_per_day_vnd": 504146.746835443,
+      "gross_income_per_day_vnd": 639810.2151898735,
+      "roi": 2.4665542491084214,
+      "acceptance_rate_percent": 78.3851976450799,
+      "cancel_rate_percent": 0,
+      "average_rating": 4.574456166031988,
+      "average_fatigue": 0.3312805959093128,
+      "retention_percent": 79
+    }
+  ],
+  "assumptions": [
+    {
+      "Title": "Fuel cost/km",
+      "Detail": "Motorcycle 700đ, Car 2,200đ, Van 2,800đ — giả định thị trường VN, không đến từ BRB hay dữ liệu tài chính thật của Panda."
+    },
+    {
+      "Title": "Phone cost/giờ online",
+      "Detail": "1,500đ/giờ — giả định chi phí data di động, không đo lường thật."
+    },
+    {
+      "Title": "ROI công thức",
+      "Detail": "Net Income / (Fuel Cost + Phone Cost) trong cùng kỳ — định nghĩa tự chọn cho mô phỏng này, không phải công thức ROI chuẩn ngành."
+    },
+    {
+      "Title": "Tài xế chưa từng online bị loại khỏi phân loại",
+      "Detail": "Không xếp vào bucket nào (không có giờ online để tính trung bình/ngày) — tránh chia cho 0 hoặc bịa số liệu."
+    }
+  ],
+  "distribution": {
+    "vehicle_mix_percent": {
+      "bike": 34,
+      "car": 46,
+      "delivery": 0,
+      "hybrid": 20
+    },
+    "vehicle_mix_count": {
+      "bike": 17,
+      "car": 23,
+      "delivery": 0,
+      "hybrid": 10
+    },
+    "zero_trip_driver_count": 0,
+    "status_counts": {
+      "app_off": 25,
+      "eating": 0,
+      "low_battery": 0,
+      "no_network": 0,
+      "offline": 25,
+      "online": 25,
+      "refueling": 0,
+      "resting": 21
+    },
+    "assumptions": [
+      {
+        "Title": "\"Đang ăn\" không được mô hình hoá",
+        "Detail": "Không có state nghỉ-ăn riêng biệt trong simulation — driver chỉ có Online/Offline liên tục, không có sub-state theo hoạt động. Luôn báo cáo 0, không suy diễn."
+      },
+      {
+        "Title": "\"Đang đổ xăng\" không được mô hình hoá",
+        "Detail": "Fuel tự hồi phục khi offline (xem simulation/engine.go's evaluateDriverState) — không có hành động \"đổ xăng\" rời rạc để đếm. Luôn báo cáo 0."
+      },
+      {
+        "Title": "\"Mất mạng\" không được mô hình hoá",
+        "Detail": "Không có khái niệm kết nối mạng trong simulation. Luôn báo cáo 0."
+      },
+      {
+        "Title": "\"Tắt app\" = Offline",
+        "Detail": "Simulation không phân biệt tài xế chủ động tắt app với tài xế offline vì lý do khác (hết ca, factor an toàn...) — dùng chung 1 trạng thái Offline."
+      },
+      {
+        "Title": "\"Đang nghỉ\" là suy luận, không phải state thật",
+        "Detail": "Xấp xỉ bằng Offline + Fatigue\u003e0.15 (đang trong giai đoạn hồi phục) — không phải một trạng thái driver tự chọn \"tôi đang nghỉ\" trong simulation."
+      }
+    ]
+  }
+}

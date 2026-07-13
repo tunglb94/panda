@@ -1,0 +1,20 @@
+{
+  "by_traffic": [
+    {
+      "traffic": "clear",
+      "trip_count": 373,
+      "average_eta_minutes": 24.10961707806819,
+      "average_pickup_minutes": 7.092995977157465,
+      "average_trip_time_minutes": 17.01662110091072,
+      "average_driver_income_vnd": 43258.67024128686
+    },
+    {
+      "traffic": "busy",
+      "trip_count": 559,
+      "average_eta_minutes": 31.268084677885717,
+      "average_pickup_minutes": 9.307778099263903,
+      "average_trip_time_minutes": 21.960306578621786,
+      "average_driver_income_vnd": 42383.021466905186
+    }
+  ]
+}

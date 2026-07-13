@@ -4,7 +4,9 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/fairride/booking/grpc/bookingpb"
 	driverentity "github.com/fairride/driver/domain/entity"
 	"github.com/fairride/gateway/http/middleware"
 	identityentity "github.com/fairride/identity/domain/entity"
@@ -31,17 +33,50 @@ type averageRatingReader interface {
 	Execute(ctx context.Context, rateeID string, raterRole reviewentity.Role) (avg float64, count int32, err error)
 }
 
-// CallHandler exposes Phone Call (Part 1) and Contact Card (Part 4) over HTTP.
+// driverVerificationReader/vehicleVerificationReader are the driver
+// service's KYC read use cases (app.GetDriverVerificationUseCase /
+// app.GetVehicleVerificationUseCase), consumed directly as Go dependencies
+// — same in-process pattern as averageRatingReader above.
+type driverVerificationReader interface {
+	Execute(ctx context.Context, driverID string) (*driverentity.DriverVerification, error)
+}
+
+type vehicleVerificationReader interface {
+	Execute(ctx context.Context, driverID string) (*driverentity.VehicleVerification, error)
+}
+
+// CallHandler exposes Phone Call (Part 1) and Contact Card (Part 4, now
+// enriched with KYC verified badge / join date / trip count — Phần 8 of the
+// Driver KYC spec) over HTTP.
 type CallHandler struct {
 	trips      TripStatusClient
 	users      userByIDFinder
 	drivers    driverByIDFinder
 	ratings    averageRatingReader
 	recordCall *notificationapp.RecordCallUseCase
+
+	driverVerifications  driverVerificationReader
+	vehicleVerifications vehicleVerificationReader
+	// booking is reused (not a new dependency surface) purely to count a
+	// driver's completed trips for the Contact Card — read-only, no Ride
+	// Lifecycle code touched.
+	booking BookingClient
 }
 
-func NewCallHandler(trips TripStatusClient, users userByIDFinder, drivers driverByIDFinder, ratings averageRatingReader, recordCall *notificationapp.RecordCallUseCase) *CallHandler {
-	return &CallHandler{trips: trips, users: users, drivers: drivers, ratings: ratings, recordCall: recordCall}
+func NewCallHandler(
+	trips TripStatusClient,
+	users userByIDFinder,
+	drivers driverByIDFinder,
+	ratings averageRatingReader,
+	recordCall *notificationapp.RecordCallUseCase,
+	driverVerifications driverVerificationReader,
+	vehicleVerifications vehicleVerificationReader,
+	booking BookingClient,
+) *CallHandler {
+	return &CallHandler{
+		trips: trips, users: users, drivers: drivers, ratings: ratings, recordCall: recordCall,
+		driverVerifications: driverVerifications, vehicleVerifications: vehicleVerifications, booking: booking,
+	}
 }
 
 func (h *CallHandler) configured() bool {
@@ -117,7 +152,10 @@ func (h *CallHandler) contactBody(ctx context.Context, calleeID string, calleeIs
 		body["vehicle_type"] = string(profile.VehicleType)
 		body["vehicle_brand"] = profile.VehicleBrand
 		body["vehicle_model"] = profile.VehicleModel
-		body["plate_number"] = profile.PlateNumber
+		body["plate_number"] = maskPlate(profile.PlateNumber)
+		body["joined_at"] = profile.CreatedAt.UTC().Format(time.RFC3339)
+		body["is_verified"] = h.isDriverKYCVerified(ctx, calleeID)
+		body["trip_count"] = h.countCompletedTrips(ctx, calleeID)
 	}
 
 	user, err := h.users.FindByID(ctx, identityUserID)
@@ -138,6 +176,48 @@ func (h *CallHandler) contactBody(ctx context.Context, calleeID string, calleeIs
 		}
 	}
 	return body, nil
+}
+
+// isDriverKYCVerified reports whether calleeID's Driver KYC AND Vehicle
+// Verification are both Approved (Phần 8's "✓ Đã xác minh" badge) — a
+// stricter, additive check on top of DriverProfile's own legacy
+// verification_status, never that field alone.
+func (h *CallHandler) isDriverKYCVerified(ctx context.Context, driverID string) bool {
+	if h.driverVerifications == nil || h.vehicleVerifications == nil {
+		return false
+	}
+	dv, err := h.driverVerifications.Execute(ctx, driverID)
+	if err != nil || !dv.IsApproved() {
+		return false
+	}
+	vv, err := h.vehicleVerifications.Execute(ctx, driverID)
+	if err != nil || !vv.IsApproved() {
+		return false
+	}
+	return true
+}
+
+// countCompletedTrips reuses the existing BookingClient.ListDriverTrips (no
+// new Trip-service surface, no Ride Lifecycle code touched) to count a
+// driver's completed/settled trips for the Contact Card's "Số chuyến".
+// Best-effort: any failure counts as 0 rather than failing the whole
+// Contact Card response.
+func (h *CallHandler) countCompletedTrips(ctx context.Context, driverID string) int {
+	if h.booking == nil {
+		return 0
+	}
+	resp, err := h.booking.ListDriverTrips(ctx, &bookingpb.ListTripsRequest{PartyId: driverID})
+	if err != nil {
+		return 0
+	}
+	count := 0
+	for _, t := range resp.GetTrips() {
+		switch t.GetStatus() {
+		case "completed", "settled":
+			count++
+		}
+	}
+	return count
 }
 
 // Call handles POST /api/v1/rides/{tripID}/call (Part 1 — Phone Call).
@@ -201,4 +281,17 @@ func maskPhone(phone string) string {
 		return strings.Repeat("*", n)
 	}
 	return phone[:3] + strings.Repeat("*", n-6) + phone[n-3:]
+}
+
+// maskPlate hides the middle of a plate number (e.g. "59-X1 123.45" ->
+// "59****45") for the Contact Card (Phần 10 of the Driver KYC Hardening
+// spec — "Biển số (mask)"). Short/malformed plates are masked entirely
+// rather than risk showing the whole thing.
+func maskPlate(plate string) string {
+	plate = strings.TrimSpace(plate)
+	n := len(plate)
+	if n <= 4 {
+		return strings.Repeat("*", n)
+	}
+	return plate[:2] + strings.Repeat("*", n-4) + plate[n-2:]
 }

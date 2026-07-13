@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	drivergrpc "github.com/fairride/driver/grpc"
 	"github.com/fairride/driver/app"
 	"github.com/fairride/driver/domain/entity"
+	drivergrpc "github.com/fairride/driver/grpc"
 	"github.com/fairride/driver/grpc/driverpb"
 	"github.com/fairride/shared/errors"
 	"google.golang.org/grpc/codes"
@@ -55,11 +55,110 @@ func (r *stubAvailRepoH) GetAvailability(_ context.Context, id string) (*entity.
 	}, nil
 }
 
+// ─── always-approved verification stubs ───────────────────────────────────────
+// This file only exercises the gRPC handler's plumbing, not the Online
+// Guard's eligibility logic itself (that's covered by
+// driver/app/availability_test.go) — so every driver here is simply
+// pre-approved.
+
+type stubApprovedDriverVerificationRepo struct{}
+
+func (stubApprovedDriverVerificationRepo) Save(context.Context, *entity.DriverVerification) error {
+	return nil
+}
+
+func (stubApprovedDriverVerificationRepo) FindByDriverID(_ context.Context, driverID string) (*entity.DriverVerification, error) {
+	return &entity.DriverVerification{DriverID: driverID, Status: entity.KYCApproved}, nil
+}
+
+func (stubApprovedDriverVerificationRepo) FindByNationalIDNumber(context.Context, string) (*entity.DriverVerification, error) {
+	return nil, errors.NotFound("driver verification not found")
+}
+
+func (stubApprovedDriverVerificationRepo) FindByLicenseNumber(context.Context, string) (*entity.DriverVerification, error) {
+	return nil, errors.NotFound("driver verification not found")
+}
+
+func (stubApprovedDriverVerificationRepo) ListByStatus(context.Context, entity.KYCStatus, int) ([]*entity.DriverVerification, error) {
+	return nil, nil
+}
+
+func (stubApprovedDriverVerificationRepo) CountByStatus(context.Context, entity.KYCStatus) (int, error) {
+	return 0, nil
+}
+
+type stubApprovedVehicleVerificationRepo struct{}
+
+func (stubApprovedVehicleVerificationRepo) Save(context.Context, *entity.VehicleVerification) error {
+	return nil
+}
+
+func (stubApprovedVehicleVerificationRepo) FindByDriverID(_ context.Context, driverID string) (*entity.VehicleVerification, error) {
+	return &entity.VehicleVerification{DriverID: driverID, Status: entity.KYCApproved, DeliveryEnabled: true}, nil
+}
+
+func (stubApprovedVehicleVerificationRepo) FindByPlateNumber(context.Context, string) (*entity.VehicleVerification, error) {
+	return nil, errors.NotFound("vehicle verification not found")
+}
+
+func (stubApprovedVehicleVerificationRepo) FindByVIN(context.Context, string) (*entity.VehicleVerification, error) {
+	return nil, errors.NotFound("vehicle verification not found")
+}
+
+func (stubApprovedVehicleVerificationRepo) FindByEngineNumber(context.Context, string) (*entity.VehicleVerification, error) {
+	return nil, errors.NotFound("vehicle verification not found")
+}
+
+func (stubApprovedVehicleVerificationRepo) FindByChassisNumber(context.Context, string) (*entity.VehicleVerification, error) {
+	return nil, errors.NotFound("vehicle verification not found")
+}
+
+func (stubApprovedVehicleVerificationRepo) ListByFilter(context.Context, entity.KYCStatus, entity.VehicleType, entity.ServiceType, int) ([]*entity.VehicleVerification, error) {
+	return nil, nil
+}
+
+func (stubApprovedVehicleVerificationRepo) ListByFilterSortedByExpiry(context.Context, entity.KYCStatus, entity.VehicleType, entity.ServiceType, int) ([]*entity.VehicleVerification, error) {
+	return nil, nil
+}
+
+// stubNoDocumentsRepo/stubAllowAllLicenseRepo/stubNoopAuditRepo satisfy the
+// Online Guard's remaining dependencies (Phần 2/1/7) with the most
+// permissive behavior possible — this file only exercises the gRPC
+// handler's plumbing, not those checks themselves.
+type stubNoDocumentsRepo struct{}
+
+func (stubNoDocumentsRepo) Save(context.Context, *entity.KYCDocument) error { return nil }
+func (stubNoDocumentsRepo) FindByDriverAndType(context.Context, string, entity.DocumentType) (*entity.KYCDocument, error) {
+	return nil, errors.NotFound("kyc document not found")
+}
+func (stubNoDocumentsRepo) ListByDriverID(context.Context, string) ([]*entity.KYCDocument, error) {
+	return nil, nil
+}
+func (stubNoDocumentsRepo) ListVersionsByDriverAndType(context.Context, string, entity.DocumentType) ([]*entity.KYCDocument, error) {
+	return nil, nil
+}
+func (stubNoDocumentsRepo) FindByID(context.Context, string) (*entity.KYCDocument, error) {
+	return nil, errors.NotFound("kyc document not found")
+}
+
+type stubAllowAllLicenseRepo struct{}
+
+func (stubAllowAllLicenseRepo) IsAllowed(context.Context, entity.LicenseClass, entity.ServiceType) (bool, error) {
+	return true, nil
+}
+
+type stubNoopAuditRepo struct{}
+
+func (stubNoopAuditRepo) Save(context.Context, *entity.AuditLog) error { return nil }
+func (stubNoopAuditRepo) ListByDriverID(context.Context, string, int) ([]*entity.AuditLog, error) {
+	return nil, nil
+}
+
 // ─── builder ─────────────────────────────────────────────────────────────────
 
 func newAvailHandler(repo *stubAvailRepoH) *drivergrpc.AvailabilityHandler {
 	return drivergrpc.NewAvailabilityHandler(
-		app.NewGoOnlineUseCase(repo),
+		app.NewGoOnlineUseCase(repo, stubApprovedDriverVerificationRepo{}, stubApprovedVehicleVerificationRepo{}, stubNoDocumentsRepo{}, stubAllowAllLicenseRepo{}, stubNoopAuditRepo{}),
 		app.NewGoOfflineUseCase(repo),
 		app.NewHeartbeatUseCase(repo),
 		app.NewGetAvailabilityUseCase(repo),

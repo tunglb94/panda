@@ -32,16 +32,23 @@ func (r *TripRepository) Save(ctx context.Context, trip *entity.Trip) error {
 			trip_id, rider_id, driver_id, status,
 			pickup_address, dropoff_address, cancellation_reason,
 			final_fare_total, fare_currency, payment_method,
-			created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+			created_at, updated_at,
+			has_commission_detail, commission_cents, driver_income_cents,
+			voucher_discount_cents, commission_rate
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 		ON CONFLICT (trip_id) DO UPDATE SET
-			driver_id           = EXCLUDED.driver_id,
-			status              = EXCLUDED.status,
-			cancellation_reason = EXCLUDED.cancellation_reason,
-			final_fare_total    = EXCLUDED.final_fare_total,
-			fare_currency       = EXCLUDED.fare_currency,
-			payment_method      = EXCLUDED.payment_method,
-			updated_at          = EXCLUDED.updated_at`
+			driver_id              = EXCLUDED.driver_id,
+			status                 = EXCLUDED.status,
+			cancellation_reason    = EXCLUDED.cancellation_reason,
+			final_fare_total       = EXCLUDED.final_fare_total,
+			fare_currency          = EXCLUDED.fare_currency,
+			payment_method         = EXCLUDED.payment_method,
+			updated_at             = EXCLUDED.updated_at,
+			has_commission_detail  = EXCLUDED.has_commission_detail,
+			commission_cents       = EXCLUDED.commission_cents,
+			driver_income_cents    = EXCLUDED.driver_income_cents,
+			voucher_discount_cents = EXCLUDED.voucher_discount_cents,
+			commission_rate        = EXCLUDED.commission_rate`
 
 	_, err := r.pool.Exec(ctx, q,
 		trip.TripID,
@@ -56,6 +63,11 @@ func (r *TripRepository) Save(ctx context.Context, trip *entity.Trip) error {
 		trip.PaymentMethod,
 		trip.CreatedAt.UTC(),
 		trip.UpdatedAt.UTC(),
+		trip.HasCommissionDetail,
+		trip.CommissionCents,
+		trip.DriverIncomeCents,
+		trip.VoucherDiscountCents,
+		trip.CommissionRate,
 	)
 	if err != nil {
 		return domainerrors.Internal("trip: save failed").WithMeta("error", err.Error())
@@ -69,7 +81,9 @@ func (r *TripRepository) FindByID(ctx context.Context, tripID string) (*entity.T
 		SELECT trip_id, rider_id, driver_id, status,
 		       pickup_address, dropoff_address, cancellation_reason,
 		       final_fare_total, fare_currency, payment_method,
-		       created_at, updated_at
+		       created_at, updated_at,
+		       has_commission_detail, commission_cents, driver_income_cents,
+		       voucher_discount_cents, commission_rate
 		FROM trips
 		WHERE trip_id = $1`
 
@@ -82,7 +96,9 @@ func (r *TripRepository) FindByRiderID(ctx context.Context, riderID string) ([]*
 		SELECT trip_id, rider_id, driver_id, status,
 		       pickup_address, dropoff_address, cancellation_reason,
 		       final_fare_total, fare_currency, payment_method,
-		       created_at, updated_at
+		       created_at, updated_at,
+		       has_commission_detail, commission_cents, driver_income_cents,
+		       voucher_discount_cents, commission_rate
 		FROM trips
 		WHERE rider_id = $1
 		ORDER BY created_at DESC`
@@ -113,7 +129,9 @@ func (r *TripRepository) FindByDriverID(ctx context.Context, driverID string) ([
 		SELECT trip_id, rider_id, driver_id, status,
 		       pickup_address, dropoff_address, cancellation_reason,
 		       final_fare_total, fare_currency, payment_method,
-		       created_at, updated_at
+		       created_at, updated_at,
+		       has_commission_detail, commission_cents, driver_income_cents,
+		       voucher_discount_cents, commission_rate
 		FROM trips
 		WHERE driver_id = $1
 		ORDER BY created_at DESC`
@@ -146,17 +164,23 @@ type rowScanner interface {
 
 func (r *TripRepository) scanOne(row rowScanner) (*entity.Trip, error) {
 	var (
-		tripID, riderID, driverID, status            string
+		tripID, riderID, driverID, status           string
 		pickupAddress, dropoffAddress, cancellation string
 		fareCurrency, paymentMethod                 string
 		finalFareTotal                              int64
 		createdAt, updatedAt                        time.Time
+		hasCommissionDetail                         bool
+		commissionCents, driverIncomeCents          int64
+		voucherDiscountCents                        int64
+		commissionRate                              float64
 	)
 	err := row.Scan(
 		&tripID, &riderID, &driverID, &status,
 		&pickupAddress, &dropoffAddress, &cancellation,
 		&finalFareTotal, &fareCurrency, &paymentMethod,
 		&createdAt, &updatedAt,
+		&hasCommissionDetail, &commissionCents, &driverIncomeCents,
+		&voucherDiscountCents, &commissionRate,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -170,5 +194,12 @@ func (r *TripRepository) scanOne(row rowScanner) (*entity.Trip, error) {
 		pickupAddress, dropoffAddress, cancellation,
 		finalFareTotal, fareCurrency, paymentMethod,
 		createdAt.UTC(), updatedAt.UTC(),
+		entity.CompleteFinancials{
+			HasCommissionDetail:  hasCommissionDetail,
+			CommissionCents:      commissionCents,
+			DriverIncomeCents:    driverIncomeCents,
+			VoucherDiscountCents: voucherDiscountCents,
+			CommissionRate:       commissionRate,
+		},
 	), nil
 }

@@ -1,0 +1,93 @@
+[
+  {
+    "Text": "Mở rộng ngân sách cho \"Manual Coupon\" — ROI cao nhất (9.5x), 12 lượt redeem.",
+    "ExpectedImpact": "Tăng GMV và số chuyến với chi phí khuyến mãi hiệu quả",
+    "Risk": "Ngân sách marketing tăng",
+    "Priority": "Medium",
+    "Signal": 75.84468099350606
+  },
+  {
+    "Text": "Tăng mật độ tài xế tại các khu vực/khung giờ có ETA cao — ETA trung bình hiện tại 32.5 phút.",
+    "ExpectedImpact": "Giảm ETA trung bình, tăng trải nghiệm khách hàng",
+    "Risk": "Cần tăng mật độ tài xế, có thể tăng chi phí incentive",
+    "Priority": "Medium",
+    "Signal": 64.93294707455087
+  },
+  {
+    "Text": "Ưu tiên phân bổ tài xế và khuyến mãi mục tiêu tại Khu dân cư — khu vực có nhu cầu cao nhất (111 yêu cầu).",
+    "ExpectedImpact": "Tối đa hoá GMV tại khu vực có nhu cầu cao nhất",
+    "Risk": "Có thể gây mất cân bằng phân bổ tài xế ở khu vực khác",
+    "Priority": "Medium",
+    "Signal": 55.5
+  },
+  {
+    "Text": "Tăng incentive/thưởng theo giờ cho tài xế hoạt động tại Bệnh viện — tỉ lệ cầu/cung trung bình đang ở mức 5.5x.",
+    "ExpectedImpact": "Giảm ETA và tăng acceptance rate tại khu vực thiếu cung",
+    "Risk": "Chi phí incentive tăng ngắn hạn",
+    "Priority": "High",
+    "Signal": 55.030321755627895
+  },
+  {
+    "Text": "Thiết kế ưu đãi nâng hạng thành viên — 69.5% khách hàng vẫn ở hạng Free.",
+    "ExpectedImpact": "Tăng retention và giảm price sensitivity trung bình",
+    "Risk": "Cần thiết kế ưu đãi hấp dẫn nhưng không ăn mòn margin",
+    "Priority": "Medium",
+    "Signal": 34.75
+  },
+  {
+    "Text": "Đơn giản hoá điều kiện áp dụng voucher — chỉ 17.4% lượt được đề nghị chọn dùng ngay.",
+    "ExpectedImpact": "Tăng tỉ lệ redeem voucher đã phát hành",
+    "Risk": "Chi phí voucher có thể tăng nếu quá dễ áp dụng",
+    "Priority": "Low",
+    "Signal": 22.644628099173552
+  },
+  {
+    "Text": "Khuyến khích tài xế online sớm trước khung giờ 04:00 (surge trung bình 1.45x) bằng thưởng cố định thay vì để khách chịu surge toàn bộ.",
+    "ExpectedImpact": "Giảm surge trung bình cho khách, tăng thu nhập tài xế trước giờ cao điểm",
+    "Risk": "Cần ngân sách incentive bổ sung",
+    "Priority": "Medium",
+    "Signal": 21.725505208429304
+  },
+  {
+    "Text": "Điều tra nguyên nhân tài xế từ chối chuyến (fare thấp, khoảng cách xa, khu vực kém an toàn) — acceptance rate hiện tại 70.1%.",
+    "ExpectedImpact": "Tăng acceptance rate, giảm thời gian tìm tài xế cho khách",
+    "Risk": "Cần điều tra fare/khoảng cách cụ thể",
+    "Priority": "High",
+    "Signal": 19.87886944818304
+  },
+  {
+    "Text": "Tăng thưởng (bonus) cho tài xế nhận đơn Delivery — hiện chỉ chiếm 15.0% tổng số chuyến dù lợi nhuận/chuyến Delivery (759,920 VND) không thua kém Ride.",
+    "ExpectedImpact": "Tăng khối lượng Delivery, đa dạng hoá doanh thu",
+    "Risk": "Chi phí thưởng tăng ngắn hạn",
+    "Priority": "Low",
+    "Signal": 15.028790786948177
+  },
+  {
+    "Text": "Rà soát cấu trúc giá cho hạng \"Ride Bike\" — lợi nhuận trung bình/chuyến thấp hơn đáng kể so với \"Ride Car XL\".",
+    "ExpectedImpact": "Cải thiện lợi nhuận ở hạng xe yếu nhất",
+    "Risk": "Cần phân tích thêm nguyên nhân chênh lệch trước khi đổi giá",
+    "Priority": "Low",
+    "Signal": 15
+  },
+  {
+    "Text": "Theo dõi biến động GMV theo Ride (29,137,382 VND) và Delivery (4,221,564 VND) theo thời gian thực để phát hiện tính mùa vụ sớm.",
+    "ExpectedImpact": "Theo dõi tính mùa vụ để tối ưu phân bổ ngân sách marketing",
+    "Risk": "Không có",
+    "Priority": "Low",
+    "Signal": 10
+  },
+  {
+    "Text": "Đầu tư marketing cho dịch vụ Delivery — hiện chỉ chiếm 15.0% tổng số chuyến hoàn tất dù đã có đầy đủ hạ tầng vận hành.",
+    "ExpectedImpact": "Đa dạng hoá nguồn doanh thu ngoài Ride",
+    "Risk": "Chi phí marketing bổ sung cho sản phẩm mới",
+    "Priority": "Low",
+    "Signal": 5.028790786948177
+  },
+  {
+    "Text": "Điều tra nguyên nhân vận hành tại Sân bay — khu vực có số chuyến huỷ sau khi đã ghép tài xế cao nhất (1 chuyến).",
+    "ExpectedImpact": "Giảm cancellation rate",
+    "Risk": "Cần điều tra vận hành cụ thể trước khi hành động",
+    "Priority": "High",
+    "Signal": 3
+  }
+]

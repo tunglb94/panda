@@ -1,49 +1,53 @@
 {
-  "total_trips_quoted": 586,
-  "average_base_fare_vnd": 51385.30204778157,
-  "average_final_fare_vnd": 59515.79863481229,
-  "average_surge_multiplier": 1.1110097482762766,
-  "surged_trip_count": 393,
-  "surged_trip_percent": 67.06484641638225,
-  "max_surge_observed": 1.4313475997686524,
+  "total_trips_quoted": 743,
+  "average_base_fare_vnd": 50128.637954239566,
+  "average_final_fare_vnd": 66653.16285329744,
+  "average_surge_multiplier": 1.2789068516470394,
+  "surged_trip_count": 743,
+  "surged_trip_percent": 100,
+  "max_surge_observed": 1.7565834356665302,
   "fare_by_vehicle_type": {
+    "bike_plus": {
+      "count": 69,
+      "average_final_fare_vnd": 51693.30434782609
+    },
     "car": {
-      "count": 381,
-      "average_final_fare_vnd": 65188.648293963255
+      "count": 287,
+      "average_final_fare_vnd": 73801.37630662021
+    },
+    "car_xl": {
+      "count": 94,
+      "average_final_fare_vnd": 109950.43617021276
     },
     "motorcycle": {
-      "count": 167,
-      "average_final_fare_vnd": 39176.748502994014
-    },
-    "van": {
-      "count": 38,
-      "average_final_fare_vnd": 92022.78947368421
+      "count": 293,
+      "average_final_fare_vnd": 49283.70648464164
     }
   },
   "fare_histogram": [
     {
       "range_label": "0-20k",
-      "count": 24
+      "count": 7
     },
     {
       "range_label": "20-40k",
-      "count": 151
+      "count": 194
     },
     {
       "range_label": "40-60k",
-      "count": 183
+      "count": 185
     },
     {
       "range_label": "60-80k",
-      "count": 103
+      "count": 151
     },
     {
       "range_label": "80-100k",
-      "count": 62
+      "count": 91
     },
     {
       "range_label": "100-120k",
-      "count": 27
+      "count": 48
     },
     {
       "range_label": "120-140k",
@@ -51,15 +55,15 @@
     },
     {
       "range_label": "140-160k",
-      "count": 11
+      "count": 21
     },
     {
       "range_label": "160-180k",
-      "count": 2
+      "count": 17
     },
     {
       "range_label": "180k+",
-      "count": 2
+      "count": 8
     }
   ]
 }

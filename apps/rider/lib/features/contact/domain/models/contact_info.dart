@@ -12,6 +12,9 @@ class ContactInfo {
     this.vehicleBrand = '',
     this.vehicleModel = '',
     this.plateNumber = '',
+    this.isVerified = false,
+    this.joinedAt,
+    this.tripCount = 0,
   });
 
   final String name;
@@ -22,6 +25,13 @@ class ContactInfo {
   final String vehicleBrand;
   final String vehicleModel;
   final String plateNumber;
+
+  /// Driver KYC + Vehicle Verification approved (Panda Driver KYC phase).
+  /// Never derived from any raw document — the gateway only ever tells us
+  /// the boolean outcome (see call_handler.go's `isDriverKYCVerified`).
+  final bool isVerified;
+  final DateTime? joinedAt;
+  final int tripCount;
 
   bool get hasRating => ratingCount > 0;
 
@@ -34,5 +44,8 @@ class ContactInfo {
         vehicleBrand: json['vehicle_brand'] as String? ?? '',
         vehicleModel: json['vehicle_model'] as String? ?? '',
         plateNumber: json['plate_number'] as String? ?? '',
+        isVerified: json['is_verified'] as bool? ?? false,
+        joinedAt: DateTime.tryParse(json['joined_at'] as String? ?? ''),
+        tripCount: (json['trip_count'] as num?)?.toInt() ?? 0,
       );
 }

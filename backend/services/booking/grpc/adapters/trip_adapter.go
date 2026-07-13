@@ -4,7 +4,11 @@ package adapters
 
 import (
 	"context"
+	"strconv"
 	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/fairride/booking/app"
 	"github.com/fairride/trip/grpc/trippb"
@@ -52,11 +56,25 @@ func (a *TripAdapter) StartTrip(ctx context.Context, tripID string) error {
 	return err
 }
 
-func (a *TripAdapter) CompleteTrip(ctx context.Context, tripID string, finalFare int64, currency string) (*app.TripInfo, error) {
+// CompleteTrip persists fare on Trip and, when fare carries commission
+// detail from Pricing V3, forwards it as OUTGOING gRPC metadata so Trip's
+// handler can persist it too — trippb.CompleteTripRequest has no field slots
+// for it and no protoc/buf toolchain is available to add one (same
+// constraint as the "x-service-type" precedent in booking/grpc/handler.go).
+func (a *TripAdapter) CompleteTrip(ctx context.Context, tripID string, fare app.FareInfo) (*app.TripInfo, error) {
+	if fare.HasCommissionDetail {
+		ctx = metadata.AppendToOutgoingContext(ctx,
+			"x-has-commission-detail", "true",
+			"x-commission-cents", strconv.FormatInt(fare.CommissionCents, 10),
+			"x-driver-income-cents", strconv.FormatInt(fare.DriverIncomeCents, 10),
+			"x-voucher-discount-cents", strconv.FormatInt(fare.VoucherDiscountCents, 10),
+			"x-commission-rate", strconv.FormatFloat(fare.CommissionRate, 'f', -1, 64),
+		)
+	}
 	resp, err := a.client.CompleteTrip(ctx, &trippb.CompleteTripRequest{
 		TripId:         tripID,
-		FinalFareTotal: finalFare,
-		FareCurrency:   currency,
+		FinalFareTotal: fare.Total,
+		FareCurrency:   fare.CurrencyCode,
 	})
 	if err != nil {
 		return nil, err
@@ -64,12 +82,46 @@ func (a *TripAdapter) CompleteTrip(ctx context.Context, tripID string, finalFare
 	return protoToTripInfo(resp.GetTrip()), nil
 }
 
+// GetTrip reads the commission detail and real payment method back via
+// INCOMING response header metadata (see trip/grpc/handler.go's
+// setFinancialsResponseHeader) — TripProto has no payment_method or
+// commission fields, same proto-extension constraint as above.
 func (a *TripAdapter) GetTrip(ctx context.Context, tripID string) (*app.TripInfo, error) {
-	resp, err := a.client.GetTrip(ctx, &trippb.GetTripRequest{TripId: tripID})
+	var header metadata.MD
+	resp, err := a.client.GetTrip(ctx, &trippb.GetTripRequest{TripId: tripID}, grpc.Header(&header))
 	if err != nil {
 		return nil, err
 	}
-	return protoToTripInfo(resp.GetTrip()), nil
+	info := protoToTripInfo(resp.GetTrip())
+	applyTripFinancialsHeader(info, header)
+	return info, nil
+}
+
+// applyTripFinancialsHeader reads PaymentMethod/commission detail Trip's
+// gRPC handler attaches as response header metadata. No-ops (leaves info's
+// zero values) when absent or info is nil.
+func applyTripFinancialsHeader(info *app.TripInfo, md metadata.MD) {
+	if info == nil || md == nil {
+		return
+	}
+	if vals := md.Get("x-payment-method"); len(vals) > 0 {
+		info.PaymentMethod = vals[0]
+	}
+	if vals := md.Get("x-has-commission-detail"); len(vals) > 0 && vals[0] == "true" {
+		info.HasCommissionDetail = true
+	}
+	if vals := md.Get("x-commission-cents"); len(vals) > 0 {
+		info.CommissionCents, _ = strconv.ParseInt(vals[0], 10, 64)
+	}
+	if vals := md.Get("x-driver-income-cents"); len(vals) > 0 {
+		info.DriverIncomeCents, _ = strconv.ParseInt(vals[0], 10, 64)
+	}
+	if vals := md.Get("x-voucher-discount-cents"); len(vals) > 0 {
+		info.VoucherDiscountCents, _ = strconv.ParseInt(vals[0], 10, 64)
+	}
+	if vals := md.Get("x-commission-rate"); len(vals) > 0 {
+		info.CommissionRate, _ = strconv.ParseFloat(vals[0], 64)
+	}
 }
 
 func (a *TripAdapter) CancelTrip(ctx context.Context, tripID, reason string) error {

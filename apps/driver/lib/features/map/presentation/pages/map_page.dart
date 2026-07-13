@@ -15,6 +15,8 @@ import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_loading_view.dart';
 import '../../../../shared/widgets/pressable_scale.dart';
 import '../../../home/data/availability_repository.dart';
+import '../../../kyc/data/kyc_repository.dart';
+import '../../../kyc/domain/models/kyc_status.dart';
 import '../../../location/services/location_upload_service.dart';
 import '../../../trip/data/active_trip_repository.dart';
 import '../../../trip/data/trip_offer_repository.dart';
@@ -77,6 +79,10 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   bool _isToggling = false;
   String? _availError;
 
+  // — KYC gating (Phần 7 — Online Switch chỉ mở khi đã Approved) ——————————————
+  late final KYCRepository _kycRepo;
+  bool _canGoOnline = true;
+
   // — Trip status mirror (read-only — see class doc) ——————————————————————————
   late final TripOfferRepository _offerRepo;
   late final ActiveTripRepository _activeTripRepo;
@@ -98,8 +104,10 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
     _availRepo = AvailabilityRepository(widget.apiClient);
     _offerRepo = TripOfferRepository(apiClient: widget.apiClient);
     _activeTripRepo = ActiveTripRepository(apiClient: widget.apiClient);
+    _kycRepo = KYCRepository(widget.apiClient);
     _resolveLocation();
     _fetchAvailability();
+    _fetchKYCEligibility();
   }
 
   @override
@@ -185,6 +193,30 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
       // Non-fatal — default to offline
     } finally {
       if (mounted) setState(() => _isLoadingStatus = false);
+    }
+  }
+
+  /// Phần 7/11 — best-effort: never blocks Home from loading, just gates the
+  /// Switch once known. The real enforcement (including auto-expiring a
+  /// document that's passed its date) is server-side in `GoOnlineUseCase`
+  /// (Online Guard) — this mirrors the same "documents not expired" check
+  /// client-side so the Switch shows disabled proactively, before the
+  /// driver even attempts to go online, rather than only after a failed
+  /// attempt flips the verification to Expired server-side.
+  Future<void> _fetchKYCEligibility() async {
+    try {
+      final driver = await _kycRepo.getDriverVerification();
+      final vehicle = await _kycRepo.getVehicleVerification();
+      var eligible = (driver?.status.isApproved ?? false) &&
+          (vehicle?.status.isApproved ?? false);
+      if (eligible) {
+        final documents = await _kycRepo.listDocuments();
+        eligible = !documents.any((d) => d.uploaded && d.expired);
+      }
+      if (mounted) setState(() => _canGoOnline = eligible);
+    } catch (_) {
+      // Non-fatal — leave the switch enabled and let the server-side guard
+      // be the source of truth if this check couldn't complete.
     }
   }
 
@@ -401,6 +433,7 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
             dropoffAddress: _tripDropoffAddress,
             countdownSeconds: _offerCountdown,
             fareLabel: _tripFareLabel,
+            canGoOnline: _canGoOnline,
             onToggleOnline: _toggle,
             onViewTrip: _goToTrips,
           ),

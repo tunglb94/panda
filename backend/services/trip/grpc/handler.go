@@ -3,8 +3,11 @@ package grpc
 
 import (
 	"context"
+	"strconv"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -170,7 +173,25 @@ func (h *Handler) GetTrip(ctx context.Context, req *trippb.GetTripRequest) (*tri
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
+	setTripFinancialsHeader(ctx, trip)
 	return &trippb.TripResponse{Trip: toProto(trip)}, nil
+}
+
+// setTripFinancialsHeader exposes PaymentMethod and commission detail as
+// OUTGOING response header metadata — TripProto has no field slots for
+// either (no protoc/buf toolchain available to add them). Callers that need
+// durable, non-invented commission numbers (Gateway's SettlementEngine) read
+// this instead of Trip's own FinalFareTotal * a self-chosen rate.
+func setTripFinancialsHeader(ctx context.Context, trip *entity.Trip) {
+	md := metadata.Pairs("x-payment-method", trip.PaymentMethod)
+	if trip.HasCommissionDetail {
+		md.Append("x-has-commission-detail", "true")
+		md.Append("x-commission-cents", strconv.FormatInt(trip.CommissionCents, 10))
+		md.Append("x-driver-income-cents", strconv.FormatInt(trip.DriverIncomeCents, 10))
+		md.Append("x-voucher-discount-cents", strconv.FormatInt(trip.VoucherDiscountCents, 10))
+		md.Append("x-commission-rate", strconv.FormatFloat(trip.CommissionRate, 'f', -1, 64))
+	}
+	_ = grpc.SetHeader(ctx, md)
 }
 
 // MarkDriverArrived implements TripServiceServer.MarkDriverArrived.
@@ -205,10 +226,32 @@ func (h *Handler) CompleteTrip(ctx context.Context, req *trippb.CompleteTripRequ
 	if req.GetFareCurrency() == "" {
 		return nil, status.Error(codes.InvalidArgument, "fare_currency is required")
 	}
+	// Commission detail has no field on CompleteTripRequest — carried as
+	// incoming metadata from Booking's TripAdapter.CompleteTrip (same
+	// proto-extension constraint as x-service-type in booking/grpc/handler.go).
+	var fin entity.CompleteFinancials
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if vals := md.Get("x-has-commission-detail"); len(vals) > 0 && vals[0] == "true" {
+			fin.HasCommissionDetail = true
+			if v := md.Get("x-commission-cents"); len(v) > 0 {
+				fin.CommissionCents, _ = strconv.ParseInt(v[0], 10, 64)
+			}
+			if v := md.Get("x-driver-income-cents"); len(v) > 0 {
+				fin.DriverIncomeCents, _ = strconv.ParseInt(v[0], 10, 64)
+			}
+			if v := md.Get("x-voucher-discount-cents"); len(v) > 0 {
+				fin.VoucherDiscountCents, _ = strconv.ParseInt(v[0], 10, 64)
+			}
+			if v := md.Get("x-commission-rate"); len(v) > 0 {
+				fin.CommissionRate, _ = strconv.ParseFloat(v[0], 64)
+			}
+		}
+	}
 	trip, err := h.completeTrip.Execute(ctx, app.CompleteTripInput{
 		TripID:         req.GetTripId(),
 		FinalFareTotal: req.GetFinalFareTotal(),
 		FareCurrency:   req.GetFareCurrency(),
+		Financials:     fin,
 	})
 	if err != nil {
 		return nil, toGRPCError(err)

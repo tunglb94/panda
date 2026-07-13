@@ -86,6 +86,9 @@ func TestLogin_Success(t *testing.T) {
 	if resp["access_token"] == "" {
 		t.Error("expected non-empty access_token")
 	}
+	if resp["refresh_token"] == "" {
+		t.Error("expected non-empty refresh_token")
+	}
 	if resp["driver_id"] != "drv-001" {
 		t.Errorf("driver_id = %q, want drv-001", resp["driver_id"])
 	}
@@ -183,6 +186,9 @@ func TestRiderLogin_Success(t *testing.T) {
 	if resp["access_token"] == "" {
 		t.Error("expected non-empty access_token")
 	}
+	if resp["refresh_token"] == "" {
+		t.Error("expected non-empty refresh_token")
+	}
 	if resp["rider_id"] != "user-002" {
 		t.Errorf("rider_id = %q, want user-002", resp["rider_id"])
 	}
@@ -247,5 +253,88 @@ func TestRiderLogin_DBNotConfigured(t *testing.T) {
 	h.RiderLogin(w, req)
 	if w.Code != http.StatusServiceUnavailable {
 		t.Errorf("status = %d, want 503", w.Code)
+	}
+}
+
+// ─── Refresh tests ─────────────────────────────────────────────────────────────
+
+func TestRefresh_Success(t *testing.T) {
+	h, uf, df := newAuthHandler(t)
+	uf.user = testUser()
+	df.driver = testDriver()
+
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login",
+		strings.NewReader(`{"phone":"+1234567890"}`))
+	loginW := httptest.NewRecorder()
+	h.Login(loginW, loginReq)
+	var loginResp map[string]string
+	if err := json.NewDecoder(loginW.Body).Decode(&loginResp); err != nil {
+		t.Fatalf("decode login response: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/refresh",
+		strings.NewReader(`{"refresh_token":"`+loginResp["refresh_token"]+`"}`))
+	w := httptest.NewRecorder()
+	h.Refresh(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 — body: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["access_token"] == "" {
+		t.Error("expected non-empty access_token")
+	}
+	if resp["refresh_token"] == "" {
+		t.Error("expected non-empty refresh_token")
+	}
+	if resp["access_token"] == loginResp["access_token"] {
+		t.Error("expected a freshly minted access_token, not the original one")
+	}
+}
+
+func TestRefresh_MissingToken(t *testing.T) {
+	h, _, _ := newAuthHandler(t)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/refresh", strings.NewReader(`{}`))
+	w := httptest.NewRecorder()
+	h.Refresh(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", w.Code)
+	}
+}
+
+func TestRefresh_InvalidToken(t *testing.T) {
+	h, _, _ := newAuthHandler(t)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/refresh",
+		strings.NewReader(`{"refresh_token":"not-a-real-token"}`))
+	w := httptest.NewRecorder()
+	h.Refresh(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", w.Code)
+	}
+}
+
+func TestRefresh_RejectsAccessTokenUsedAsRefreshToken(t *testing.T) {
+	h, uf, df := newAuthHandler(t)
+	uf.user = testUser()
+	df.driver = testDriver()
+
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login",
+		strings.NewReader(`{"phone":"+1234567890"}`))
+	loginW := httptest.NewRecorder()
+	h.Login(loginW, loginReq)
+	var loginResp map[string]string
+	if err := json.NewDecoder(loginW.Body).Decode(&loginResp); err != nil {
+		t.Fatalf("decode login response: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/refresh",
+		strings.NewReader(`{"refresh_token":"`+loginResp["access_token"]+`"}`))
+	w := httptest.NewRecorder()
+	h.Refresh(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401 — an access token must not work as a refresh token", w.Code)
 	}
 }

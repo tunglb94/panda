@@ -4,34 +4,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:rider/features/booking/domain/models/mock_fare_calculator.dart';
+import 'package:rider/features/booking/domain/models/fare_estimate.dart';
 import 'package:rider/features/booking/domain/models/pricing_explanation.dart';
 import 'package:rider/features/booking/domain/models/surge_info.dart';
-import 'package:rider/features/booking/domain/models/vehicle_option.dart';
 import 'package:rider/features/booking/domain/models/voucher.dart';
 
-MockFareBreakdown _fare({int discountPercent = 0}) => MockFareBreakdown.calculate(
-      vehicle: const VehicleOption(
-        category: VehicleCategory.car,
-        label: 'Ô tô',
-        icon: Icons.directions_car,
-        capacity: 4,
-        baseFareCents: 10000,
-        perKmCents: 4000,
-        perMinuteCents: 400,
-        minimumFareCents: 25000,
-        bookingFeeCents: 2000,
-      ),
-      distanceKm: 8.3,
-      durationMin: 18,
-      discountPercent: discountPercent,
-    );
+const _fare = FareEstimate(
+  serviceType: 'car',
+  vehicleType: 'car',
+  distanceKm: 8.3,
+  durationMinutes: 18,
+  baseFare: 10000,
+  distanceFare: 33200,
+  timeFare: 7200,
+  bookingFee: 2000,
+  rideFare: 50400,
+  total: 52400,
+  currencyCode: 'VND',
+  isFinal: false,
+);
 
 void main() {
   group('PricingExplanation.build', () {
     test('No Voucher: shows "Không áp dụng voucher" and no discount line', () {
       final lines = PricingExplanation.build(
-        fare: _fare(),
+        fare: _fare,
         distanceKm: 8.3,
         durationMin: 18,
         requestTime: DateTime(2026, 1, 5, 22), // Monday 22:00 — off-peak
@@ -40,10 +37,10 @@ void main() {
       );
 
       expect(lines.map((l) => l.text), contains('Không áp dụng voucher'));
-      expect(lines.any((l) => l.text.startsWith('Voucher')), isFalse);
+      expect(lines.any((l) => l.text.startsWith('Voucher') || l.text.startsWith('Áp dụng mã')), isFalse);
     });
 
-    test('Voucher: shows the voucher code and discount amount', () {
+    test('Voucher: shows the voucher code was applied (no discount amount — backend has none)', () {
       const voucher = Voucher(
         id: 'v1',
         code: 'FIRST50',
@@ -53,11 +50,9 @@ void main() {
         accentColor: Colors.orange,
         discountLabel: '-50%',
         status: VoucherStatus.applied,
-        discountPercent: 50,
       );
-      final fare = _fare(discountPercent: 50);
       final lines = PricingExplanation.build(
-        fare: fare,
+        fare: _fare,
         distanceKm: 8.3,
         durationMin: 18,
         requestTime: DateTime(2026, 1, 5, 22),
@@ -65,14 +60,13 @@ void main() {
         surge: null,
       );
 
-      final voucherLine = lines.firstWhere((l) => l.text.startsWith('Voucher'));
+      final voucherLine = lines.firstWhere((l) => l.text.startsWith('Áp dụng mã'));
       expect(voucherLine.text, contains('FIRST50'));
-      expect(voucherLine.text, contains(fare.format(fare.discountCents)));
     });
 
     test('distance/duration lines reflect the real trip geometry', () {
       final lines = PricingExplanation.build(
-        fare: _fare(),
+        fare: _fare,
         distanceKm: 8.3,
         durationMin: 18,
         requestTime: DateTime(2026, 1, 5, 22),
@@ -83,7 +77,7 @@ void main() {
 
     test('peak hour window (BRB §2.2.12): weekday 08:00 is flagged as peak', () {
       final lines = PricingExplanation.build(
-        fare: _fare(),
+        fare: _fare,
         distanceKm: 8.3,
         durationMin: 18,
         requestTime: DateTime(2026, 1, 5, 8, 0), // Monday 08:00
@@ -93,7 +87,7 @@ void main() {
 
     test('peak hour window (BRB §2.2.12): weekday 14:00 is not peak', () {
       final lines = PricingExplanation.build(
-        fare: _fare(),
+        fare: _fare,
         distanceKm: 8.3,
         durationMin: 18,
         requestTime: DateTime(2026, 1, 5, 14, 0), // Monday 14:00
@@ -103,7 +97,7 @@ void main() {
 
     test('peak hour window (BRB §2.2.12): Saturday 08:00 is not peak (weekday-only rule)', () {
       final lines = PricingExplanation.build(
-        fare: _fare(),
+        fare: _fare,
         distanceKm: 8.3,
         durationMin: 18,
         requestTime: DateTime(2026, 1, 3, 8, 0), // Saturday 08:00
@@ -113,7 +107,7 @@ void main() {
 
     test('No surge: shows "Không áp dụng Surge"', () {
       final lines = PricingExplanation.build(
-        fare: _fare(),
+        fare: _fare,
         distanceKm: 8.3,
         durationMin: 18,
         requestTime: DateTime(2026, 1, 5, 22),
@@ -125,7 +119,7 @@ void main() {
     test('Surge present: shows the surge label and is flagged non-positive', () {
       const surge = SurgeInfo(label: 'Giá đang thay đổi', explanation: 'Nhu cầu tăng cao tạm thời.');
       final lines = PricingExplanation.build(
-        fare: _fare(),
+        fare: _fare,
         distanceKm: 8.3,
         durationMin: 18,
         requestTime: DateTime(2026, 1, 5, 22),

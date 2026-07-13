@@ -1,0 +1,20 @@
+[
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "hospital",
+    "severity": 92.97655475167116,
+    "detail": "Khu vực hospital có tỉ lệ cầu/cung trung bình 6.20x — thiếu tài xế nghiêm trọng."
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "cbd",
+    "severity": 69.79537709427318,
+    "detail": "Khu vực cbd có tỉ lệ cầu/cung trung bình 4.65x — thiếu tài xế nghiêm trọng."
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "school",
+    "severity": 67.1908482541069,
+    "detail": "Khu vực school có tỉ lệ cầu/cung trung bình 4.48x — thiếu tài xế nghiêm trọng."
+  }
+]

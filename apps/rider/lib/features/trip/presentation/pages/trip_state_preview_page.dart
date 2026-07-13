@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'package:rider/core/network/api_client.dart';
 import 'package:rider/features/booking/domain/models/mock_booking_catalog.dart';
-import 'package:rider/features/booking/domain/models/mock_fare_calculator.dart';
 import 'package:rider/features/map/domain/models/trip_selection.dart';
+import 'package:rider/shared/utils/currency_format.dart';
 
 import '../../domain/models/driver_profile.dart';
 import '../../domain/models/rider_trip_status.dart';
@@ -33,12 +33,10 @@ class TripStatePreviewPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final vehicle = MockBookingCatalog.vehicles.first;
-    final fare = MockFareBreakdown.calculate(
-      vehicle: vehicle,
-      distanceKm: 6.4,
-      durationMin: 14,
-    );
+    // Dev-only preview screen (see class doc comment) — a fixed sample
+    // amount is fine here; this never reaches a real rider and isn't the
+    // real booking flow, which always quotes via PricingRepository.
+    final fareText = formatMoney(45000, 'VND');
     const driver = DriverProfile(
       vehicleBrand: 'Toyota',
       vehicleModel: 'Vios',
@@ -86,7 +84,7 @@ class TripStatePreviewPage extends StatelessWidget {
                   TripCompletedView(
                     tripSelection: _sampleTrip,
                     driver: driver,
-                    fareText: fare.format(fare.totalCents),
+                    fareText: fareText,
                     onDone: () => Navigator.of(context).pop(),
                   ),
                 RiderTripStatus.cancelled => TripCancelledView(

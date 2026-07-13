@@ -1,0 +1,18 @@
+{
+  "switch_to_competitor_percent": 0.7299270072992701,
+  "stay_on_panda_percent": 99.27007299270073,
+  "voucher_use_percent": 17.355371900826448,
+  "voucher_keep_percent": 82.64462809917356,
+  "cancelled_by_price_or_loyalty_percent": 0.5383580080753702,
+  "not_modeled": [
+    "huỷ vì ETA",
+    "huỷ vì Driver",
+    "đợi thêm (chờ lâu hơn thay vì huỷ)"
+  ],
+  "assumptions": [
+    {
+      "Title": "Chỉ có 1 lý do huỷ chủ động của khách",
+      "Detail": "SwitchAppDecision (giá + lòng trung thành) là quyết định huỷ DUY NHẤT ride_flow.go/delivery_flow.go mô hình hoá. Không có logic riêng cho \"huỷ vì ETA cao\" hay \"huỷ vì driver\" — báo cáo trung thực 0/not_modeled thay vì suy diễn tỉ lệ giả."
+    }
+  ]
+}

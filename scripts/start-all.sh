@@ -68,7 +68,7 @@ fi
 fail() { echo "FATAL: $1" >&2; exit 1; }
 
 # ─── 1. Docker infra ─────────────────────────────────────────────────────────
-echo "== 1/6 Docker infra =="
+echo "== 1/7 Docker infra =="
 docker info >/dev/null 2>&1 || fail "Docker is not running. Start Docker Desktop first."
 
 cd "$INFRA_DIR"
@@ -88,7 +88,7 @@ done
 echo "Postgres: healthy. Redis: $(docker exec fairride_redis redis-cli -a "$REDIS_PASSWORD" ping 2>/dev/null)"
 
 # ─── 2. Migrations + seed data (idempotent) ──────────────────────────────────
-echo "== 2/6 Database migrations + seed =="
+echo "== 2/7 Database migrations + seed =="
 for f in "$BACKEND_DIR"/migrations/*.up.sql; do
   docker exec -i fairride_postgres psql -U fairride -d fairride < "$f" >/dev/null || fail "migration failed: $f"
 done
@@ -97,7 +97,7 @@ docker exec -i fairride_postgres psql -U fairride -d fairride < "$ROOT_DIR/scrip
 echo "Schema + dev seed data (Rider +84900000001 / Driver +84900000002) applied."
 
 # ─── 3. Build services ────────────────────────────────────────────────────────
-echo "== 3/6 Building services =="
+echo "== 3/7 Building services =="
 cd "$BACKEND_DIR"
 for entry in "${SERVICES[@]}" "gateway::"; do
   name="${entry%%:*}"
@@ -106,7 +106,7 @@ for entry in "${SERVICES[@]}" "gateway::"; do
 done
 
 # ─── 4. Launch services ──────────────────────────────────────────────────────
-echo "== 4/6 Starting services =="
+echo "== 4/7 Starting services =="
 
 start_service() {
   local name="$1"; shift
@@ -146,12 +146,12 @@ sleep 2
 
 HTTP_ADDR=:8080 \
   JWT_ACCESS_SECRET="$JWT_ACCESS_SECRET" JWT_REFRESH_SECRET="$JWT_REFRESH_SECRET" \
-  BOOKING_ADDR=:50060 DRIVER_ADDR=:50053 DISPATCH_ADDR=:50055 REVIEW_ADDR=:50057 \
+  BOOKING_ADDR=:50060 DRIVER_ADDR=:50053 DISPATCH_ADDR=:50055 REVIEW_ADDR=:50057 TRIP_ADDR=:50054 \
   DB_URL="$DB_URL" \
   start_service gateway
 
 # ─── 5. Wait + verify ────────────────────────────────────────────────────────
-echo "== 5/6 Verifying =="
+echo "== 5/7 Verifying =="
 sleep 3
 if curl -sf http://localhost:8080/health >/dev/null; then
   echo "Gateway /health: OK"
@@ -159,7 +159,7 @@ else
   echo "WARNING: gateway /health did not respond — check backend/logs/gateway.log"
 fi
 
-echo "== 6/6 Status =="
+echo "== 6/7 Status =="
 for entry in "${SERVICES[@]}" "gateway:-:8080"; do
   name="${entry%%:*}"
   pid_file="$PID_DIR/$name.pid"
@@ -173,4 +173,44 @@ done
 LAN_IP="$(ipconfig 2>/dev/null | grep -A1 'Ethernet adapter Ethernet' | grep 'IPv4' | awk -F': ' '{print $2}' | tr -d '\r' | head -1)"
 echo ""
 echo "READY. Gateway: http://localhost:8080  (phones: http://${LAN_IP:-<this-machine-LAN-IP>}:8080)"
+
+# ─── 7. Cloudflare quick tunnel ───────────────────────────────────────────────
+# So the Rider/Driver APKs can reach the gateway from anywhere (real device,
+# emulator, different network) via a stable-for-this-session public HTTPS
+# URL instead of localhost/10.0.2.2, which only resolve on this machine.
+echo "== 7/7 Cloudflare tunnel =="
+CLOUDFLARED="/c/Program Files (x86)/cloudflared/cloudflared.exe"
+CF_CONFIG="$HOME/.cloudflared/config.yml"
+if [[ -f "$CF_CONFIG" ]]; then
+  # A stale named-tunnel config.yml (from an unrelated project) silently
+  # overrides --url's ingress with its own catch-all http_status:404 rule,
+  # so every request through the quick tunnel 404s even though the
+  # connector reports "Registered tunnel connection". Move it aside rather
+  # than delete it — it may belong to another project on this machine.
+  mv "$CF_CONFIG" "$CF_CONFIG.bak"
+  echo "Moved stale $CF_CONFIG aside (was overriding quick-tunnel routing) -> config.yml.bak"
+fi
+if [[ -x "$CLOUDFLARED" ]]; then
+  rm -f "$LOG_DIR/cloudflared.log"
+  "$CLOUDFLARED" tunnel --url http://localhost:8080 >"$LOG_DIR/cloudflared.log" 2>&1 &
+  echo $! > "$PID_DIR/cloudflared.pid"
+  TUNNEL_URL=""
+  for i in $(seq 1 30); do
+    TUNNEL_URL="$(grep -o 'https://[a-zA-Z0-9-]*\.trycloudflare\.com' "$LOG_DIR/cloudflared.log" | head -1)"
+    [[ -n "$TUNNEL_URL" ]] && break
+    sleep 1
+  done
+  if [[ -n "$TUNNEL_URL" ]]; then
+    echo "Tunnel: $TUNNEL_URL"
+    for f in "$ROOT_DIR/apps/rider/lib/core/config/app_config.dart" "$ROOT_DIR/apps/driver/lib/core/config/app_config.dart"; do
+      sed -i -E "s#defaultValue: 'https://[a-zA-Z0-9-]*\.trycloudflare\.com'#defaultValue: '$TUNNEL_URL'#" "$f"
+      echo "  updated ${f#$ROOT_DIR/}"
+    done
+  else
+    echo "WARNING: tunnel URL did not appear in time — check backend/logs/cloudflared.log"
+  fi
+else
+  echo "WARNING: cloudflared not found at $CLOUDFLARED — skipping tunnel, apps must use localhost"
+fi
+
 echo "Stop everything with: ./scripts/start-all.sh --stop"

@@ -5,15 +5,16 @@ import 'package:rider/core/network/api_client.dart';
 import 'package:rider/core/places/nominatim_places_service.dart';
 import 'package:rider/core/theme/app_colors.dart';
 import 'package:rider/core/theme/app_spacing.dart';
+import 'package:rider/features/booking/data/pricing_repository.dart';
+import 'package:rider/features/booking/domain/models/fare_estimate.dart';
 import 'package:rider/features/booking/domain/models/mock_booking_catalog.dart';
-import 'package:rider/features/booking/domain/models/mock_fare_calculator.dart';
-import 'package:rider/features/booking/domain/models/mock_trip_metrics.dart';
 import 'package:rider/features/booking/domain/models/vehicle_option.dart';
 import 'package:rider/features/delivery/data/delivery_repository.dart';
 import 'package:rider/features/delivery/domain/models/package_category.dart';
 import 'package:rider/features/delivery/presentation/pages/delivery_lifecycle_page.dart';
 import 'package:rider/features/map/presentation/pages/map_address_picker_page.dart';
 import 'package:rider/features/map/presentation/widgets/place_search_field.dart';
+import 'package:rider/shared/utils/currency_format.dart';
 import 'package:rider/shared/widgets/app_button.dart';
 import 'package:rider/shared/widgets/app_card.dart';
 import 'package:rider/shared/widgets/app_snackbar.dart';
@@ -59,6 +60,9 @@ class _DeliveryFormPageState extends State<DeliveryFormPage> {
   VehicleOption _vehicle = MockBookingCatalog.vehicles.first;
   bool _booking = false;
 
+  FareEstimate? _fareEstimate;
+  bool _loadingFare = false;
+
   @override
   void dispose() {
     _senderNameController.dispose();
@@ -89,21 +93,47 @@ class _DeliveryFormPageState extends State<DeliveryFormPage> {
         _receiverLocation = location;
       }
     });
+    _loadFare();
   }
 
   bool get _hasRoute => _pickupLocation != null && _receiverLocation != null;
 
   bool get _canBook =>
-      _hasRoute && _receiverNameController.text.trim().isNotEmpty && _receiverPhoneController.text.trim().isNotEmpty;
+      _hasRoute &&
+      _fareEstimate != null &&
+      _receiverNameController.text.trim().isNotEmpty &&
+      _receiverPhoneController.text.trim().isNotEmpty;
 
-  double get _distanceKm =>
-      _hasRoute ? MockTripMetrics.distanceKm(_pickupLocation!, _receiverLocation!) : 0;
-
-  double get _durationMin =>
-      _hasRoute ? MockTripMetrics.estimateDurationMinutes(_distanceKm) : 0;
-
-  MockFareBreakdown get _fare =>
-      MockFareBreakdown.calculate(vehicle: _vehicle, distanceKm: _distanceKm, durationMin: _durationMin);
+  /// Fetches the real fare from the backend's Pricing service
+  /// (`PricingRepository.estimateFare`) — no client-side fare math. A failed
+  /// call leaves [_fareEstimate] null; [_canBook] then stays false, so
+  /// booking is blocked rather than proceeding on a guessed price.
+  Future<void> _loadFare() async {
+    if (!_hasRoute) {
+      setState(() => _fareEstimate = null);
+      return;
+    }
+    setState(() => _loadingFare = true);
+    try {
+      final estimate = await PricingRepository(widget.apiClient).estimateFare(
+        pickup: _pickupLocation!,
+        destination: _receiverLocation!,
+        serviceType: _vehicle.category.backendKey,
+        tripType: 'delivery',
+      );
+      if (!mounted) return;
+      setState(() {
+        _fareEstimate = estimate;
+        _loadingFare = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _fareEstimate = null;
+        _loadingFare = false;
+      });
+    }
+  }
 
   /// The wire's only free-text channel for what's in the package — no
   /// `package_type` field exists on `CreateTripRequest`/`BookRideRequest`
@@ -118,6 +148,8 @@ class _DeliveryFormPageState extends State<DeliveryFormPage> {
 
   Future<void> _book() async {
     if (!_canBook || _booking) return;
+    final fare = _fareEstimate;
+    if (fare == null) return;
     setState(() => _booking = true);
     try {
       final valueVnd = int.tryParse(_valueController.text.replaceAll('.', '').trim()) ?? 0;
@@ -143,8 +175,8 @@ class _DeliveryFormPageState extends State<DeliveryFormPage> {
           receiverLocation: _receiverLocation!,
           receiverName: _receiverNameController.text.trim(),
           receiverPhone: _receiverPhoneController.text.trim(),
-          estimatedFareCents: _fare.totalCents,
-          currency: _fare.currencyCode,
+          estimatedFareCents: fare.total,
+          currency: fare.currencyCode,
         ),
       ));
     } on ApiException catch (e) {
@@ -306,12 +338,50 @@ class _DeliveryFormPageState extends State<DeliveryFormPage> {
                         label: Text(v.label),
                         avatar: Icon(v.icon, size: 18),
                         selected: _vehicle.category == v.category,
-                        onSelected: (_) => setState(() => _vehicle = v),
+                        onSelected: (_) {
+                          setState(() => _vehicle = v);
+                          _loadFare();
+                        },
                       ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xl),
-                if (_hasRoute)
+                if (!_hasRoute)
+                  Text(
+                    'Chọn điểm lấy và giao hàng để xem giá ước tính.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+                  )
+                else if (_loadingFare)
+                  const AppCard(
+                    child: SizedBox(
+                      height: 64,
+                      child: Center(
+                        child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                        ),
+                      ),
+                    ),
+                  )
+                else if (_fareEstimate == null)
+                  AppCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Không thể tính giá',
+                          style: theme.textTheme.titleSmall?.copyWith(color: AppColors.error),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton(onPressed: _loadFare, child: const Text('Thử lại')),
+                        ),
+                      ],
+                    ),
+                  )
+                else
                   AppCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,7 +393,7 @@ class _DeliveryFormPageState extends State<DeliveryFormPage> {
                                 ?.copyWith(color: AppColors.textSecondary)),
                             Flexible(
                               child: Text(
-                                _fare.format(_fare.totalCents),
+                                formatMoney(_fareEstimate!.total, _fareEstimate!.currencyCode),
                                 textAlign: TextAlign.right,
                                 style: theme.textTheme.titleLarge?.copyWith(color: AppColors.primary),
                               ),
@@ -332,16 +402,11 @@ class _DeliveryFormPageState extends State<DeliveryFormPage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${_distanceKm.toStringAsFixed(1)} km · ${_durationMin.round()} phút',
+                          '${_fareEstimate!.distanceKm.toStringAsFixed(1)} km · ${_fareEstimate!.durationMinutes.round()} phút',
                           style: theme.textTheme.labelMedium?.copyWith(color: AppColors.textTertiary),
                         ),
                       ],
                     ),
-                  )
-                else
-                  Text(
-                    'Chọn điểm lấy và giao hàng để xem giá ước tính.',
-                    style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
                   ),
                 const SizedBox(height: AppSpacing.lg),
                 AppButton.primary(

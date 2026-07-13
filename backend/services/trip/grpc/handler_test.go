@@ -92,7 +92,7 @@ func newHandlerWithDeliveryRepo(repo *stubRepo, deliveryRepo *memory.DeliveryRep
 }
 
 func seedTrip(repo *stubRepo, tripID, riderID string, st entity.TripStatus) *entity.Trip {
-	trip := entity.ReconstituteTrip(tripID, riderID, "", st, "pickup", "dropoff", "", 0, "", "", testNow, testNow)
+	trip := entity.ReconstituteTrip(tripID, riderID, "", st, "pickup", "dropoff", "", 0, "", "", testNow, testNow, entity.CompleteFinancials{})
 	_ = repo.Save(context.Background(), trip)
 	return trip
 }
@@ -366,7 +366,7 @@ func TestCompleteTrip_MissingCurrency(t *testing.T) {
 // seedDeliveryTrip seeds a Trip (TripType=delivery, Status=driver_arrived)
 // and its linked Delivery aggregate at the given status, into repo/deliveryRepo.
 func seedDeliveryTrip(repo *stubRepo, deliveryRepo *memory.DeliveryRepository, tripID, deliveryID string, deliveryStatus entity.DeliveryStatus) {
-	trip := entity.ReconstituteTrip(tripID, "r1", "d1", entity.StatusDriverArrived, "pickup", "dropoff", "", 0, "", "", testNow, testNow)
+	trip := entity.ReconstituteTrip(tripID, "r1", "d1", entity.StatusDriverArrived, "pickup", "dropoff", "", 0, "", "", testNow, testNow, entity.CompleteFinancials{})
 	trip.TripType = entity.TripTypeDelivery
 	trip.DeliveryID = deliveryID
 	_ = repo.Save(context.Background(), trip)

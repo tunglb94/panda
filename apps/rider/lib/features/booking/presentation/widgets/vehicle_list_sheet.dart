@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import 'package:rider/core/network/api_client.dart';
 import 'package:rider/core/theme/app_colors.dart';
 import 'package:rider/core/theme/app_icon_sizes.dart';
 import 'package:rider/core/theme/app_radius.dart';
 import 'package:rider/core/theme/app_spacing.dart';
+import 'package:rider/shared/utils/currency_format.dart';
 import 'package:rider/shared/widgets/app_bottom_sheet.dart';
 import 'package:rider/shared/widgets/app_card.dart';
 
-import '../../domain/models/mock_fare_calculator.dart';
+import '../../data/pricing_repository.dart';
+import '../../domain/models/fare_estimate.dart';
 import '../../domain/models/vehicle_option.dart';
 
 enum _FilterTab { recommended, bike, car }
@@ -15,13 +19,19 @@ enum _FilterTab { recommended, bike, car }
 /// Opens the vehicle-list sheet (tabs + rows with capacity/price, styled
 /// after Be/Xanh SM's vehicle picker). Returns the tapped [VehicleCategory],
 /// or `null` if the rider dismissed the sheet without picking one.
+///
+/// Each row fetches its own real quote from the backend's Pricing service
+/// (`PricingRepository.estimateFare`) — there is no client-side fare
+/// computation anywhere in this sheet.
 abstract final class VehicleListSheet {
   static Future<VehicleCategory?> show(
     BuildContext context, {
     required List<VehicleOption> options,
     required VehicleCategory selected,
-    required double distanceKm,
-    required double durationMin,
+    required LatLng pickup,
+    required LatLng destination,
+    required String tripType,
+    required ApiClient apiClient,
   }) {
     return AppBottomSheet.show<VehicleCategory?>(
       context,
@@ -30,8 +40,10 @@ abstract final class VehicleListSheet {
       builder: (sheetContext) => _VehicleListBody(
         options: options,
         selected: selected,
-        distanceKm: distanceKm,
-        durationMin: durationMin,
+        pickup: pickup,
+        destination: destination,
+        tripType: tripType,
+        apiClient: apiClient,
       ),
     );
   }
@@ -41,14 +53,18 @@ class _VehicleListBody extends StatefulWidget {
   const _VehicleListBody({
     required this.options,
     required this.selected,
-    required this.distanceKm,
-    required this.durationMin,
+    required this.pickup,
+    required this.destination,
+    required this.tripType,
+    required this.apiClient,
   });
 
   final List<VehicleOption> options;
   final VehicleCategory selected;
-  final double distanceKm;
-  final double durationMin;
+  final LatLng pickup;
+  final LatLng destination;
+  final String tripType;
+  final ApiClient apiClient;
 
   @override
   State<_VehicleListBody> createState() => _VehicleListBodyState();
@@ -85,16 +101,13 @@ class _VehicleListBodyState extends State<_VehicleListBody> {
               itemBuilder: (context, i) {
                 final option = visible[i];
                 final isSelected = option.category == widget.selected;
-                final fare = option.isAvailable
-                    ? MockFareBreakdown.calculate(
-                        vehicle: option,
-                        distanceKm: widget.distanceKm,
-                        durationMin: widget.durationMin,
-                      )
-                    : null;
                 return _VehicleRow(
+                  key: ValueKey(option.category),
                   option: option,
-                  fare: fare,
+                  pickup: widget.pickup,
+                  destination: widget.destination,
+                  tripType: widget.tripType,
+                  apiClient: widget.apiClient,
                   isSelected: isSelected,
                   onTap: option.isAvailable ? () => Navigator.of(context).pop(option.category) : null,
                 );
@@ -159,32 +172,58 @@ class _TabChip extends StatelessWidget {
   }
 }
 
-class _VehicleRow extends StatelessWidget {
+/// One row — fetches its own real quote from the backend the moment it's
+/// built (only visible rows get built, `ListView.separated` isn't lazy but
+/// the sheet's row count is always small — 4 tiers today). No client-side
+/// fare math; a failed quote shows "—", never a fabricated price.
+class _VehicleRow extends StatefulWidget {
   const _VehicleRow({
+    super.key,
     required this.option,
-    required this.fare,
+    required this.pickup,
+    required this.destination,
+    required this.tripType,
+    required this.apiClient,
     required this.isSelected,
     required this.onTap,
   });
 
   final VehicleOption option;
-  final MockFareBreakdown? fare;
+  final LatLng pickup;
+  final LatLng destination;
+  final String tripType;
+  final ApiClient apiClient;
   final bool isSelected;
   final VoidCallback? onTap;
 
   @override
+  State<_VehicleRow> createState() => _VehicleRowState();
+}
+
+class _VehicleRowState extends State<_VehicleRow> {
+  late final Future<FareEstimate>? _fareFuture = widget.option.isAvailable
+      ? PricingRepository(widget.apiClient).estimateFare(
+          pickup: widget.pickup,
+          destination: widget.destination,
+          serviceType: widget.option.category.backendKey,
+          tripType: widget.tripType,
+        )
+      : null;
+
+  @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final option = widget.option;
     return Container(
       decoration: BoxDecoration(
         borderRadius: AppRadius.lgAll,
-        border: Border.all(color: isSelected ? AppColors.primary : Colors.transparent, width: 2),
+        border: Border.all(color: widget.isSelected ? AppColors.primary : Colors.transparent, width: 2),
       ),
       child: AppCard(
         animateIn: false,
-        onTap: onTap,
+        onTap: widget.onTap,
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-        color: isSelected ? AppColors.primaryLight : AppColors.surface,
+        color: widget.isSelected ? AppColors.primaryLight : AppColors.surface,
         child: Opacity(
           opacity: option.isAvailable ? 1 : 0.5,
           child: Row(
@@ -196,7 +235,12 @@ class _VehicleRow extends StatelessWidget {
                   color: AppColors.surfaceAlt,
                   borderRadius: AppRadius.mdAll,
                 ),
-                child: Icon(option.icon, color: AppColors.textPrimary, size: AppIconSize.lg),
+                child: option.imageAsset != null
+                    ? Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Image.asset(option.imageAsset!, fit: BoxFit.contain),
+                      )
+                    : Icon(option.icon, color: AppColors.textPrimary, size: AppIconSize.lg),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -217,23 +261,26 @@ class _VehicleRow extends StatelessWidget {
               ),
               if (!option.isAvailable)
                 Text('Chưa khả dụng', style: textTheme.bodySmall?.copyWith(color: AppColors.textTertiary))
-              else if (fare != null)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    if (option.originalPriceCents != null)
-                      Text(
-                        fare!.format(option.originalPriceCents!),
-                        style: textTheme.bodySmall?.copyWith(
-                          color: AppColors.textTertiary,
-                          decoration: TextDecoration.lineThrough,
-                        ),
-                      ),
-                    Text(
-                      fare!.format(fare!.totalCents),
+              else
+                FutureBuilder<FareEstimate>(
+                  future: _fareFuture,
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      );
+                    }
+                    if (snapshot.hasError) {
+                      return Text('—', style: textTheme.bodyLarge?.copyWith(color: AppColors.textTertiary));
+                    }
+                    final fare = snapshot.data!;
+                    return Text(
+                      formatMoney(fare.total, fare.currencyCode),
                       style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700, color: AppColors.primary),
-                    ),
-                  ],
+                    );
+                  },
                 ),
             ],
           ),

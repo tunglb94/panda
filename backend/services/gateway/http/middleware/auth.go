@@ -42,6 +42,23 @@ func ClaimsFromContext(ctx context.Context) (*jwt.AccessClaims, bool) {
 	return c, ok
 }
 
+// RequireAdmin wraps an already-Auth'd handler and additionally rejects any
+// request whose claims.UserType isn't "admin" (Phần 9 — the KYC review
+// dashboard is admin-only). Must be chained after Auth, e.g.
+// auth(RequireAdmin(http.HandlerFunc(h.Approve))), since it reads claims
+// Auth already placed in the context — it does not itself validate the
+// token.
+func RequireAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := ClaimsFromContext(r.Context())
+		if !ok || claims.UserType != "admin" {
+			writeAuthError(w, "admin access required")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func extractBearer(r *http.Request) (string, bool) {
 	h := r.Header.Get("Authorization")
 	if h == "" {

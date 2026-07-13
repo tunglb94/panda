@@ -19,19 +19,32 @@ import '../../../earnings/presentation/widgets/driver_level_card.dart';
 import '../../../earnings/presentation/widgets/statistics_grid.dart';
 import '../../../home/data/availability_repository.dart';
 import '../../../safety/presentation/pages/safety_center_page.dart';
+import '../../../kyc/data/kyc_repository.dart';
+import '../../../kyc/domain/models/kyc_status.dart';
+import '../../../kyc/presentation/pages/kyc_status_page.dart';
+import '../../../wallet/presentation/pages/wallet_page.dart';
 import '../../data/driver_profile_repository.dart';
 import '../../domain/models/driver_own_profile.dart';
-import 'documents_page.dart';
 import 'driver_trip_history_page.dart';
 import 'settings_page.dart';
 import 'support_page.dart';
 import 'vehicle_center_page.dart';
 
 class _ProfileData {
-  const _ProfileData({required this.profile, required this.isOnline, required this.tripCounts});
+  const _ProfileData({
+    required this.profile,
+    required this.isOnline,
+    required this.tripCounts,
+    required this.kycApproved,
+  });
   final DriverOwnProfile profile;
   final bool isOnline;
   final (int, int) tripCounts;
+
+  /// Real Driver KYC + Vehicle Verification status (both Approved) — the
+  /// richer, document-backed status this phase adds, distinct from
+  /// [DriverOwnProfile.isVerified] (the older, coarse legacy field).
+  final bool kycApproved;
 }
 
 /// Profile — header (verification/online status/trip count/join date are
@@ -70,6 +83,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final profileRepo = DriverProfileRepository(widget.apiClient);
     final availRepo = AvailabilityRepository(widget.apiClient);
     final earningsRepo = EarningsRepository(widget.apiClient);
+    final kycRepo = KYCRepository(widget.apiClient);
 
     final results = await Future.wait([
       profileRepo.fetchOwnProfile(driverId),
@@ -77,10 +91,22 @@ class _ProfilePageState extends State<ProfilePage> {
       earningsRepo.fetchAllTimeTripCounts(),
     ]);
 
+    // Best-effort, independent of the 3 calls above — a KYC fetch failure
+    // (e.g. nothing submitted yet, 404) must never break the rest of Profile.
+    var kycApproved = false;
+    try {
+      final driverV = await kycRepo.getDriverVerification();
+      final vehicleV = await kycRepo.getVehicleVerification();
+      kycApproved = (driverV?.status.isApproved ?? false) && (vehicleV?.status.isApproved ?? false);
+    } catch (_) {
+      // Ignore — badge just shows "Chưa xác minh".
+    }
+
     return _ProfileData(
       profile: results[0] as DriverOwnProfile,
       isOnline: (results[1] as AvailabilityResult).isOnline,
       tripCounts: results[2] as (int, int),
+      kycApproved: kycApproved,
     );
   }
 
@@ -130,7 +156,7 @@ class _ProfilePageState extends State<ProfilePage> {
             child: ListView(
               padding: const EdgeInsets.all(AppSpacing.lg),
               children: [
-                _ProfileHeader(data: data),
+                _ProfileHeader(data: data, apiClient: widget.apiClient),
                 const SizedBox(height: AppSpacing.xl),
                 Text('Thống kê', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: AppSpacing.md),
@@ -154,9 +180,10 @@ class _ProfilePageState extends State<ProfilePage> {
 }
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.data});
+  const _ProfileHeader({required this.data, required this.apiClient});
 
   final _ProfileData data;
+  final ApiClient apiClient;
 
   @override
   Widget build(BuildContext context) {
@@ -205,10 +232,16 @@ class _ProfileHeader extends StatelessWidget {
             runSpacing: AppSpacing.sm,
             alignment: WrapAlignment.center,
             children: [
-              AppStatusChip(
-                label: profile.isVerified ? 'Đã xác minh' : 'Chưa xác minh',
-                color: profile.isVerified ? AppColors.primary : AppColors.warning,
-                icon: profile.isVerified ? Icons.verified : Icons.hourglass_empty,
+              InkWell(
+                borderRadius: BorderRadius.circular(999),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => KYCStatusPage(apiClient: apiClient)),
+                ),
+                child: AppStatusChip(
+                  label: data.kycApproved ? 'Đã xác minh' : 'Chưa xác minh — Xem chi tiết',
+                  color: data.kycApproved ? AppColors.primary : AppColors.warning,
+                  icon: data.kycApproved ? Icons.verified : Icons.hourglass_empty,
+                ),
               ),
               const AppStatusChip(label: 'Đánh giá —', color: AppColors.textTertiary, icon: Icons.star_outline),
             ],
@@ -269,7 +302,11 @@ class _QuickShortcutsGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final driverId = authState.driverId ?? '';
     final shortcuts = <(IconData, String, VoidCallback)>[
-      (Icons.account_balance_wallet_outlined, 'Ví', () => context.go(AppRoutes.earnings)),
+      (
+        Icons.account_balance_wallet_outlined,
+        'Ví',
+        () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => WalletPage(apiClient: apiClient))),
+      ),
       (Icons.bar_chart_outlined, 'Thu nhập', () => context.go(AppRoutes.earnings)),
       (
         Icons.receipt_long_outlined,
@@ -293,9 +330,11 @@ class _QuickShortcutsGrid extends StatelessWidget {
         () => AppSnackbar.show(context, 'Liên kết ngân hàng chưa khả dụng — sẽ ra mắt trong giai đoạn tiếp theo.'),
       ),
       (
-        Icons.folder_outlined,
-        'Giấy tờ',
-        () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DocumentsPage())),
+        Icons.badge_outlined,
+        'Xác minh',
+        () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => KYCStatusPage(apiClient: apiClient)),
+            ),
       ),
       (Icons.notifications_outlined, 'Thông báo', () => context.go(AppRoutes.notifications)),
       (

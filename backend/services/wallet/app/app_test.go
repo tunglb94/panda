@@ -65,6 +65,11 @@ var _ repository.LedgerEntryRepository = (*stubLedgerRepo)(nil)
 func newLedgerRepo() *stubLedgerRepo { return &stubLedgerRepo{} }
 
 func (r *stubLedgerRepo) Save(_ context.Context, e *entity.LedgerEntry) error {
+	for _, existing := range r.entries {
+		if existing.EntryID == e.EntryID {
+			return domainerrors.AlreadyExists("ledger entry already exists")
+		}
+	}
 	r.entries = append(r.entries, *e)
 	return nil
 }
@@ -89,6 +94,10 @@ func (r *stubLedgerRepo) FindByTransactionID(_ context.Context, txID string) ([]
 	return out, nil
 }
 
+func (r *stubLedgerRepo) ListOutstandingDrivers(_ context.Context, limit int) ([]repository.OutstandingDriver, error) {
+	return nil, nil
+}
+
 // ─── stub TransactionRepository ─────────────────────────────────────────────
 
 type stubTxRepo struct {
@@ -106,6 +115,9 @@ func newTxRepo() *stubTxRepo {
 }
 
 func (r *stubTxRepo) Save(_ context.Context, tx *entity.Transaction) error {
+	if _, ok := r.byID[tx.TransactionID]; ok {
+		return domainerrors.AlreadyExists("transaction already exists")
+	}
 	r.byID[tx.TransactionID] = tx
 	if tx.ReferenceID != "" {
 		r.byRef[tx.ReferenceID] = append(r.byRef[tx.ReferenceID], tx)
@@ -119,6 +131,16 @@ func (r *stubTxRepo) FindByID(_ context.Context, id string) (*entity.Transaction
 		return nil, domainerrors.NotFound("transaction not found: " + id)
 	}
 	return tx, nil
+}
+
+func (r *stubTxRepo) FindByIDs(_ context.Context, ids []string) (map[string]*entity.Transaction, error) {
+	out := map[string]*entity.Transaction{}
+	for _, id := range ids {
+		if tx, ok := r.byID[id]; ok {
+			out[id] = tx
+		}
+	}
+	return out, nil
 }
 
 func (r *stubTxRepo) FindByReferenceID(_ context.Context, refID string) ([]*entity.Transaction, error) {
@@ -148,7 +170,7 @@ func seedEntry(t *testing.T, repo *stubLedgerRepo, walletID, txID string, dir en
 
 func seedTransaction(t *testing.T, repo *stubTxRepo, txID, refID string, txType entity.TransactionType) *entity.Transaction {
 	t.Helper()
-	tx, err := entity.NewTransaction(txID, txType, refID, "USD", "", now)
+	tx, err := entity.NewTransaction(txID, txType, refID, "", "USD", "", now)
 	if err != nil {
 		t.Fatal(err)
 	}

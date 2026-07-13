@@ -90,6 +90,18 @@ func (c *VersionedFareCalculator) EstimateV3Detailed(input entity.RideInputV3) (
 	return c.v3.EstimateV3(input)
 }
 
+// CalculateFinalDetailed mirrors EstimateV3Detailed for the post-trip final
+// fare — exposes Commission, DriverIncome, VoucherDiscount, CommissionRate
+// etc. for callers (Settlement) that must never invent their own commission
+// number. Returns an error if the calculator is not running in v3 mode, so a
+// caller can't accidentally read a V3 breakdown while configured for v2.
+func (c *VersionedFareCalculator) CalculateFinalDetailed(input entity.RideInputV3) (*entity.FullFareBreakdownV3, error) {
+	if c.Version != PricingVersionV3 || c.v3 == nil {
+		return nil, errPricingV3NotActive
+	}
+	return c.v3.CalculateFinalV3(input)
+}
+
 var errPricingV3NotActive = fareCalculatorV3NotActiveError{}
 
 type fareCalculatorV3NotActiveError struct{}

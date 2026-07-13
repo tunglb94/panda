@@ -1,18 +1,18 @@
 {
-  "rule_engine_decisions": 3885,
-  "ai_decisions": 346,
-  "ai_decision_percent": 8.177735759867643,
+  "rule_engine_decisions": 3863,
+  "ai_decisions": 382,
+  "ai_decision_percent": 8.998822143698469,
   "ai_calls": 0,
   "cache_hits": 0,
   "cache_hit_percent": 0,
   "cache_size": 0,
-  "rule_fallback_used": 346,
+  "rule_fallback_used": 382,
   "ai_timeouts": 0,
   "avg_ai_latency_ms": 0,
   "circuit_open_at_end": false,
   "ticks_processed": 2880,
-  "trips_processed": 586,
-  "wall_clock_seconds": 0.0385299,
-  "ticks_per_second": 74747.14442549812,
-  "peak_alloc_mb": 1.2779388427734375
+  "trips_processed": 743,
+  "wall_clock_seconds": 0.0402236,
+  "ticks_per_second": 71599.75735637786,
+  "peak_alloc_mb": 2.1077346801757812
 }

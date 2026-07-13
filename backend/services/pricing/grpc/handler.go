@@ -3,8 +3,11 @@ package grpc
 
 import (
 	"context"
+	"strconv"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	"github.com/fairride/pricing/app"
@@ -55,7 +58,42 @@ func (h *Handler) CalculateFinalFare(ctx context.Context, req *pricingpb.Calcula
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
+	setCommissionResponseHeader(ctx, h.calc, req)
 	return &pricingpb.FareResponse{Fare: toProto(fb)}, nil
+}
+
+// setCommissionResponseHeader exposes Commission/DriverIncome/VoucherDiscount/
+// CommissionRate as OUTGOING response gRPC metadata. FareBreakdown (the proto
+// message) has no field slots for these — Settlement must never invent its
+// own commission rate, it must read the platform's own computed number, so
+// this is how that number crosses the Pricing->Booking boundary without a
+// protoc/buf regeneration (none available in this environment). Best-effort:
+// silently no-ops when the calculator isn't running V3 (only V3 computes
+// these fields at all) — Settlement falls back to its own documented default
+// in that case, and the response body/behaviour is completely unchanged
+// either way.
+func setCommissionResponseHeader(ctx context.Context, calc app.FareEstimator, req *pricingpb.CalculateFinalFareRequest) {
+	vc, ok := calc.(*app.VersionedFareCalculator)
+	if !ok {
+		return
+	}
+	full, err := vc.CalculateFinalDetailed(entity.RideInputV3{
+		VehicleType:    entity.VehicleType(req.GetVehicleType()),
+		DistanceKM:     req.GetActualDistanceKm(),
+		DurationMin:    req.GetActualDurationMinutes(),
+		CommissionTier: entity.CommissionTierBronze,
+	})
+	if err != nil {
+		return
+	}
+	md := metadata.Pairs(
+		"x-pricing-v3", "true",
+		"x-commission-cents", strconv.FormatInt(full.Commission, 10),
+		"x-driver-income-cents", strconv.FormatInt(full.DriverIncome, 10),
+		"x-voucher-discount-cents", strconv.FormatInt(full.VoucherDiscount, 10),
+		"x-commission-rate", strconv.FormatFloat(full.CommissionRate, 'f', -1, 64),
+	)
+	_ = grpc.SetHeader(ctx, md)
 }
 
 // ─── private helpers ──────────────────────────────────────────────────────────

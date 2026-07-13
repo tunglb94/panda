@@ -19,6 +19,13 @@ type TripInfo struct {
 	FinalFareTotal     int64
 	FareCurrency       string
 	CancellationReason string
+	PaymentMethod      string
+
+	HasCommissionDetail  bool
+	CommissionCents      int64
+	DriverIncomeCents    int64
+	VoucherDiscountCents int64
+	CommissionRate       float64
 }
 
 // DispatchInfo is a lightweight view of a dispatch job returned by DispatchClient.
@@ -28,10 +35,20 @@ type DispatchInfo struct {
 	AssignedDriverID string
 }
 
-// FareInfo is the fare result returned by PricingClient.
+// FareInfo is the fare result returned by PricingClient. CommissionCents/
+// DriverIncomeCents/VoucherDiscountCents/CommissionRate are populated only
+// when Pricing is running V3 (0/HasCommissionDetail=false otherwise) — see
+// PricingAdapter.CalculateFinalFare. Settlement must read these instead of
+// inventing its own commission rate.
 type FareInfo struct {
 	Total        int64
 	CurrencyCode string
+
+	HasCommissionDetail  bool
+	CommissionCents      int64
+	DriverIncomeCents    int64
+	VoucherDiscountCents int64
+	CommissionRate       float64
 }
 
 // TripSummary is a lightweight trip view used in list operations.
@@ -78,7 +95,10 @@ type TripClient interface {
 	// MarkDriverArrived transitions a trip from driver_assigned to driver_arrived.
 	MarkDriverArrived(ctx context.Context, tripID string) error
 	StartTrip(ctx context.Context, tripID string) error
-	CompleteTrip(ctx context.Context, tripID string, finalFareTotal int64, fareCurrency string) (*TripInfo, error)
+	// CompleteTrip persists the fare (and, when Pricing supplied it, the
+	// commission detail in fare) onto the Trip. Settlement must later read
+	// commission/driver_income from Trip, never invent its own rate.
+	CompleteTrip(ctx context.Context, tripID string, fare FareInfo) (*TripInfo, error)
 	GetTrip(ctx context.Context, tripID string) (*TripInfo, error)
 	// CancelTrip cancels a trip, used for saga compensation when downstream steps fail.
 	CancelTrip(ctx context.Context, tripID, reason string) error

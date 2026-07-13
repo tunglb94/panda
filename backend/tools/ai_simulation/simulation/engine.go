@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sort"
 	"time"
 
 	pricingentity "github.com/fairride/pricing/domain/entity"
@@ -68,6 +69,8 @@ func NewEngine(cfg Config) *Engine {
 
 	seedDrivers(world, cfg.Drivers)
 	seedRiders(world, cfg.Riders)
+	world.DriverIDs = sortedKeys(world.Drivers)
+	world.RiderIDs = sortedKeys(world.Riders)
 
 	return &Engine{cfg: cfg, world: world}
 }
@@ -204,7 +207,8 @@ func processTick(ctx context.Context, w *World) {
 	// typical activity window and the current scenario demand multiplier.
 	// Expected value is calibrated so a rider with average habits requests
 	// roughly 1-3 trips across a simulated day, not every tick.
-	for _, rider := range w.Riders {
+	for _, riderID := range w.RiderIDs {
+		rider := w.Riders[riderID]
 		if rider.CurrentTripID != "" {
 			continue
 		}
@@ -230,8 +234,8 @@ func processTick(ctx context.Context, w *World) {
 	// is enough to model fatigue/relocation choices realistically without
 	// evaluating the rule engine 500 times every single minute.
 	if w.Clock.Tick%15 == 0 {
-		for _, driver := range w.Drivers {
-			evaluateDriverState(ctx, w, driver)
+		for _, driverID := range w.DriverIDs {
+			evaluateDriverState(ctx, w, w.Drivers[driverID])
 		}
 	}
 }
@@ -423,6 +427,17 @@ func dailyTargetForTier(tier entity.AccountType) int64 {
 	default:
 		return 500_000
 	}
+}
+
+// sortedKeys returns m's keys in a fixed, deterministic order — the fix for
+// the --seed non-determinism bug (see World.DriverIDs/RiderIDs doc comment).
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func clamp01(v float64) float64 {

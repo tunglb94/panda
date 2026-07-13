@@ -1,0 +1,84 @@
+{
+  "average_monthly_income_vnd": 27617453.154,
+  "voucher_used_count": 63,
+  "voucher_unused_count": 47,
+  "membership_counts": {
+    "diamond": 13,
+    "free": 343,
+    "gold": 46,
+    "silver": 98
+  },
+  "trips_per_month": 21.689999999999998,
+  "average_spend_vnd": 54965.531712473574,
+  "average_fare_vnd": 54965.531712473574,
+  "average_km": 9.055106326423461,
+  "average_eta_minutes": 31.082311265096322,
+  "average_waiting_minutes": 8.99633070947497,
+  "average_cancel_percent": 25.531829573934846,
+  "segments": {
+    "segments": [
+      {
+        "segment": "Tourist/Business",
+        "rider_count": 14,
+        "average_trips": 111.5,
+        "average_spend_vnd": 84489.5,
+        "average_voucher_used_count": 0.14285714285714285,
+        "retention_percent": 71.42857142857143
+      },
+      {
+        "segment": "Normal",
+        "rider_count": 160,
+        "average_trips": 102,
+        "average_spend_vnd": 109547.74375,
+        "average_voucher_used_count": 0.0375,
+        "retention_percent": 75
+      },
+      {
+        "segment": "Student",
+        "rider_count": 11,
+        "average_trips": 78,
+        "average_spend_vnd": 159189.45454545456,
+        "average_voucher_used_count": 0,
+        "retention_percent": 81.81818181818181
+      },
+      {
+        "segment": "VIP",
+        "rider_count": 13,
+        "average_trips": 105.61538461538461,
+        "average_spend_vnd": 126237.69230769231,
+        "average_voucher_used_count": 0.07692307692307693,
+        "retention_percent": 76.92307692307692
+      },
+      {
+        "segment": "Heavy User",
+        "rider_count": 5,
+        "average_trips": 200.6,
+        "average_spend_vnd": 116863,
+        "average_voucher_used_count": 0.2,
+        "retention_percent": 100
+      },
+      {
+        "segment": "Cheap",
+        "rider_count": 120,
+        "average_trips": 99.26666666666667,
+        "average_spend_vnd": 79623.5,
+        "average_voucher_used_count": 0.10833333333333334,
+        "retention_percent": 76.66666666666667
+      },
+      {
+        "segment": "Office Worker",
+        "rider_count": 177,
+        "average_trips": 95.5819209039548,
+        "average_spend_vnd": 111613.51412429378,
+        "average_voucher_used_count": 0.05084745762711865,
+        "retention_percent": 78.8135593220339
+      }
+    ],
+    "assumptions": [
+      {
+        "Title": "Phân khúc là suy luận, không phải nhãn thật",
+        "Detail": "RiderAgent không có trường \"segment\"/\"is_tourist\" — VIP=Membership Diamond, Heavy User=TripCount\u003e2x trung bình, Cheap=PriceSensitivity\u003e0.75, Office Worker=Habit Commuter, Student=Income\u003c8tr VND/tháng, Tourist/Business=Habit BusinessTraveler (proxy gần nhất, không phân biệt được khách du lịch thật với khách công tác). Mỗi rider chỉ thuộc 1 phân khúc theo thứ tự ưu tiên trên."
+      }
+    ]
+  }
+}

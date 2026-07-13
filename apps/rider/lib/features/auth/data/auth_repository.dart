@@ -1,9 +1,10 @@
 import '../../../core/network/api_client.dart';
 
 class LoginResult {
-  const LoginResult({required this.accessToken, required this.riderId});
+  const LoginResult({required this.accessToken, required this.refreshToken, required this.riderId});
 
   final String accessToken;
+  final String? refreshToken;
   final String riderId;
 }
 
@@ -19,6 +20,7 @@ class AuthRepository {
     );
     return LoginResult(
       accessToken: body['access_token'] as String,
+      refreshToken: body['refresh_token'] as String?,
       riderId: body['rider_id'] as String,
     );
   }

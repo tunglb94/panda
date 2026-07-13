@@ -1,23 +1,27 @@
 {
-  "total_trips_quoted": 666,
-  "average_base_fare_vnd": 52286.762762762766,
-  "average_final_fare_vnd": 65260.036036036036,
-  "average_surge_multiplier": 1.20366959040846,
-  "surged_trip_count": 580,
-  "surged_trip_percent": 87.08708708708708,
-  "max_surge_observed": 1.7033340362222067,
+  "total_trips_quoted": 743,
+  "average_base_fare_vnd": 50128.637954239566,
+  "average_final_fare_vnd": 66653.16285329744,
+  "average_surge_multiplier": 1.2789068516470394,
+  "surged_trip_count": 743,
+  "surged_trip_percent": 100,
+  "max_surge_observed": 1.7565834356665302,
   "fare_by_vehicle_type": {
+    "bike_plus": {
+      "count": 69,
+      "average_final_fare_vnd": 51693.30434782609
+    },
     "car": {
-      "count": 427,
-      "average_final_fare_vnd": 69607.53864168619
+      "count": 287,
+      "average_final_fare_vnd": 73801.37630662021
+    },
+    "car_xl": {
+      "count": 94,
+      "average_final_fare_vnd": 109950.43617021276
     },
     "motorcycle": {
-      "count": 184,
-      "average_final_fare_vnd": 46266.27173913043
-    },
-    "van": {
-      "count": 55,
-      "average_final_fare_vnd": 95050.38181818182
+      "count": 293,
+      "average_final_fare_vnd": 49283.70648464164
     }
   },
   "fare_histogram": [
@@ -27,39 +31,39 @@
     },
     {
       "range_label": "20-40k",
-      "count": 151
+      "count": 194
     },
     {
       "range_label": "40-60k",
-      "count": 198
+      "count": 185
     },
     {
       "range_label": "60-80k",
-      "count": 135
+      "count": 151
     },
     {
       "range_label": "80-100k",
-      "count": 87
+      "count": 91
     },
     {
       "range_label": "100-120k",
-      "count": 38
+      "count": 48
     },
     {
       "range_label": "120-140k",
-      "count": 18
+      "count": 21
     },
     {
       "range_label": "140-160k",
-      "count": 24
+      "count": 21
     },
     {
       "range_label": "160-180k",
-      "count": 5
+      "count": 17
     },
     {
       "range_label": "180k+",
-      "count": 3
+      "count": 8
     }
   ]
 }

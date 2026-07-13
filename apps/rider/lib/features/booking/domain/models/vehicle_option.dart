@@ -13,9 +13,10 @@ enum VehicleCategory { motorcycle, bikePlus, car, carXL }
 enum VehicleFamily { bike, car }
 
 extension VehicleCategoryX on VehicleCategory {
-  /// The exact string key the backend's VehicleType recognizes
-  /// (`backend/services/pricing/domain/entity/fare.go`,
-  /// `backend/services/dispatch/domain/entity/dispatch_job.go`).
+  /// The exact string key the backend recognizes as `service_type` — both
+  /// `POST /api/v1/rides/estimate-fare` (gateway's `PricingHandler`, which
+  /// maps this onto Pricing's real `car|motorcycle|van` VehicleType) and the
+  /// existing `x-service-type` dispatch metadata use this same key.
   String get backendKey => switch (this) {
         VehicleCategory.motorcycle => 'motorcycle',
         VehicleCategory.bikePlus => 'bike_plus',
@@ -29,50 +30,32 @@ extension VehicleCategoryX on VehicleCategory {
       };
 }
 
-/// A single selectable ride option shown in the Vehicle Selector.
-///
-/// Fare fields mirror the shape and values of `DefaultFareConfig` in
-/// `backend/services/pricing/domain/entity/fare.go` (whole VND — no decimal
-/// subunit — despite the legacy `*Cents` field names) so the mock fare
-/// preview matches what the real Pricing service returns. This is a UI-only
-/// mock model — no network call is made and no backend code is referenced.
+/// A single selectable ride option shown in the Vehicle Selector — pure
+/// product catalog metadata (tier identity, label, artwork, capacity). Fare
+/// is never stored here: every price shown anywhere in the app comes from a
+/// live call to `PricingRepository.estimateFare` (backend Pricing service),
+/// never a field on this class.
 class VehicleOption {
   const VehicleOption({
     required this.category,
     required this.label,
     required this.icon,
     required this.capacity,
-    required this.baseFareCents,
-    required this.perKmCents,
-    required this.perMinuteCents,
-    required this.minimumFareCents,
-    required this.bookingFeeCents,
     this.isAvailable = true,
-    this.originalPriceCents,
+    this.imageAsset,
   });
 
   final VehicleCategory category;
   final String label;
   final IconData icon;
+
+  /// Real vehicle artwork (`assets/vehicles/...`), shown instead of [icon]
+  /// when present. Null falls back to [icon] — keeps every category
+  /// renderable even before/without dedicated art.
+  final String? imageAsset;
   final int capacity;
-  final int baseFareCents;
-  final int perKmCents;
-  final int perMinuteCents;
-  final int minimumFareCents;
-  final int bookingFeeCents;
 
-  /// False for tiers the backend recognizes but has no BRB-approved fare
-  /// config for yet (Bike Plus, Car XL — see
-  /// `backend/services/pricing/config/pricing_v3.default.yaml`'s
-  /// placeholder comment). Shown in the list as "Chưa khả dụng", not
-  /// selectable, no price rendered — never a fabricated number.
+  /// False for a tier that isn't bookable yet — shown in the list as "Chưa
+  /// khả dụng", not selectable, and never quoted a fare.
   final bool isAvailable;
-
-  /// The pre-discount price, shown struck through next to the real price —
-  /// ONLY when a genuine discount exists (e.g. an auto-applied promotion).
-  /// Null means no discount; the UI must never invent this value. Nothing
-  /// in the backend today auto-applies a promotion before vehicle
-  /// selection, so this is always null until that exists — see the
-  /// Vehicle Catalog Expansion frontend report's "Known Gap" section.
-  final int? originalPriceCents;
 }

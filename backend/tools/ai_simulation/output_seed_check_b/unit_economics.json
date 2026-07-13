@@ -1,44 +1,44 @@
 {
   "overall": {
-    "sample_size_completed_trips": 546,
-    "average_customer_pays_vnd": 56201.7326007326,
-    "average_voucher_vnd": 184.32600732600733,
+    "sample_size_completed_trips": 521,
+    "average_customer_pays_vnd": 63856.6679462572,
+    "average_voucher_vnd": 172.01919385796546,
     "average_promotion_vnd": 0,
-    "average_driver_vnd": 44499.37362637363,
-    "average_commission_vnd": 11702.358974358975,
-    "average_vat_vnd": 1170.2358974358974,
-    "average_platform_net_vnd": 10532.123076923077,
+    "average_driver_vnd": 50726.46449136276,
+    "average_commission_vnd": 13130.203454894434,
+    "average_vat_vnd": 1313.0203454894433,
+    "average_platform_net_vnd": 11817.18310940499,
     "estimated_cloud_cost_vnd": 400,
     "estimated_map_cost_vnd": 250,
     "estimated_sms_cost_vnd": 350,
-    "estimated_profit_vnd": 9532.123076923077
+    "estimated_profit_vnd": 10817.18310940499
   },
   "ride": {
-    "sample_size_completed_trips": 422,
-    "average_customer_pays_vnd": 55608.91232227488,
-    "average_voucher_vnd": 213.5,
+    "sample_size_completed_trips": 443,
+    "average_customer_pays_vnd": 65584.78329571107,
+    "average_voucher_vnd": 188.08803611738148,
     "average_promotion_vnd": 0,
-    "average_driver_vnd": 43996.06161137441,
-    "average_commission_vnd": 11612.850710900473,
-    "average_vat_vnd": 1161.2850710900473,
-    "average_platform_net_vnd": 10451.565639810426,
+    "average_driver_vnd": 52244.43115124154,
+    "average_commission_vnd": 13340.352144469525,
+    "average_vat_vnd": 1334.0352144469525,
+    "average_platform_net_vnd": 12006.316930022573,
     "estimated_cloud_cost_vnd": 400,
     "estimated_map_cost_vnd": 250,
     "estimated_sms_cost_vnd": 350,
-    "estimated_profit_vnd": 9451.565639810426
+    "estimated_profit_vnd": 11006.316930022573
   },
   "delivery": {
-    "sample_size_completed_trips": 124,
-    "average_customer_pays_vnd": 58219.23387096774,
-    "average_voucher_vnd": 85.04032258064517,
+    "sample_size_completed_trips": 78,
+    "average_customer_pays_vnd": 54041.85897435898,
+    "average_voucher_vnd": 80.75641025641026,
     "average_promotion_vnd": 0,
-    "average_driver_vnd": 46212.25806451613,
-    "average_commission_vnd": 12006.975806451614,
-    "average_vat_vnd": 1200.6975806451615,
-    "average_platform_net_vnd": 10806.278225806453,
+    "average_driver_vnd": 42105.192307692305,
+    "average_commission_vnd": 11936.666666666666,
+    "average_vat_vnd": 1193.6666666666665,
+    "average_platform_net_vnd": 10743,
     "estimated_cloud_cost_vnd": 400,
     "estimated_map_cost_vnd": 250,
     "estimated_sms_cost_vnd": 350,
-    "estimated_profit_vnd": 9806.278225806453
+    "estimated_profit_vnd": 9743
   }
 }

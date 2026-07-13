@@ -11,12 +11,23 @@ class TripSelection {
     required this.destination,
     this.pickupAddress,
     this.destinationAddress,
+    this.routeDistanceMeters,
+    this.routeDurationSeconds,
   });
 
   final LatLng pickup;
   final LatLng destination;
   final String? pickupAddress;
   final String? destinationAddress;
+
+  /// The real road-route distance/duration MapPage already fetched from
+  /// Google Directions (`RouteEngine`/`RouteProvider`), NOT a straight-line
+  /// estimate. Null when no route was available yet (e.g. the fetch is
+  /// still in flight, failed, or this TripSelection is a demo/sample one) —
+  /// callers must fall back to a straight-line estimate in that case, never
+  /// pretend a real route exists.
+  final int? routeDistanceMeters;
+  final int? routeDurationSeconds;
 
   @override
   String toString() =>
