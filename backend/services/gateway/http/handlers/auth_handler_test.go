@@ -39,9 +39,9 @@ func (s *stubDriverFinder) FindByUserID(_ context.Context, _ string) (*driverent
 
 func testUser() *identityentity.User {
 	return identityentity.ReconstituteUser(
-		"user-001", "+1234567890", "Test Driver", "",
+		"user-001", "+1234567890", "Test Driver", "", "",
 		identityentity.TypeDriver, identityentity.StatusActive,
-		"role-001", time.Now(), time.Now(),
+		"role-001", false, time.Now(), time.Now(),
 	)
 }
 
@@ -161,9 +161,9 @@ func TestLogin_DBNotConfigured(t *testing.T) {
 
 func testRider() *identityentity.User {
 	return identityentity.ReconstituteUser(
-		"user-002", "+9876543210", "Test Rider", "",
+		"user-002", "+9876543210", "Test Rider", "", "",
 		identityentity.TypeRider, identityentity.StatusActive,
-		"role-002", time.Now(), time.Now(),
+		"role-002", false, time.Now(), time.Now(),
 	)
 }
 

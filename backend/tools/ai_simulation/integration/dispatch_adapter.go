@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"math/rand"
 
 	dispatchapp "github.com/fairride/dispatch/app"
 	dispatchentity "github.com/fairride/dispatch/domain/entity"
@@ -32,9 +33,9 @@ type DispatchAdapter struct {
 	rejectUC  *dispatchapp.RejectTripUseCase
 }
 
-func NewDispatchAdapter() *DispatchAdapter {
+func NewDispatchAdapter(rng *rand.Rand) *DispatchAdapter {
 	jobRepo := newFakeDispatchJobRepository()
-	locationRepo := newFakeDriverLocationRepository()
+	locationRepo := newFakeDriverLocationRepository(rng)
 	tripUpdater := newFakeTripUpdater()
 	transactor := &fakeTransactor{jobRepo: jobRepo, tripUpdater: tripUpdater}
 

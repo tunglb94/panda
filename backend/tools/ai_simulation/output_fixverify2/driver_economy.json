@@ -1,0 +1,157 @@
+{
+  "segments": [
+    {
+      "category": "part_time",
+      "driver_count": 115,
+      "average_income_per_day_vnd": 379200.1007512152,
+      "average_income_per_month_vnd": 11376003.022536455,
+      "trips_per_day": 7.86389748121962,
+      "km_per_day": 70.56260267896073,
+      "online_hours_per_day": 3.6176201372997716,
+      "driving_hours_per_day": 2.9741537623304617,
+      "waiting_hours_per_day": 0.6434663749693099,
+      "idle_percent": 17.787007771623024,
+      "fuel_cost_per_day_vnd": 99462.59038486551,
+      "phone_cost_per_day_vnd": 5426.430205949658,
+      "net_income_per_day_vnd": 379200.1007512152,
+      "gross_income_per_day_vnd": 479691.9032258064,
+      "roi": 3.6152506584127706,
+      "acceptance_rate_percent": 76.48601022907981,
+      "cancel_rate_percent": 0,
+      "average_rating": 4.5345926408787784,
+      "average_fatigue": 0.4353643382495161,
+      "retention_percent": 98.3913043478261
+    },
+    {
+      "category": "regular",
+      "driver_count": 246,
+      "average_income_per_day_vnd": 564500.8094546963,
+      "average_income_per_month_vnd": 16935024.283640888,
+      "trips_per_day": 12.333402446609993,
+      "km_per_day": 110.06309882912316,
+      "online_hours_per_day": 5.532306672847431,
+      "driving_hours_per_day": 4.661191050235587,
+      "waiting_hours_per_day": 0.8711156226118444,
+      "idle_percent": 15.745974945446918,
+      "fuel_cost_per_day_vnd": 143753.14493413526,
+      "phone_cost_per_day_vnd": 8298.460009271146,
+      "net_income_per_day_vnd": 564500.8094546963,
+      "gross_income_per_day_vnd": 711659.6010781671,
+      "roi": 3.7125606774410795,
+      "acceptance_rate_percent": 77.56219683930527,
+      "cancel_rate_percent": 0,
+      "average_rating": 4.576199516695276,
+      "average_fatigue": 0.41092888740950423,
+      "retention_percent": 98.02845528455285
+    },
+    {
+      "category": "full_time",
+      "driver_count": 44,
+      "average_income_per_day_vnd": 961617.042203986,
+      "average_income_per_month_vnd": 28848511.26611958,
+      "trips_per_day": 18.232121922626025,
+      "km_per_day": 163.01779024615013,
+      "online_hours_per_day": 8.929395933014355,
+      "driving_hours_per_day": 6.9142125817113405,
+      "waiting_hours_per_day": 2.0151833513030146,
+      "idle_percent": 22.567969506787634,
+      "fuel_cost_per_day_vnd": 248602.13012537896,
+      "phone_cost_per_day_vnd": 13394.093899521533,
+      "net_income_per_day_vnd": 961617.042203986,
+      "gross_income_per_day_vnd": 1203119.0316529896,
+      "roi": 3.670346951689626,
+      "acceptance_rate_percent": 78.8840984022318,
+      "cancel_rate_percent": 0,
+      "average_rating": 4.619888610978353,
+      "average_fatigue": 0.3330375489428928,
+      "retention_percent": 96.93181818181819
+    },
+    {
+      "category": "hardcore",
+      "driver_count": 95,
+      "average_income_per_day_vnd": 1399862.300107181,
+      "average_income_per_month_vnd": 41995869.00321543,
+      "trips_per_day": 30.871918542336548,
+      "km_per_day": 275.96230971344625,
+      "online_hours_per_day": 12.871945983379497,
+      "driving_hours_per_day": 11.75068966288696,
+      "waiting_hours_per_day": 1.1212563204925363,
+      "idle_percent": 8.71085321473788,
+      "fuel_cost_per_day_vnd": 336093.04456679715,
+      "phone_cost_per_day_vnd": 19307.918975069246,
+      "net_income_per_day_vnd": 1399862.300107181,
+      "gross_income_per_day_vnd": 1761826.1414790996,
+      "roi": 3.9388252810470408,
+      "acceptance_rate_percent": 81.63216143065652,
+      "cancel_rate_percent": 0,
+      "average_rating": 4.575168086225227,
+      "average_fatigue": 0.2552594500594656,
+      "retention_percent": 98.21052631578948
+    }
+  ],
+  "assumptions": [
+    {
+      "Title": "Fuel cost/km",
+      "Detail": "Motorcycle 700đ, Car 2,200đ, Van 2,800đ — giả định thị trường VN, không đến từ BRB hay dữ liệu tài chính thật của Panda."
+    },
+    {
+      "Title": "Phone cost/giờ online",
+      "Detail": "1,500đ/giờ — giả định chi phí data di động, không đo lường thật."
+    },
+    {
+      "Title": "ROI công thức",
+      "Detail": "Net Income / (Fuel Cost + Phone Cost) trong cùng kỳ — định nghĩa tự chọn cho mô phỏng này, không phải công thức ROI chuẩn ngành."
+    },
+    {
+      "Title": "Tài xế chưa từng online bị loại khỏi phân loại",
+      "Detail": "Không xếp vào bucket nào (không có giờ online để tính trung bình/ngày) — tránh chia cho 0 hoặc bịa số liệu."
+    }
+  ],
+  "distribution": {
+    "vehicle_mix_percent": {
+      "bike": 49.4,
+      "car": 29.4,
+      "delivery": 0,
+      "hybrid": 21.2
+    },
+    "vehicle_mix_count": {
+      "bike": 247,
+      "car": 147,
+      "delivery": 0,
+      "hybrid": 106
+    },
+    "zero_trip_driver_count": 0,
+    "status_counts": {
+      "app_off": 371,
+      "eating": 0,
+      "low_battery": 0,
+      "no_network": 0,
+      "offline": 371,
+      "online": 129,
+      "refueling": 0,
+      "resting": 307
+    },
+    "assumptions": [
+      {
+        "Title": "\"Đang ăn\" không được mô hình hoá",
+        "Detail": "Không có state nghỉ-ăn riêng biệt trong simulation — driver chỉ có Online/Offline liên tục, không có sub-state theo hoạt động. Luôn báo cáo 0, không suy diễn."
+      },
+      {
+        "Title": "\"Đang đổ xăng\" không được mô hình hoá",
+        "Detail": "Fuel tự hồi phục khi offline (xem simulation/engine.go's evaluateDriverState) — không có hành động \"đổ xăng\" rời rạc để đếm. Luôn báo cáo 0."
+      },
+      {
+        "Title": "\"Mất mạng\" không được mô hình hoá",
+        "Detail": "Không có khái niệm kết nối mạng trong simulation. Luôn báo cáo 0."
+      },
+      {
+        "Title": "\"Tắt app\" = Offline",
+        "Detail": "Simulation không phân biệt tài xế chủ động tắt app với tài xế offline vì lý do khác (hết ca, factor an toàn...) — dùng chung 1 trạng thái Offline."
+      },
+      {
+        "Title": "\"Đang nghỉ\" là suy luận, không phải state thật",
+        "Detail": "Xấp xỉ bằng Offline + Fatigue\u003e0.15 (đang trong giai đoạn hồi phục) — không phải một trạng thái driver tự chọn \"tôi đang nghỉ\" trong simulation."
+      }
+    ]
+  }
+}

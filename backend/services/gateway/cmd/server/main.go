@@ -17,11 +17,16 @@ import (
 	httpgateway "github.com/fairride/gateway/http"
 	"github.com/fairride/gateway/http/handlers"
 	"github.com/fairride/gateway/http/middleware"
+	identityapp "github.com/fairride/identity/app"
+	"github.com/fairride/identity/infrastructure/googleauth"
 	"github.com/fairride/identity/infrastructure/jwt"
+	identityotp "github.com/fairride/identity/infrastructure/otp"
 	identitypostgres "github.com/fairride/identity/infrastructure/postgres"
 	notificationapp "github.com/fairride/notification/app"
 	notificationpostgres "github.com/fairride/notification/infrastructure/postgres"
 	"github.com/fairride/pricing/grpc/pricingpb"
+	promotionapp "github.com/fairride/promotion/app"
+	promotionpostgres "github.com/fairride/promotion/infrastructure/postgres"
 	reviewapp "github.com/fairride/review/app"
 	"github.com/fairride/review/grpc/reviewpb"
 	reviewpostgres "github.com/fairride/review/infrastructure/postgres"
@@ -29,6 +34,11 @@ import (
 	"github.com/fairride/shared/database"
 	"github.com/fairride/shared/logger"
 	"github.com/fairride/trip/grpc/trippb"
+	userapp "github.com/fairride/user/app"
+	userlocalstore "github.com/fairride/user/infrastructure/localstore"
+	userocr "github.com/fairride/user/infrastructure/ocr"
+	userpostgres "github.com/fairride/user/infrastructure/postgres"
+	uservision "github.com/fairride/user/infrastructure/vision"
 	walletapp "github.com/fairride/wallet/app"
 	walletpostgres "github.com/fairride/wallet/infrastructure/postgres"
 	"google.golang.org/grpc"
@@ -43,12 +53,36 @@ func main() {
 		AccessSecret:    mustEnv("JWT_ACCESS_SECRET"),
 		RefreshSecret:   mustEnv("JWT_REFRESH_SECRET"),
 		AccessTokenTTL:  15 * time.Minute,
-		RefreshTokenTTL: 7 * 24 * time.Hour,
+		RefreshTokenTTL: 30 * 24 * time.Hour,
 	}
 	tokenSvc, err := jwt.NewTokenService(jwtCfg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid JWT config")
 	}
+
+	// Auth + Onboarding: APP_ENV gates whether /auth/otp/request echoes the
+	// code back in its response (never in production — see plan's OTP dev
+	// visibility decision). GOOGLE_CLIENT_ID pins the audience Google ID
+	// tokens must be issued for; if unset, Google login degrades to 503
+	// like every other optional dependency below.
+	appEnv := envOrDefault("APP_ENV", "production")
+	isDevelopment := appEnv == "development"
+	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
+
+	// Startup Flow: App Version gate, one config per app, env-driven (no DB
+	// table — see AppVersionHandler's doc comment).
+	avch := handlers.NewAppVersionHandler(map[string]handlers.AppVersionConfig{
+		"driver": {
+			MinimumVersion: envOrDefault("DRIVER_MIN_VERSION", "1.0.0"),
+			LatestVersion:  envOrDefault("DRIVER_LATEST_VERSION", "1.0.0"),
+			ForceUpdate:    envOrDefault("DRIVER_FORCE_UPDATE", "false") == "true",
+		},
+		"rider": {
+			MinimumVersion: envOrDefault("RIDER_MIN_VERSION", "1.0.0"),
+			LatestVersion:  envOrDefault("RIDER_LATEST_VERSION", "1.0.0"),
+			ForceUpdate:    envOrDefault("RIDER_FORCE_UPDATE", "false") == "true",
+		},
+	})
 
 	// Booking service.
 	bookingAddr := envOrDefault("BOOKING_ADDR", cfg.GRPC.Addr)
@@ -113,6 +147,105 @@ func main() {
 	if ah == nil {
 		ah = handlers.NewAuthHandler(nil, nil, tokenSvc)
 	}
+
+	// Auth + Onboarding: phone OTP + Google Sign-In self-registration login
+	// (identity/app.EnsureSystemRolesUseCase seeds the "rider"/"driver"
+	// system roles new accounts are assigned — see that use case's doc
+	// comment for why nothing did this before). Degrades to 503 like every
+	// other pool-backed handler when DB_URL is unset.
+	var oah *handlers.OTPAuthHandler
+	if pool != nil {
+		roleRepo := identitypostgres.NewRoleRepository(pool)
+		userRepo := identitypostgres.NewUserRepository(pool)
+		if err := identityapp.NewEnsureSystemRolesUseCase(roleRepo).Execute(context.Background()); err != nil {
+			log.Warn().Err(err).Msg("gateway: failed to seed system roles — otp/google signup may fail")
+		}
+
+		otpRepo := identitypostgres.NewOTPRepository(pool)
+		otpProvider := identityotp.NewMockOTPProvider(log)
+		findOrCreateUser := identityapp.NewFindOrCreateUserUseCase(userRepo, roleRepo)
+		googleVerifier := googleauth.NewTokenInfoVerifier(googleClientID)
+
+		// Device & Security: best-effort login telemetry (see
+		// OTPAuthHandler.recordLoginAttempt/upsertLoginDevice — neither ever
+		// fails the login itself).
+		deviceRepo := identitypostgres.NewDeviceRepository(pool)
+		loginHistoryRepo := identitypostgres.NewLoginHistoryRepository(pool)
+
+		oah = handlers.NewOTPAuthHandler(
+			identityapp.NewRequestOTPUseCase(otpRepo, otpProvider),
+			identityapp.NewVerifyOTPUseCase(otpRepo, findOrCreateUser),
+			identityapp.NewGoogleLoginUseCase(googleVerifier, findOrCreateUser),
+			userRepo,
+			identityapp.NewRecordLoginUseCase(loginHistoryRepo),
+			identityapp.NewUpsertDeviceUseCase(deviceRepo),
+			tokenSvc,
+			isDevelopment,
+		)
+	}
+	if oah == nil {
+		oah = handlers.NewOTPAuthHandler(nil, nil, nil, nil, nil, nil, tokenSvc, isDevelopment)
+	}
+
+	// Rider KYC — mirrors the Driver KYC wiring above but against the user
+	// service's own tables/local storage. RIDER_KYC_STORAGE_DIR mirrors
+	// KYC_STORAGE_DIR's role for driver documents.
+	var rkh *handlers.RiderKYCHandler
+	var arkh *handlers.AdminRiderKYCHandler
+	if pool != nil {
+		riderVerificationRepo := userpostgres.NewRiderVerificationRepository(pool)
+		riderStorageDir := envOrDefault("RIDER_KYC_STORAGE_DIR", "./data/rider-kyc")
+		riderDocumentStore := userlocalstore.NewDocumentStore(riderStorageDir)
+
+		// AI KYC pipeline: only Mock providers exist today (see
+		// user/infrastructure/ocr and .../vision doc comments) — swapping in
+		// PaddleOCR/Qwen2.5-VL/Gemma Vision later is a one-line change here.
+		rkh = handlers.NewRiderKYCHandler(
+			userapp.NewUploadRiderDocumentUseCase(riderVerificationRepo, riderDocumentStore),
+			userapp.NewSubmitRiderVerificationUseCase(riderVerificationRepo, userocr.NewMockOCRProvider(), uservision.NewMockVisionProvider()),
+			userapp.NewGetRiderVerificationUseCase(riderVerificationRepo),
+		)
+		arkh = handlers.NewAdminRiderKYCHandler(
+			userapp.NewListPendingRiderVerificationsUseCase(riderVerificationRepo),
+			userapp.NewReviewRiderVerificationUseCase(riderVerificationRepo),
+		)
+	}
+	if rkh == nil {
+		rkh = handlers.NewRiderKYCHandler(nil, nil, nil)
+	}
+	if arkh == nil {
+		arkh = handlers.NewAdminRiderKYCHandler(nil, nil)
+	}
+
+	// Voucher & Promotion — in-process, same pattern/rationale as Rider KYC
+	// above (no protoc/buf toolchain for a promotion.proto; see
+	// promotion/cmd/server/main.go's doc comment). Shares the gateway's pool.
+	var proh *handlers.PromotionHandler
+	var aproh *handlers.AdminPromotionHandler
+	var promotionService *promotionapp.PromotionService
+	if pool != nil {
+		voucherRepo := promotionpostgres.NewVoucherRepository(pool)
+		validator := promotionapp.NewVoucherValidator()
+		rules := promotionapp.NewDefaultRuleRegistry()
+		promotionService = promotionapp.NewPromotionService(voucherRepo, validator, rules)
+
+		proh = handlers.NewPromotionHandler(promotionService, promotionapp.NewMyVouchersUseCase(voucherRepo))
+		aproh = handlers.NewAdminPromotionHandler(
+			promotionapp.NewCreateVoucherUseCase(voucherRepo),
+			promotionapp.NewUpdateVoucherUseCase(voucherRepo),
+			promotionapp.NewListVouchersUseCase(voucherRepo),
+			promotionapp.NewGetVoucherUseCase(voucherRepo),
+			promotionapp.NewReviewVoucherUseCase(voucherRepo),
+			promotionapp.NewVoucherStatsUseCase(voucherRepo),
+		)
+	}
+	if proh == nil {
+		proh = handlers.NewPromotionHandler(nil, nil)
+	}
+	if aproh == nil {
+		aproh = handlers.NewAdminPromotionHandler(nil, nil, nil, nil, nil, nil)
+	}
+	bh.SetPromotionService(promotionService)
 
 	// Communication Module — Phone Call / In-App Chat / Notification /
 	// Contact Card. Needs both `pool` (its own tables) and `tripClient`
@@ -358,7 +491,7 @@ func main() {
 	}
 
 	authMW := middleware.Auth(tokenSvc)
-	router := httpgateway.NewRouter(bh, ah, avh, lh, dph, rh, dh, ch, cah, nh, kh, akh, wh, awh, ph, authMW, log)
+	router := httpgateway.NewRouter(bh, ah, oah, avch, avh, lh, dph, rh, dh, ch, cah, nh, kh, akh, rkh, arkh, wh, awh, ph, proh, aproh, authMW, log)
 
 	addr := cfg.HTTP.Addr
 	srv := &http.Server{

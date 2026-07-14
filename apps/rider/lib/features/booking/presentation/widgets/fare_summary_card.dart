@@ -35,12 +35,20 @@ class FareSummaryCard extends StatelessWidget {
     required this.distanceKm,
     required this.durationMin,
     this.voucher,
+    this.discountAmount,
+    this.finalTotal,
     this.promotion,
     this.surge,
     this.cheaperThanCompetitorLabel,
   });
 
   final FareEstimate breakdown;
+
+  /// Real discount from `PromotionRepository.apply` — null hides the
+  /// discount row entirely. [finalTotal] (breakdown.total - discountAmount,
+  /// computed server-side) replaces the big total figure when present.
+  final int? discountAmount;
+  final int? finalTotal;
 
   /// Real trip geometry, used only to render the "Tại sao giá này?"
   /// explanation; not itself an invented pricing input.
@@ -142,12 +150,25 @@ class FareSummaryCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          if (discountAmount != null && finalTotal != null)
+                            Text(
+                              formatMoney(breakdown.total, breakdown.currencyCode),
+                              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                    color: AppColors.textTertiary,
+                                    decoration: TextDecoration.lineThrough,
+                                  ),
+                            ),
                           AnimatedCounter(
-                            value: breakdown.total,
+                            value: finalTotal ?? breakdown.total,
                             format: (v) => formatMoney(v, breakdown.currencyCode),
                             style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: AppColors.primary),
                           ),
-                          Text('Giá ước tính', style: Theme.of(context).textTheme.labelSmall),
+                          Text(
+                            discountAmount != null
+                                ? 'Đã giảm ${formatMoney(discountAmount!, breakdown.currencyCode)}'
+                                : 'Giá ước tính',
+                            style: Theme.of(context).textTheme.labelSmall,
+                          ),
                         ],
                       ),
                     ),

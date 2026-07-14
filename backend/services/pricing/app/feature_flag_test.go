@@ -117,7 +117,7 @@ func TestFareCalculatorV2_UnaffectedByV3Additions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if fb.Total != 55500 {
-		t.Errorf("Total = %d, want 55500 (unchanged VND formula — see fare_calculator_test.go)", fb.Total)
+	if fb.Total != 73500 {
+		t.Errorf("Total = %d, want 73500 (unchanged VND formula — see fare_calculator_test.go)", fb.Total)
 	}
 }

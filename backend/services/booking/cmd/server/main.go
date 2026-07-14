@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 
 	sharedconfig "github.com/fairride/shared/config"
 	sharedgrpc "github.com/fairride/shared/grpc"
@@ -73,9 +74,17 @@ func register(srv *sharedgrpc.Server, ready *server.ReadinessTracker) {
 		}
 	}
 
+	// Ride Lifecycle Fare Validation — no-movement fraud guard thresholds,
+	// configurable via env (not hardcoded in the use case itself). Defaults:
+	// a trip under 300m AND under 2 minutes is not a real ride; either
+	// threshold alone being exceeded (e.g. GPS glitch under-reports
+	// distance but real time elapsed) lets FinishTrip proceed.
+	minDistanceKm := envFloatOrDefault("TRIP_FRAUD_MIN_DISTANCE_KM", 0.3)
+	minDurationMin := envFloatOrDefault("TRIP_FRAUD_MIN_DURATION_MIN", 2.0)
+
 	bookRide := app.NewBookRideUseCase(tripAdapter, dispatchAdapter)
 	acceptOffer := app.NewAcceptDispatchOfferUseCase(dispatchAdapter, tripAdapter)
-	finishTrip := app.NewFinishTripUseCase(pricingAdapter, tripAdapter)
+	finishTrip := app.NewFinishTripUseCase(pricingAdapter, tripAdapter).WithFraudGuard(minDistanceKm, minDurationMin)
 	if idemStore != nil {
 		bookRide = bookRide.WithIdempotency(idemStore)
 		acceptOffer = acceptOffer.WithIdempotency(idemStore)
@@ -102,6 +111,15 @@ func register(srv *sharedgrpc.Server, ready *server.ReadinessTracker) {
 func envOrDefault(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return def
+}
+
+func envFloatOrDefault(key string, def float64) float64 {
+	if v := os.Getenv(key); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
+		}
 	}
 	return def
 }

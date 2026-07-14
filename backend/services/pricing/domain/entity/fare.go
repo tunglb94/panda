@@ -44,49 +44,78 @@ type FareConfig struct {
 
 // DefaultFareConfig returns the launch-market rates. VND has no decimal
 // subunit (BRB v1.0 §2.2.9), so amounts here are whole VND, not cents.
+// This is Pricing V2's config — the DEFAULT engine (PricingVersionV2, see
+// app/feature_flag.go); Pricing V3's tiered config is a separate, currently
+// opt-in system (config/pricing_v3.default.yaml, PRICING_VERSION=v3) not
+// touched by this calibration.
 //
-// Car/Motorcycle/BikePlus/CarXL are calibrated to undercut Be/Xanh SM by
-// ~10-20% on a real ~11.2km reference route (R7 Phú Mỹ Hưng → Ga T3 Tân
-// Sơn Nhất) rather than taken from BRB §2.2.1-§2.2.5 verbatim — the BRB
-// Standard/XL rows priced noticeably above that competitor band once
-// checked against real fares. BikePlus/CarXL are new rate cards (~1.2x
-// Bike, ~1.35x Car) so they no longer alias Motorcycle/Van pricing.
-// VehicleTypeVan keeps its original BRB XL row — it's legacy, not part of
-// the rider-facing catalog (CarXL replaced it there).
+// Car/Motorcycle calibrated 2026-07-14 to sit within ±5% of the real
+// Grab/Be/Xanh SM average (docs/business/MARKET_PRICING_RESEARCH.md Phần 2,
+// sourced 2026-07-11) across the full 2-60km range, replacing an earlier
+// deliberate "10-20% cheaper" positioning that had drifted to -42.5% to
+// -52.8% below market once actually checked against real fares — coefficients
+// were fit by linear regression against the market curve (BaseFare+BookingFee
+// as intercept, PerKmRate+2.2×PerMinuteRate as slope, matching this formula's
+// own shape — DurationMin ≈ 2.2×DistanceKM per the research doc's convention),
+// NOT copied from any single competitor's price:
+//   - Motorcycle: fits the market curve almost exactly (max |err| ~0.1%,
+//     13 distances 2-60km) — Grab/Be/Xanh SM bike pricing has no long-haul
+//     distance tiering in the public rate cards found, so a flat rate tracks
+//     it closely.
+//   - Car: max |err| ~2.9% across the same 13 distances — comfortably inside
+//     the ±5% target despite the market curve being mildly degressive
+//     (Be/Xanh SM taper their /km on long trips; Grab's public rate card has
+//     no visible taper). A flat V2 rate cannot fit a genuinely tiered curve
+//     at both very-short and very-long distances simultaneously — see
+//     Pricing V3 (config/pricing_v3.default.yaml) for the distance-tiered
+//     engine that exists for exactly this reason.
+//
+// CarXL/BikePlus have no independent multi-platform market data (BRB/PS/the
+// research doc all note Vietnam platforms rarely publish standalone XL rate
+// cards) — kept at the same ratios over Car/Motorcycle the previous
+// calibration already used (CarXL ≈1.3x Car per the research doc's XL
+// assumption, BikePlus ≈1.2x Motorcycle), recomputed off the new base
+// numbers rather than independently fit. Xanh SM's published Premium/Luxury
+// rate (21,000/km flat) is a different, higher product tier and is not a
+// valid ±5% target for a standard XL/7-seat class.
+//
+// VehicleTypeVan is unchanged — explicitly legacy/not part of the
+// rider-facing catalog (CarXL replaced it there, see the pre-existing note
+// below), so it was left out of this pass.
 func DefaultFareConfig() FareConfig {
 	return FareConfig{
 		CurrencyCode: "VND",
 		Rates: map[VehicleType]VehicleRates{
 			VehicleTypeMotorcycle: {
-				BaseFare:      8_000,
-				PerKmRate:     2_800,
+				BaseFare:      2_700,
+				PerKmRate:     4_140,
 				PerMinuteRate: 200,
-				MinimumFare:   15_000,
+				MinimumFare:   9_000,
 				BookingFee:    2_000,
 			},
 			VehicleTypeBikePlus: {
-				BaseFare:      10_000,
-				PerKmRate:     3_400,
-				PerMinuteRate: 250,
-				MinimumFare:   18_000,
+				BaseFare:      3_200,
+				PerKmRate:     5_000,
+				PerMinuteRate: 240,
+				MinimumFare:   11_000,
 				BookingFee:    2_000,
 			},
 			VehicleTypeCar: {
-				BaseFare:      15_000,
-				PerKmRate:     6_500,
-				PerMinuteRate: 400,
-				MinimumFare:   30_000,
+				BaseFare:      11_250,
+				PerKmRate:     10_700,
+				PerMinuteRate: 450,
+				MinimumFare:   25_000,
 				BookingFee:    2_000,
 			},
 			VehicleTypeCarXL: {
-				BaseFare:      22_000,
-				PerKmRate:     8_500,
-				PerMinuteRate: 550,
-				MinimumFare:   45_000,
+				BaseFare:      14_600,
+				PerKmRate:     13_900,
+				PerMinuteRate: 580,
+				MinimumFare:   32_000,
 				BookingFee:    2_000,
 			},
 			VehicleTypeVan: {
-				BaseFare:      18_000, // BRB §2.2.1 XL
+				BaseFare:      18_000, // BRB §2.2.1 XL — legacy, unchanged (see doc comment above)
 				PerKmRate:     5_000,  // BRB §2.2.2 XL
 				PerMinuteRate: 500,    // BRB §2.2.3 XL
 				MinimumFare:   40_000, // BRB §2.2.4 XL

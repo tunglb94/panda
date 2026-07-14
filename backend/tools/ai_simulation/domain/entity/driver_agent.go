@@ -80,10 +80,17 @@ type DriverAgent struct {
 	IncomeWeek   int64   // VND, resets every 7 simulated days
 	Satisfaction float64 // 0-1, drifts based on income/fatigue/wait outcomes
 	Fatigue      float64 // 0-1, rises with consecutive online hours, falls when offline
-	PhoneBattery float64 // 0-1
-	Fuel         float64 // 0-1 (or state-of-charge for EVs — simulation doesn't distinguish)
-	Cash         int64   // VND on hand (wallet-adjacent, not the real Wallet service)
-	Zone         ZoneType
+	// FatigueGainPerTick is this driver's own stamina — how much Fatigue
+	// rises per 15-min tick while online (see simulation/engine.go's
+	// evaluateDriverState). Seeded once per driver (simulation/seed.go) so
+	// individual online-stretch length naturally varies across the
+	// population instead of every driver sharing one flat rate — see
+	// CHANGELOG's Driver Economy shift-classification fix.
+	FatigueGainPerTick float64
+	PhoneBattery       float64 // 0-1
+	Fuel               float64 // 0-1 (or state-of-charge for EVs — simulation doesn't distinguish)
+	Cash               int64   // VND on hand (wallet-adjacent, not the real Wallet service)
+	Zone               ZoneType
 
 	Online           bool
 	HoursOnlineToday float64

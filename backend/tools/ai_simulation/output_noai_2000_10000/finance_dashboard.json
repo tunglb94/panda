@@ -1,0 +1,24 @@
+{
+  "platform_revenue_vnd": 3531662005,
+  "platform_cost_vnd": 296860000,
+  "driver_revenue_vnd": 13379826081,
+  "voucher_cost_vnd": 7163478,
+  "promotion_cost_vnd": 167800818,
+  "refund_vnd": 0,
+  "commission_vnd": 3531662005,
+  "tax_vnd": 353166200,
+  "gross_margin_percent": 21.69336394783042,
+  "net_margin_percent": 15.841038551989802,
+  "profit_per_ride_vnd": 10189.674290474257,
+  "profit_per_delivery_vnd": 7814.035898880127,
+  "assumptions": [
+    {
+      "Title": "Refund luôn = 0",
+      "Detail": "Simulation không có cơ chế hoàn tiền (refund) — Promotion/Voucher Engine chỉ áp giảm giá tại thời điểm đặt, không có luồng hoàn tiền sau khi hoàn tất chuyến."
+    },
+    {
+      "Title": "Platform Cost chỉ gồm chi phí hạ tầng ước tính",
+      "Detail": "Không bao gồm chi phí nhân sự/marketing/vận hành thật của Panda — chỉ Cloud/Map/SMS như unit_economics.json đã định nghĩa."
+    }
+  ]
+}

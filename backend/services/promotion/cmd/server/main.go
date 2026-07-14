@@ -18,15 +18,15 @@ func main() {
 // register wires the Promotion Engine's domain/app/infrastructure layers
 // (Postgres repository -> VoucherValidator + RuleRegistry -> PromotionService).
 //
-// TODO(promotion-engine): this service does not yet expose a gRPC handler —
-// no .proto/generated *pb code was written in this sprint (see CHANGELOG /
-// report: the sprint's explicit required components — PromotionService,
-// VoucherValidator, PromotionRepository, PromotionRule, PromotionResult,
-// PromotionError — are all domain/app-layer concepts, and this environment
-// has no Go toolchain available to safely hand-verify generated protobuf
-// code). Once a promotion.proto + grpc handler exist, register them here on
-// srv.Inner(), following the exact pattern used by
-// backend/services/driver/cmd/server/main.go.
+// This service has no gRPC handler and is not meant to run as a standalone
+// process in production — no .proto/generated *pb code exists for it (this
+// environment has no protoc/buf toolchain), so gateway/cmd/server/main.go
+// imports these same domain/app/infrastructure packages directly and
+// in-process instead, sharing the gateway's own Postgres pool — the exact
+// pattern already used there for Identity/User/Wallet. This main() and its
+// standalone binary exist only so `go build ./...`/`go vet ./...` cover the
+// module the same way every other service's does; it is never actually
+// deployed/run on its own.
 func register(_ *sharedgrpc.Server, ready *server.ReadinessTracker) {
 	cfg := sharedconfig.Load("promotion")
 

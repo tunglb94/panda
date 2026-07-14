@@ -47,6 +47,34 @@ class ApiClient {
     return _parse(response);
   }
 
+  /// Uploads one file as `multipart/form-data` — used by the Rider KYC
+  /// document upload step. [fields] are sent as plain form fields alongside
+  /// the file (e.g. `document_type`). Rebuilds the whole request on a
+  /// retry — a sent [http.MultipartRequest] cannot be resent as-is. Mirrors
+  /// `apps/driver`'s `ApiClient.postMultipart`.
+  Future<Map<String, dynamic>> postMultipart(
+    String path, {
+    required String fileFieldName,
+    required List<int> bytes,
+    required String filename,
+    Map<String, String> fields = const {},
+    Duration? timeout,
+  }) async {
+    final uri = Uri.parse('$_baseUrl$path');
+    Future<http.Response> send() async {
+      final request = http.MultipartRequest('POST', uri);
+      final token = _authState.accessToken;
+      if (token != null) request.headers['Authorization'] = 'Bearer $token';
+      request.fields.addAll(fields);
+      request.files.add(http.MultipartFile.fromBytes(fileFieldName, bytes, filename: filename));
+      final streamed = await _httpClient.send(request).timeout(timeout ?? _timeout, onTimeout: _throwTimeout);
+      return http.Response.fromStream(streamed);
+    }
+
+    final response = await _sendWithAuthRetry(send);
+    return _parse(response);
+  }
+
   /// [timeout] overrides the default 15s — used by the chat feature's
   /// long-poll `GET .../messages?poll=true`, which the server deliberately
   /// holds open for up to ~25s (see notificationapp.DefaultPollTimeout on

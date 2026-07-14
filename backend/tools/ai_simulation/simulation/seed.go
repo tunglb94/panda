@@ -8,6 +8,15 @@ import (
 	"github.com/fairride/ai_simulation/domain/entity"
 )
 
+// baseFatigueGainPerTick is the center of seedDrivers' per-driver stamina
+// range (see DriverAgent.FatigueGainPerTick) — was previously a single flat
+// constant applied to every driver, which meant every driver's online
+// stretch length converged to the same long-run average given enough
+// simulated days, degenerating driver_economy.json's shift classification
+// to 100% "hardcore" regardless of population size or --days (see
+// CHANGELOG). Not a BRB number — no real per-driver stamina data exists.
+const baseFatigueGainPerTick = 0.012
+
 // seedDrivers populates n randomized DriverAgents and publishes their
 // starting position to the Dispatch adapter so they're immediately
 // matchable. Value ranges here are simulation-design choices, not sourced
@@ -34,12 +43,18 @@ func seedDrivers(w *World, n int) {
 			AccountType:     entity.AccountBronze,
 			Satisfaction:    0.5 + w.Rand.Float64()*0.4,
 			Fatigue:         w.Rand.Float64() * 0.2,
-			PhoneBattery:    0.6 + w.Rand.Float64()*0.4,
-			Fuel:            0.5 + w.Rand.Float64()*0.5,
-			Cash:            int64(200_000 + w.Rand.Intn(2_000_000)),
-			Zone:            zone,
-			Online:          w.Rand.Float64() < 0.6,
-			TotalTrips:      w.Rand.Intn(3000),
+			// 0.4x-10.0x of the base rate — spans roughly a ~2h (fast-tiring,
+			// naturally lands in part_time once classified) to ~12h+
+			// (slow-tiring, hardcore) online stretch length, letting
+			// driver_economy.json's 4 shift categories emerge from natural
+			// per-driver variation instead of one shared constant.
+			FatigueGainPerTick: baseFatigueGainPerTick * (0.4 + w.Rand.Float64()*9.6),
+			PhoneBattery:       0.6 + w.Rand.Float64()*0.4,
+			Fuel:               0.5 + w.Rand.Float64()*0.5,
+			Cash:               int64(200_000 + w.Rand.Intn(2_000_000)),
+			Zone:               zone,
+			Online:             w.Rand.Float64() < 0.6,
+			TotalTrips:         w.Rand.Intn(3000),
 		}
 		w.Drivers[id] = d
 		if d.Online {

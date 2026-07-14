@@ -1,0 +1,17 @@
+{
+  "trip_count": 36528,
+  "average_eta_minutes": 62.360262494006,
+  "average_passenger_waiting_minutes": 20.65052549411331,
+  "revenue_vnd": 2428179924,
+  "cancel_rate_percent": 0.8075996495838809,
+  "not_modeled": [
+    "queue (không có hàng đợi vật lý tại sân bay)",
+    "driver waiting (tài xế không \"chờ\" tại 1 khu vực — được ghép ngay khi có yêu cầu qua Dispatch gần nhất)"
+  ],
+  "assumptions": [
+    {
+      "Title": "Airport trips = pickup HOẶC dropoff tại Sân bay",
+      "Detail": "Khớp với định nghĩa Airport Profit (§16) trong Business Audit phase trước — một chuyến chỉ cần chạm Sân bay ở một đầu là được tính, không chỉ pickup."
+    }
+  ]
+}

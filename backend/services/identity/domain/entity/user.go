@@ -35,19 +35,31 @@ const (
 	StatusDeactivated         UserStatus = "deactivated"
 )
 
-// User is the platform account entity. One User exists per unique phone number.
-// Email is optional; an empty string means not provided.
+// User is the platform account entity. PhoneNumber, Email, and GoogleSub are
+// each optional — empty string means "not provided" — but whichever ones
+// are set must be unique platform-wide (enforced by the persistence layer,
+// see migration 020). A phone-OTP signup sets PhoneNumber only; a Google
+// signup sets Email + GoogleSub only; either can later gain the other via
+// FindOrCreateUserUseCase's auto-link (matching by email) or a future
+// explicit account-merge flow (not implemented yet — see plan's Known Gaps).
+//
+// Every account defaults to TypeRider/RoleRider regardless of which app
+// first created it (Driver app included) — DriverEnabled is the capability
+// flag that actually gates the Driver app, independent of Type/RoleID. One
+// account can be Rider and Driver-enabled at the same time.
 // RoleID links to an identity.Role that governs permissions.
 type User struct {
-	ID          string
-	PhoneNumber string
-	Name        string
-	Email       string
-	Type        UserType
-	Status      UserStatus
-	RoleID      string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID            string
+	PhoneNumber   string
+	Name          string
+	Email         string
+	GoogleSub     string
+	Type          UserType
+	Status        UserStatus
+	RoleID        string
+	DriverEnabled bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 // NewUser creates a new User account in StatusPendingVerification.
@@ -93,25 +105,62 @@ func NewUser(
 	}, nil
 }
 
+// NewGoogleUser creates a new User account from a verified Google Sign-In —
+// no phone number, since Google never provides one. email and googleSub
+// must both be non-empty (GoogleLoginUseCase already requires a verified
+// email before calling this). Always TypeRider — see the User doc comment
+// on why Type/RoleID no longer vary by which app first created the account.
+func NewGoogleUser(id, email, googleSub, name, roleID string, now time.Time) (*User, error) {
+	if id == "" {
+		return nil, errors.InvalidArgument("user id must not be empty")
+	}
+	if err := validateEmail(email); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(googleSub) == "" {
+		return nil, errors.InvalidArgument("google sub must not be empty")
+	}
+	if strings.TrimSpace(name) == "" {
+		return nil, errors.InvalidArgument("user name must not be empty")
+	}
+	if roleID == "" {
+		return nil, errors.InvalidArgument("user role id must not be empty")
+	}
+	return &User{
+		ID:        id,
+		Name:      name,
+		Email:     email,
+		GoogleSub: googleSub,
+		Type:      TypeRider,
+		Status:    StatusPendingVerification,
+		RoleID:    roleID,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}, nil
+}
+
 // ReconstituteUser rebuilds a User from a persistence record.
 // No validation is applied — data is assumed already valid.
 func ReconstituteUser(
-	id, phoneNumber, name, email string,
+	id, phoneNumber, name, email, googleSub string,
 	userType UserType,
 	status UserStatus,
 	roleID string,
+	driverEnabled bool,
 	createdAt, updatedAt time.Time,
 ) *User {
 	return &User{
-		ID:          id,
-		PhoneNumber: phoneNumber,
-		Name:        name,
-		Email:       email,
-		Type:        userType,
-		Status:      status,
-		RoleID:      roleID,
-		CreatedAt:   createdAt,
-		UpdatedAt:   updatedAt,
+		ID:            id,
+		PhoneNumber:   phoneNumber,
+		Name:          name,
+		Email:         email,
+		GoogleSub:     googleSub,
+		Type:          userType,
+		Status:        status,
+		RoleID:        roleID,
+		DriverEnabled: driverEnabled,
+		CreatedAt:     createdAt,
+		UpdatedAt:     updatedAt,
 	}
 }
 
@@ -149,6 +198,34 @@ func (u *User) Deactivate(now time.Time) error {
 		return errors.PreconditionFailed("cannot deactivate user with status: " + string(u.Status))
 	}
 	u.Status = StatusDeactivated
+	u.UpdatedAt = now
+	return nil
+}
+
+// EnableDriverCapability idempotently flips DriverEnabled on — called the
+// first time an account logs into the Driver app. Does not touch Type or
+// RoleID (a Driver-enabled account is still, and remains, a Rider account —
+// see the User doc comment).
+func (u *User) EnableDriverCapability(now time.Time) {
+	if u.DriverEnabled {
+		return
+	}
+	u.DriverEnabled = true
+	u.UpdatedAt = now
+}
+
+// LinkGoogleSub attaches a verified Google subject ID to an account that
+// doesn't have one yet — used when GoogleLoginUseCase resolves an existing
+// phone/email account by email match rather than by GoogleSub (auto-link,
+// not a full account merge; see the User doc comment).
+func (u *User) LinkGoogleSub(sub string, now time.Time) error {
+	if strings.TrimSpace(sub) == "" {
+		return errors.InvalidArgument("google sub must not be empty")
+	}
+	if u.GoogleSub != "" && u.GoogleSub != sub {
+		return errors.PreconditionFailed("account is already linked to a different Google account")
+	}
+	u.GoogleSub = sub
 	u.UpdatedAt = now
 	return nil
 }

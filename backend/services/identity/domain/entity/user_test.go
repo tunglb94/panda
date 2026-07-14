@@ -176,8 +176,8 @@ func TestNewUser_EmailValidation(t *testing.T) {
 func TestReconstituteUser_ArbitraryState(t *testing.T) {
 	// Reconstitute must accept any status without validation.
 	u := ReconstituteUser(
-		"u-42", "+84999999999", "Ahmad", "ahmad@example.com",
-		TypeDriver, StatusSuspended, "role-driver",
+		"u-42", "+84999999999", "Ahmad", "ahmad@example.com", "",
+		TypeDriver, StatusSuspended, "role-driver", false,
 		testUserNow, testUserNow.Add(24*time.Hour),
 	)
 	if u.ID != "u-42" {

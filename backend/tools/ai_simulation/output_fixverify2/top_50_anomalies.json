@@ -1,0 +1,104 @@
+[
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0435",
+    "severity": 26425.365,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0106",
+    "severity": 25122.837,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0029",
+    "severity": 22771.208,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0130",
+    "severity": 21428.145,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0096",
+    "severity": 20324.15,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0464",
+    "severity": 19974.446,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0002",
+    "severity": 19700.981,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0347",
+    "severity": 19547.902,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0230",
+    "severity": 19226.079,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0045",
+    "severity": 16761.606,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0283",
+    "severity": 16745.545,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "airport",
+    "severity": 1378.866254012008,
+    "detail": "Khu vực airport có tỉ lệ cầu/cung trung bình 91.92x — thiếu tài xế nghiêm trọng."
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "cbd",
+    "severity": 1146.1548313412907,
+    "detail": "Khu vực cbd có tỉ lệ cầu/cung trung bình 76.41x — thiếu tài xế nghiêm trọng."
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "hospital",
+    "severity": 955.5133297684029,
+    "detail": "Khu vực hospital có tỉ lệ cầu/cung trung bình 63.70x — thiếu tài xế nghiêm trọng."
+  },
+  {
+    "type": "driver_12h_plus",
+    "entity_id": "driver-0207",
+    "severity": 120,
+    "detail": "Đã từng online liên tục \u003e=12h trong một ca — chạm ngưỡng an toàn cứng của FatigueDecision"
+  },
+  {
+    "type": "driver_12h_plus",
+    "entity_id": "driver-0436",
+    "severity": 120,
+    "detail": "Đã từng online liên tục \u003e=12h trong một ca — chạm ngưỡng an toàn cứng của FatigueDecision"
+  },
+  {
+    "type": "driver_12h_plus",
+    "entity_id": "driver-0397",
+    "severity": 120,
+    "detail": "Đã từng online liên tục \u003e=12h trong một ca — chạm ngưỡng an toàn cứng của FatigueDecision"
+  }
+]

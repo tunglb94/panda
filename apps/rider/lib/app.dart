@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rider/core/auth/auth_state.dart';
+import 'package:rider/core/kyc/kyc_gate.dart';
 import 'package:rider/core/network/api_client.dart';
 import 'package:rider/core/router/app_router.dart';
 import 'package:rider/core/routing/route_provider.dart';
@@ -26,13 +27,16 @@ class RiderApp extends StatefulWidget {
 }
 
 class _RiderAppState extends State<RiderApp> {
+  late final KycGate _kycGate;
   late final GoRouter _router;
 
   @override
   void initState() {
     super.initState();
+    _kycGate = KycGate();
     _router = AppRouter.create(
       authState: widget.authState,
+      kycGate: _kycGate,
       tokenStorage: widget.tokenStorage,
       apiClient: widget.apiClient,
       routeProvider: widget.routeProvider,

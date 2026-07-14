@@ -137,7 +137,7 @@ func (a *PromotionAdapter) Evaluate(ctx context.Context, in EvaluateInput) (*pro
 	return a.service.Evaluate(ctx, req, in.RequestTime)
 }
 
-// Redeem calls the real PromotionService.Redeem to commit budget/usage.
+// Redeem calls the real PromotionService.Reserve to commit budget/usage.
 func (a *PromotionAdapter) Redeem(ctx context.Context, result *promotionentity.PromotionResult, riderID, tripID string) error {
-	return a.service.Redeem(ctx, result, riderID, tripID)
+	return a.service.Reserve(ctx, result, riderID, tripID)
 }

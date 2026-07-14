@@ -45,6 +45,12 @@ func (val *VoucherValidator) Validate(v *entity.Voucher, req *entity.PromotionRe
 	if err := val.checkVehicleType(v, req.VehicleType); err != nil {
 		return err
 	}
+	if err := val.checkServiceType(v, req.ServiceType); err != nil {
+		return err
+	}
+	if err := val.checkTripType(v, req.TripType); err != nil {
+		return err
+	}
 	if err := val.checkMembership(v, req.MembershipTier); err != nil {
 		return err
 	}
@@ -113,6 +119,30 @@ func (val *VoucherValidator) checkVehicleType(v *entity.Voucher, vehicleType str
 	}
 	if !containsCI(v.VehicleTypes, vehicleType) {
 		return entity.PromotionError(entity.ReasonWrongVehicle, "voucher is not valid for vehicle type: "+vehicleType)
+	}
+	return nil
+}
+
+// checkServiceType: voucher scoped to specific Rider-app tiers (bike/bike_plus/
+// car/car_xl) — empty list on the voucher = all tiers. See Voucher.ServiceTypes.
+func (val *VoucherValidator) checkServiceType(v *entity.Voucher, serviceType string) error {
+	if len(v.ServiceTypes) == 0 {
+		return nil
+	}
+	if !containsCI(v.ServiceTypes, serviceType) {
+		return entity.PromotionError(entity.ReasonWrongServiceType, "voucher is not valid for service type: "+serviceType)
+	}
+	return nil
+}
+
+// checkTripType: voucher scoped to "ride" and/or "delivery" — empty list on
+// the voucher = both. See Voucher.TripTypes.
+func (val *VoucherValidator) checkTripType(v *entity.Voucher, tripType string) error {
+	if len(v.TripTypes) == 0 {
+		return nil
+	}
+	if !containsCI(v.TripTypes, tripType) {
+		return entity.PromotionError(entity.ReasonWrongTripType, "voucher is not valid for trip type: "+tripType)
 	}
 	return nil
 }

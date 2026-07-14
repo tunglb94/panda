@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'package:vibration/vibration.dart';
 
 import '../../../../core/location/location_engine.dart';
 import '../../../../core/network/api_client.dart';
@@ -79,6 +81,16 @@ class _TripPageState extends State<TripPage> with WidgetsBindingObserver {
   Timer? _paymentPollTimer;
   bool _isPollingActive = false;
   bool _isPaymentPollingActive = false;
+  final _offerSoundPlayer = AudioPlayer();
+
+  /// Plays the pickup alert sound + vibrates so the driver notices a new
+  /// trip offer even if the phone isn't in hand.
+  Future<void> _notifyNewOffer() async {
+    unawaited(_offerSoundPlayer.play(AssetSource('sounds/panda_pickup.mp3')));
+    if (await Vibration.hasVibrator()) {
+      unawaited(Vibration.vibrate(pattern: [0, 400, 200, 400]));
+    }
+  }
 
   @override
   void initState() {
@@ -97,6 +109,7 @@ class _TripPageState extends State<TripPage> with WidgetsBindingObserver {
     _countdownTimer?.cancel();
     _paymentPollTimer?.cancel();
     _metricsEngine.reset();
+    _offerSoundPlayer.dispose();
     super.dispose();
   }
 
@@ -219,6 +232,7 @@ class _TripPageState extends State<TripPage> with WidgetsBindingObserver {
             _state = _PageState.offerAvailable;
             _offer = offer;
           });
+          _notifyNewOffer();
         }
       }
     } on ApiException catch (e) {

@@ -65,7 +65,7 @@ func TestNewTrip_EmptyDropoff(t *testing.T) {
 // ─── Cancel ──────────────────────────────────────────────────────────────────
 
 func tripAt(status entity.TripStatus) *entity.Trip {
-	return entity.ReconstituteTrip("t1", "r1", "", status, "pickup", "dropoff", "", 0, "", "", testNow, testNow, entity.CompleteFinancials{})
+	return entity.ReconstituteTrip("t1", "r1", "", status, "pickup", "dropoff", "", 0, "", "", testNow, testNow, entity.CompleteFinancials{}, nil, nil, 0, entity.TripSummary{})
 }
 
 func TestCancel_FromPending(t *testing.T) {
@@ -177,7 +177,7 @@ func TestStart_FromInProgressFails(t *testing.T) {
 
 func TestComplete_FromInProgress(t *testing.T) {
 	trip := tripAt(entity.StatusInProgress)
-	if err := trip.Complete(325, "USD", entity.CompleteFinancials{}, testNow); err != nil {
+	if err := trip.Complete(325, "USD", entity.CompleteFinancials{}, entity.TripSummary{}, testNow); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if trip.Status != entity.StatusCompleted {
@@ -191,9 +191,45 @@ func TestComplete_FromInProgress(t *testing.T) {
 	}
 }
 
+// TestComplete_WaitingThenShortRide_ComputesSummaryFields covers the
+// "waiting then finish" case: driver waits a long time at pickup, then the
+// actual ride is short but legitimate. WaitingDurationMin must reflect the
+// pickup wait (ArrivedAt -> StartedAt), kept distinct from
+// TravelledDurationMin (the ride itself) — neither should be conflated with
+// the other, and both are Trip Summary fields Pricing can read independently.
+func TestComplete_WaitingThenShortRide_ComputesSummaryFields(t *testing.T) {
+	trip := tripAt(entity.StatusDriverAssigned)
+
+	arrivedAt := testNow
+	if err := trip.MarkDriverArrived(arrivedAt); err != nil {
+		t.Fatalf("MarkDriverArrived: %v", err)
+	}
+
+	startedAt := arrivedAt.Add(8 * time.Minute) // long wait at pickup
+	if err := trip.Start(startedAt); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	completedAt := startedAt.Add(3 * time.Minute)
+	summary := entity.TripSummary{TravelledDistanceKm: 0.6, TravelledDurationMin: 3}
+	if err := trip.Complete(15_000, "VND", entity.CompleteFinancials{}, summary, completedAt); err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+
+	if trip.WaitingDurationMin != 8 {
+		t.Errorf("WaitingDurationMin = %v, want 8 (derived from ArrivedAt->StartedAt, not client input)", trip.WaitingDurationMin)
+	}
+	if trip.TravelledDurationMin != 3 {
+		t.Errorf("TravelledDurationMin = %v, want 3 (the ride itself, distinct from waiting)", trip.TravelledDurationMin)
+	}
+	if trip.TravelledDistanceKm != 0.6 {
+		t.Errorf("TravelledDistanceKm = %v, want 0.6", trip.TravelledDistanceKm)
+	}
+}
+
 func TestComplete_FromPendingFails(t *testing.T) {
 	trip := tripAt(entity.StatusPending)
-	err := trip.Complete(100, "USD", entity.CompleteFinancials{}, testNow)
+	err := trip.Complete(100, "USD", entity.CompleteFinancials{}, entity.TripSummary{}, testNow)
 	if !domainerrors.IsCode(err, domainerrors.CodePreconditionFailed) {
 		t.Errorf("expected PreconditionFailed, got %v", err)
 	}
@@ -201,7 +237,7 @@ func TestComplete_FromPendingFails(t *testing.T) {
 
 func TestComplete_FromCompletedFails(t *testing.T) {
 	trip := tripAt(entity.StatusCompleted)
-	err := trip.Complete(100, "USD", entity.CompleteFinancials{}, testNow)
+	err := trip.Complete(100, "USD", entity.CompleteFinancials{}, entity.TripSummary{}, testNow)
 	if !domainerrors.IsCode(err, domainerrors.CodePreconditionFailed) {
 		t.Errorf("expected PreconditionFailed, got %v", err)
 	}
@@ -211,7 +247,7 @@ func TestComplete_FromCompletedFails(t *testing.T) {
 
 func TestReconstituteTrip_NoValidation(t *testing.T) {
 	// Should not panic or error even with empty fields
-	trip := entity.ReconstituteTrip("", "", "", entity.StatusCompleted, "", "", "some reason", 0, "", "", testNow, testNow, entity.CompleteFinancials{})
+	trip := entity.ReconstituteTrip("", "", "", entity.StatusCompleted, "", "", "some reason", 0, "", "", testNow, testNow, entity.CompleteFinancials{}, nil, nil, 0, entity.TripSummary{})
 	if trip == nil {
 		t.Fatal("expected non-nil trip")
 	}

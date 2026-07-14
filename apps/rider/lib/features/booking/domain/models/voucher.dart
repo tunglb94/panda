@@ -1,15 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'package:rider/shared/utils/currency_format.dart';
+
 /// A voucher's redemption state, driving both its badge label/color and
 /// whether it can be selected.
-///
-/// There is no Voucher backend yet — `backend/services/promotion` has real
-/// domain logic (see `PromotionRule`/`VoucherValidator`) but is not wired to
-/// any gRPC handler or REST route, so no client can call it. This enum and
-/// [Voucher] exist so the UI is fully built and ready; the rider's actual
-/// voucher list is empty today (see `VoucherRepository`/`voucher_list_sheet.dart`)
-/// because there is nothing real to show — not because this widget can't
-/// render one.
 enum VoucherStatus { available, applied, unavailable, used, expired }
 
 extension VoucherStatusPresentation on VoucherStatus {
@@ -24,12 +18,12 @@ extension VoucherStatusPresentation on VoucherStatus {
   bool get isSelectable => this == VoucherStatus.available || this == VoucherStatus.applied;
 }
 
-/// One voucher/promotion campaign as shown to the rider.
-///
-/// Field shape intentionally mirrors what `backend/services/promotion`'s
-/// `Voucher` entity already models (code, discount, min order, expiry,
-/// budget) so wiring this to a real API later is a data-mapping change, not
-/// a UI redesign.
+/// One voucher/promotion campaign as shown to the rider — backed by the
+/// real `GET /api/v1/rider/vouchers` endpoint (gateway's `PromotionHandler`,
+/// `backend/services/promotion`'s Voucher entity). [fromApi] is the only
+/// production constructor; the base constructor stays available for
+/// building a locally-mutated copy (see `voucher_list_sheet.dart`'s
+/// "selected" clone).
 class Voucher {
   const Voucher({
     required this.id,
@@ -46,6 +40,32 @@ class Voucher {
     this.discountPercent = 0,
   });
 
+  factory Voucher.fromApi(Map<String, dynamic> json, {required VoucherStatus status}) {
+    final discountType = json['discount_type'] as String? ?? 'percentage';
+    final discountValue = (json['discount_value'] as num?)?.toInt() ?? 0;
+    final maxDiscount = (json['max_discount'] as num?)?.toInt() ?? 0;
+    final minOrder = (json['min_order'] as num?)?.toInt() ?? 0;
+    final endTimeRaw = json['end_time'] as String?;
+
+    final discountLabel = discountType == 'flat'
+        ? '-${formatMoney(discountValue, 'VND')}'
+        : '-$discountValue%${maxDiscount > 0 ? ' (tối đa ${formatMoney(maxDiscount, 'VND')})' : ''}';
+
+    return Voucher(
+      id: json['id'] as String? ?? '',
+      code: json['code'] as String? ?? '',
+      title: json['name'] as String? ?? (json['voucher_name'] as String? ?? ''),
+      description: json['description'] as String? ?? '',
+      icon: Icons.local_offer_outlined,
+      accentColor: const Color(0xFF1A8C4E),
+      discountLabel: discountLabel,
+      status: status,
+      conditionText: minOrder > 0 ? 'Đơn tối thiểu ${formatMoney(minOrder, 'VND')}' : null,
+      expiresAt: endTimeRaw != null ? DateTime.tryParse(endTimeRaw) : null,
+      discountPercent: discountType == 'percentage' ? discountValue : 0,
+    );
+  }
+
   final String id;
   final String code;
   final String title;
@@ -58,7 +78,7 @@ class Voucher {
 
   final VoucherStatus status;
 
-  /// e.g. "Đơn tối thiểu 50,000đ · Chỉ áp dụng xe máy".
+  /// e.g. "Đơn tối thiểu 50,000đ".
   final String? conditionText;
   final DateTime? expiresAt;
 
@@ -66,10 +86,8 @@ class Voucher {
   /// hides the progress row entirely rather than showing a fake 0%.
   final double? budgetUsedRatio;
 
-  /// Display-only percent discount — there is no Promotion Engine API to
-  /// apply this to a real fare (see class doc comment); the backend's
-  /// EstimateFare response never carries a discount, so this value is
-  /// never used in any fare calculation, only shown in the voucher's own
-  /// badge/detail UI.
+  /// Display-only percent discount, shown in the voucher's own badge/detail
+  /// UI — the actual applied discount amount always comes from
+  /// `PromotionRepository.apply`, never computed client-side.
   final int discountPercent;
 }

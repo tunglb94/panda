@@ -1,0 +1,2 @@
+ALTER TABLE trips DROP COLUMN IF EXISTS voucher_code;
+ALTER TABLE trips DROP COLUMN IF EXISTS voucher_id;

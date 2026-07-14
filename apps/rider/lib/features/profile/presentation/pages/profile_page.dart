@@ -4,6 +4,7 @@ import 'package:rider/core/auth/auth_state.dart';
 import 'package:rider/core/network/api_client.dart';
 import 'package:rider/core/storage/token_storage.dart';
 import 'package:rider/core/theme/app_spacing.dart';
+import 'package:rider/features/booking/presentation/pages/voucher_wallet_page.dart';
 import 'package:rider/features/history/presentation/pages/trip_history_page.dart';
 import 'package:rider/features/wallet/presentation/pages/wallet_page.dart';
 import 'package:rider/shared/widgets/app_badge.dart';
@@ -116,6 +117,14 @@ class _ProfilePageState extends State<ProfilePage> {
                             label: 'Ví',
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute(builder: (_) => const WalletPage()),
+                            ),
+                          ),
+                          const Divider(height: 1),
+                          AppSettingsTile(
+                            icon: Icons.local_offer_outlined,
+                            label: 'Ví voucher',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => VoucherWalletPage(apiClient: widget.apiClient)),
                             ),
                           ),
                           const Divider(height: 1),

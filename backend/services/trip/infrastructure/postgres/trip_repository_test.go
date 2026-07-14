@@ -21,6 +21,8 @@ func makeTrip(tripID, riderID string, status entity.TripStatus) *entity.Trip {
 		0, "", "",
 		testNow, testNow,
 		entity.CompleteFinancials{},
+		nil, nil, 0,
+		entity.TripSummary{},
 	)
 }
 

@@ -207,8 +207,8 @@ func TestAdminKYCHandler_ListDriverVerifications_EnrichesPhoneAndSearches(t *tes
 		"d2": driverentity.ReconstituteDriverProfile("d2", "user-2", "LIC2", driverentity.VehicleTypeCar, "", "", "", "P2", driverentity.OnlineStatusOffline, driverentity.VerificationStatusVerified, time.Now(), time.Now(), driverentity.ServiceTypeCar, true, false),
 	}}
 	users := &fakeUserFinderByID{byID: map[string]*identityentity.User{
-		"user-1": identityentity.ReconstituteUser("user-1", "+84900001111", "A", "", identityentity.TypeDriver, identityentity.StatusActive, "role-1", time.Now(), time.Now()),
-		"user-2": identityentity.ReconstituteUser("user-2", "+84900002222", "B", "", identityentity.TypeDriver, identityentity.StatusActive, "role-1", time.Now(), time.Now()),
+		"user-1": identityentity.ReconstituteUser("user-1", "+84900001111", "A", "", "", identityentity.TypeDriver, identityentity.StatusActive, "role-1", false, time.Now(), time.Now()),
+		"user-2": identityentity.ReconstituteUser("user-2", "+84900002222", "B", "", "", identityentity.TypeDriver, identityentity.StatusActive, "role-1", false, time.Now(), time.Now()),
 	}}
 	h := buildAdminKYCHandlerWithPhone(dv, newFakeVVRepo(), newFakeDocRepo(), t.TempDir(), drivers, users)
 

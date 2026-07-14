@@ -24,6 +24,11 @@ type stubTrip struct {
 	// CreateTrip call, for asserting Booking correctly forwards Delivery
 	// fields (Delivery V1 Phase 2, docs/business/DELIVERY_V1_DESIGN.md).
 	lastCreateParams app.CreateTripParams
+	// lastCompleteFare records the FareInfo passed to the most recent
+	// CompleteTrip call — Ride Lifecycle Fare Validation tests assert on
+	// the Trip Summary fields (TravelledDistanceKm/TravelledDurationMin)
+	// forwarded here.
+	lastCompleteFare app.FareInfo
 }
 
 func newStubTrip() *stubTrip {
@@ -63,6 +68,7 @@ func (s *stubTrip) StartTrip(_ context.Context, tripID string) error {
 }
 
 func (s *stubTrip) CompleteTrip(_ context.Context, tripID string, fare app.FareInfo) (*app.TripInfo, error) {
+	s.lastCompleteFare = fare
 	t, ok := s.trips[tripID]
 	if !ok {
 		return nil, errors.New("trip not found")
@@ -195,13 +201,24 @@ type stubPricing struct {
 	fare     int64
 	currency string
 	err      error
+	// calls counts CalculateFinalFare invocations — Ride Lifecycle Fare
+	// Validation tests assert the fraud guard rejects BEFORE Pricing is
+	// ever called (no wasted calculation on an abnormal completion).
+	calls int
+	// lastDistanceKM/lastDurationMin record the args passed to the most
+	// recent CalculateFinalFare call.
+	lastDistanceKM  float64
+	lastDurationMin float64
 }
 
 func newStubPricing(fare int64, currency string) *stubPricing {
 	return &stubPricing{fare: fare, currency: currency}
 }
 
-func (s *stubPricing) CalculateFinalFare(_ context.Context, _ string, _, _ float64) (*app.FareInfo, error) {
+func (s *stubPricing) CalculateFinalFare(_ context.Context, _ string, distanceKM, durationMin float64) (*app.FareInfo, error) {
+	s.calls++
+	s.lastDistanceKM = distanceKM
+	s.lastDurationMin = durationMin
 	if s.err != nil {
 		return nil, s.err
 	}

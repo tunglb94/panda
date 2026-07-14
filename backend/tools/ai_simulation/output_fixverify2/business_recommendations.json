@@ -1,0 +1,114 @@
+[
+  {
+    "Text": "Ưu tiên phân bổ tài xế và khuyến mãi mục tiêu tại Trung tâm (CBD) — khu vực có nhu cầu cao nhất (33987 yêu cầu).",
+    "ExpectedImpact": "Tối đa hoá GMV tại khu vực có nhu cầu cao nhất",
+    "Risk": "Có thể gây mất cân bằng phân bổ tài xế ở khu vực khác",
+    "Priority": "Medium",
+    "Signal": 16993.5
+  },
+  {
+    "Text": "Tăng incentive/thưởng theo giờ cho tài xế hoạt động tại Sân bay — tỉ lệ cầu/cung trung bình đang ở mức 91.9x.",
+    "ExpectedImpact": "Giảm ETA và tăng acceptance rate tại khu vực thiếu cung",
+    "Risk": "Chi phí incentive tăng ngắn hạn",
+    "Priority": "High",
+    "Signal": 919.2441693413388
+  },
+  {
+    "Text": "Điều tra nguyên nhân vận hành tại Trung tâm (CBD) — khu vực có số chuyến huỷ sau khi đã ghép tài xế cao nhất (152 chuyến).",
+    "ExpectedImpact": "Giảm cancellation rate",
+    "Risk": "Cần điều tra vận hành cụ thể trước khi hành động",
+    "Priority": "High",
+    "Signal": 456
+  },
+  {
+    "Text": "Tăng 5% tài xế hoạt động quanh khu vực Sân bay — tỉ lệ cầu/cung hiện tại 91.9x.",
+    "ExpectedImpact": "Giảm ETA và tăng acceptance rate tại Sân bay",
+    "Risk": "Chi phí incentive tăng",
+    "Priority": "High",
+    "Signal": 91.92441693413387
+  },
+  {
+    "Text": "Mở rộng ngân sách cho \"Manual Coupon\" — ROI cao nhất (9.2x), 629 lượt redeem.",
+    "ExpectedImpact": "Tăng GMV và số chuyến với chi phí khuyến mãi hiệu quả",
+    "Risk": "Ngân sách marketing tăng",
+    "Priority": "Medium",
+    "Signal": 73.46697672852673
+  },
+  {
+    "Text": "Tăng mật độ tài xế tại các khu vực/khung giờ có ETA cao — ETA trung bình hiện tại 32.4 phút.",
+    "ExpectedImpact": "Giảm ETA trung bình, tăng trải nghiệm khách hàng",
+    "Risk": "Cần tăng mật độ tài xế, có thể tăng chi phí incentive",
+    "Priority": "Medium",
+    "Signal": 64.73444017954678
+  },
+  {
+    "Text": "Xem xét lộ trình lên hạng (tier) rõ ràng hơn cho tài xế mới — 42.2% tài xế vẫn ở hạng Bronze (hoa hồng 20%, cao nhất theo BRB §7.1).",
+    "ExpectedImpact": "Tăng driver income trung bình, giảm rủi ro nghỉ việc ở nhóm mới",
+    "Risk": "Giảm doanh thu hoa hồng ngắn hạn nếu hạ ngưỡng lên hạng",
+    "Priority": "Medium",
+    "Signal": 42.2
+  },
+  {
+    "Text": "Xem xét giảm ngân sách hoặc thắt chặt điều kiện áp dụng cho \"First Ride\" — ROI thấp nhất trong các chương trình đã redeem (1.6x).",
+    "ExpectedImpact": "Giảm chi phí voucher/promotion, tăng lợi nhuận ròng",
+    "Risk": "Có thể làm giảm số chuyến nếu cắt giảm quá mạnh",
+    "Priority": "Medium",
+    "Signal": 40
+  },
+  {
+    "Text": "Đơn giản hoá điều kiện áp dụng voucher — chỉ 4.4% lượt được đề nghị chọn dùng ngay.",
+    "ExpectedImpact": "Tăng tỉ lệ redeem voucher đã phát hành",
+    "Risk": "Chi phí voucher có thể tăng nếu quá dễ áp dụng",
+    "Priority": "Low",
+    "Signal": 35.581492288453525
+  },
+  {
+    "Text": "Thiết kế ưu đãi nâng hạng thành viên — 69.7% khách hàng vẫn ở hạng Free.",
+    "ExpectedImpact": "Tăng retention và giảm price sensitivity trung bình",
+    "Risk": "Cần thiết kế ưu đãi hấp dẫn nhưng không ăn mòn margin",
+    "Priority": "Medium",
+    "Signal": 34.86
+  },
+  {
+    "Text": "Tối ưu vùng phủ tài xế cho Delivery — thời gian lấy hàng trung bình hiện tại 22.9 phút.",
+    "ExpectedImpact": "Giảm thời gian lấy hàng cho Delivery",
+    "Risk": "Cần thêm tài xế chuyên trách Delivery ở khu vực nguồn hàng",
+    "Priority": "Medium",
+    "Signal": 22.91741770089992
+  },
+  {
+    "Text": "Khuyến khích tài xế online sớm trước khung giờ 01:00 (surge trung bình 1.35x) bằng thưởng cố định thay vì để khách chịu surge toàn bộ.",
+    "ExpectedImpact": "Giảm surge trung bình cho khách, tăng thu nhập tài xế trước giờ cao điểm",
+    "Risk": "Cần ngân sách incentive bổ sung",
+    "Priority": "Medium",
+    "Signal": 20.31383215862891
+  },
+  {
+    "Text": "Xem xét tăng ngưỡng surge cuối tuần — giá/km cuối tuần (6529đ) chỉ nhỉnh hơn ngày thường (7010đ) không đáng kể dù nhu cầu cuối tuần thường cao hơn.",
+    "ExpectedImpact": "Tăng doanh thu giờ cao điểm cuối tuần",
+    "Risk": "Có thể giảm nhu cầu nếu surge quá cao",
+    "Priority": "Low",
+    "Signal": 20
+  },
+  {
+    "Text": "Rà soát cấu trúc giá cho hạng \"Delivery Bike\" — lợi nhuận trung bình/chuyến thấp hơn đáng kể so với \"Ride Car XL\".",
+    "ExpectedImpact": "Cải thiện lợi nhuận ở hạng xe yếu nhất",
+    "Risk": "Cần phân tích thêm nguyên nhân chênh lệch trước khi đổi giá",
+    "Priority": "Low",
+    "Signal": 15
+  },
+  {
+    "Text": "Theo dõi biến động GMV theo Ride (7,281,347,000 VND) và Delivery (1,637,145,396 VND) theo thời gian thực để phát hiện tính mùa vụ sớm.",
+    "ExpectedImpact": "Theo dõi tính mùa vụ để tối ưu phân bổ ngân sách marketing",
+    "Risk": "Không có",
+    "Priority": "Low",
+    "Signal": 10
+  },
+  {
+    "Text": "Tăng thưởng (bonus) cho tài xế nhận đơn Delivery — hiện chỉ chiếm 22.9% tổng số chuyến dù lợi nhuận/chuyến Delivery (271,682,969 VND) không thua kém Ride.",
+    "ExpectedImpact": "Tăng khối lượng Delivery, đa dạng hoá doanh thu",
+    "Risk": "Chi phí thưởng tăng ngắn hạn",
+    "Priority": "Low",
+    "Signal": 7.115641555713612
+  }
+]

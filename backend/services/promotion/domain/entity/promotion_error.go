@@ -14,18 +14,20 @@ import (
 type ReasonCode string
 
 const (
-	ReasonNotFound        ReasonCode = "VOUCHER_NOT_FOUND"
-	ReasonInvalidStatus   ReasonCode = "VOUCHER_INVALID_STATUS"   // "voucher hợp lệ" — not active/draft/paused
-	ReasonExpired         ReasonCode = "VOUCHER_EXPIRED"          // "voucher hết hạn"
-	ReasonBudgetExhausted ReasonCode = "VOUCHER_BUDGET_EXHAUSTED" // "voucher hết ngân sách"
-	ReasonUsageExhausted  ReasonCode = "VOUCHER_USAGE_EXHAUSTED"  // "voucher hết lượt"
-	ReasonWrongCity       ReasonCode = "VOUCHER_WRONG_CITY"       // "voucher sai thành phố"
-	ReasonWrongVehicle    ReasonCode = "VOUCHER_WRONG_VEHICLE"    // "voucher sai loại xe"
-	ReasonWrongMembership ReasonCode = "VOUCHER_WRONG_MEMBERSHIP" // "voucher sai membership"
-	ReasonWrongTiming     ReasonCode = "VOUCHER_WRONG_TIMING"     // "voucher sai thời gian" (before start_time or after end_time)
-	ReasonMinOrderNotMet  ReasonCode = "VOUCHER_MIN_ORDER_NOT_MET"
-	ReasonNotEligible     ReasonCode = "VOUCHER_NOT_ELIGIBLE" // PromotionRule-level rejection (e.g. not a first ride, not the rider's birthday)
-	ReasonRuleNotDefined  ReasonCode = "VOUCHER_RULE_NOT_DEFINED" // promotion type has no BRB-approved rule yet (TODO)
+	ReasonNotFound         ReasonCode = "VOUCHER_NOT_FOUND"
+	ReasonInvalidStatus    ReasonCode = "VOUCHER_INVALID_STATUS"     // "voucher hợp lệ" — not active/draft/paused
+	ReasonExpired          ReasonCode = "VOUCHER_EXPIRED"            // "voucher hết hạn"
+	ReasonBudgetExhausted  ReasonCode = "VOUCHER_BUDGET_EXHAUSTED"   // "voucher hết ngân sách"
+	ReasonUsageExhausted   ReasonCode = "VOUCHER_USAGE_EXHAUSTED"    // "voucher hết lượt"
+	ReasonWrongCity        ReasonCode = "VOUCHER_WRONG_CITY"         // "voucher sai thành phố"
+	ReasonWrongVehicle     ReasonCode = "VOUCHER_WRONG_VEHICLE"      // "voucher sai loại xe"
+	ReasonWrongServiceType ReasonCode = "VOUCHER_WRONG_SERVICE_TYPE" // "voucher sai hạng dịch vụ" (bike/bike_plus/car/car_xl)
+	ReasonWrongTripType    ReasonCode = "VOUCHER_WRONG_TRIP_TYPE"    // "voucher sai loại chuyến" (ride/delivery)
+	ReasonWrongMembership  ReasonCode = "VOUCHER_WRONG_MEMBERSHIP"   // "voucher sai membership"
+	ReasonWrongTiming      ReasonCode = "VOUCHER_WRONG_TIMING"       // "voucher sai thời gian" (before start_time or after end_time)
+	ReasonMinOrderNotMet   ReasonCode = "VOUCHER_MIN_ORDER_NOT_MET"
+	ReasonNotEligible      ReasonCode = "VOUCHER_NOT_ELIGIBLE"     // PromotionRule-level rejection (e.g. not a first ride, not the rider's birthday)
+	ReasonRuleNotDefined   ReasonCode = "VOUCHER_RULE_NOT_DEFINED" // promotion type has no BRB-approved rule yet (TODO)
 )
 
 // PromotionError builds a *errors.DomainError for a voucher-validation

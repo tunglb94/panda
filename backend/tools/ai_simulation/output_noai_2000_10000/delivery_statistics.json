@@ -1,0 +1,11 @@
+{
+  "requested": 92814,
+  "accepted": 60364,
+  "rejected": 32450,
+  "cancelled": 0,
+  "completed": 60364,
+  "average_pickup_minutes": 23.067781024751177,
+  "average_delivery_minutes": 22.83575910086461,
+  "average_distance_km": 9.44810104012639,
+  "average_weight_kg": 7.7330801845170924
+}

@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"math"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -101,15 +102,20 @@ type fakeDriverLocationRepository struct {
 	serviceTypes    map[string]dispatchentity.ServiceType
 	rideEnabled     map[string]bool
 	deliveryEnabled map[string]bool
+	// rng breaks exact-distance ties in FindNearby (see shuffleTiedGroups) —
+	// a separate source from the simulation's main Rand so this doesn't
+	// change the random-draw sequence every other subsystem depends on.
+	rng *rand.Rand
 }
 
-func newFakeDriverLocationRepository() *fakeDriverLocationRepository {
+func newFakeDriverLocationRepository(rng *rand.Rand) *fakeDriverLocationRepository {
 	return &fakeDriverLocationRepository{
 		positions:       make(map[string][2]float64),
 		active:          make(map[string]bool),
 		serviceTypes:    make(map[string]dispatchentity.ServiceType),
 		rideEnabled:     make(map[string]bool),
 		deliveryEnabled: make(map[string]bool),
+		rng:             rng,
 	}
 }
 
@@ -144,6 +150,7 @@ func (r *fakeDriverLocationRepository) FindNearby(_ context.Context, lat, lon, r
 		}
 	}
 	sortCandidatesByDistance(candidates)
+	shuffleTiedGroups(candidates, r.rng)
 	if len(candidates) > limit {
 		candidates = candidates[:limit]
 	}
@@ -174,7 +181,10 @@ func sortCandidatesByDistance(c []locationCandidate) {
 	// c is built by ranging over a map (see FindNearby), whose iteration
 	// order Go randomizes per-process, so without this secondary key the
 	// same --seed picks a different "nearest" driver among tied
-	// candidates on every run (the --seed determinism bug).
+	// candidates on every run (the --seed determinism bug). This id order
+	// is only a deterministic STARTING point — shuffleTiedGroups (called
+	// right after, in FindNearby) randomizes which driver actually wins
+	// each tied group, so the same low-numbered id doesn't win every tie.
 	for i := 1; i < len(c); i++ {
 		for j := i; j > 0 && less(c[j], c[j-1]); j-- {
 			c[j], c[j-1] = c[j-1], c[j]
@@ -187,6 +197,32 @@ func less(a, b locationCandidate) bool {
 		return a.dist < b.dist
 	}
 	return a.id < b.id
+}
+
+// shuffleTiedGroups randomizes candidate order within each run of exactly
+// equal distance, using rng. Fixes a real dispatch-fairness bug: because
+// this simulation's city-plane model gives every driver in the same zone
+// the identical (x, y), FindNearby's candidates are tied on distance far
+// more often than not — sortCandidatesByDistance's id tie-break (needed for
+// --seed determinism, see its doc comment) meant the same lowest-id driver
+// in a zone won the "nearest driver" slot on essentially every request,
+// which is how a handful of low-numbered drivers (driver-0002, -0004,
+// -0007...) ended up receiving 10-40x the trips/income of their peers (see
+// CHANGELOG). Shuffling within each tied group keeps genuine distance
+// ordering intact (a real nearest driver still wins over a farther one)
+// while giving every driver in a tied group an equal chance, and remains
+// fully deterministic for a given --seed since rng is seeded from it.
+func shuffleTiedGroups(c []locationCandidate, rng *rand.Rand) {
+	start := 0
+	for i := 1; i <= len(c); i++ {
+		if i == len(c) || c[i].dist != c[start].dist {
+			if i-start > 1 {
+				group := c[start:i]
+				rng.Shuffle(len(group), func(a, b int) { group[a], group[b] = group[b], group[a] })
+			}
+			start = i
+		}
+	}
 }
 
 func (r *fakeDriverLocationRepository) IsActive(_ context.Context, driverID string) (bool, error) {

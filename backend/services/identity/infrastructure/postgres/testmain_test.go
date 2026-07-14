@@ -94,16 +94,24 @@ func createSchema(ctx context.Context, pool *pgxpool.Pool) error {
 		);
 
 		CREATE TABLE IF NOT EXISTS identity_users (
-			id           TEXT        PRIMARY KEY,
-			phone_number TEXT        NOT NULL UNIQUE,
-			name         TEXT        NOT NULL,
-			email        TEXT        NOT NULL DEFAULT '',
-			type         TEXT        NOT NULL,
-			status       TEXT        NOT NULL,
-			role_id      TEXT        NOT NULL,
-			created_at   TIMESTAMPTZ NOT NULL,
-			updated_at   TIMESTAMPTZ NOT NULL
+			id             TEXT        PRIMARY KEY,
+			phone_number   TEXT        NOT NULL DEFAULT '',
+			name           TEXT        NOT NULL,
+			email          TEXT        NOT NULL DEFAULT '',
+			google_sub     TEXT        NOT NULL DEFAULT '',
+			type           TEXT        NOT NULL,
+			status         TEXT        NOT NULL,
+			role_id        TEXT        NOT NULL,
+			driver_enabled BOOLEAN     NOT NULL DEFAULT FALSE,
+			created_at     TIMESTAMPTZ NOT NULL,
+			updated_at     TIMESTAMPTZ NOT NULL
 		);
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_identity_users_phone_unique
+			ON identity_users (phone_number) WHERE phone_number <> '';
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_identity_users_email_unique
+			ON identity_users (email) WHERE email <> '';
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_identity_users_google_sub_unique
+			ON identity_users (google_sub) WHERE google_sub <> '';
 	`)
 	return err
 }

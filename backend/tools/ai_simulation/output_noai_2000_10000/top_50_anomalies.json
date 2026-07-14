@@ -1,0 +1,302 @@
+[
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0002",
+    "severity": 175399.553,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0004",
+    "severity": 146318.834,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0007",
+    "severity": 145118.94,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0010",
+    "severity": 139603.331,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0015",
+    "severity": 129759.88,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0013",
+    "severity": 116594.925,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0001",
+    "severity": 116572.892,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0011",
+    "severity": 105697.218,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0003",
+    "severity": 100799.009,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0014",
+    "severity": 95273.23,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0018",
+    "severity": 93835.048,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0033",
+    "severity": 93318.407,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0008",
+    "severity": 93090.277,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0020",
+    "severity": 92642.518,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0016",
+    "severity": 88136.169,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0012",
+    "severity": 86203.697,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0022",
+    "severity": 85689.784,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0038",
+    "severity": 79514.913,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0046",
+    "severity": 75997.215,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0040",
+    "severity": 75784.01,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0024",
+    "severity": 74564.452,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0027",
+    "severity": 72943.776,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0023",
+    "severity": 70491.085,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0041",
+    "severity": 63437.957,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0025",
+    "severity": 60313.15,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0029",
+    "severity": 57563.184,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0043",
+    "severity": 55188.961,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0067",
+    "severity": 54016.407,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0062",
+    "severity": 53039.39,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0039",
+    "severity": 52203.657,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0073",
+    "severity": 50815.511,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0000",
+    "severity": 49883.884,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0045",
+    "severity": 48204.724,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0044",
+    "severity": 42723.981,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0048",
+    "severity": 40835.394,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0076",
+    "severity": 40341.555,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "airport",
+    "severity": 3352.340329127818,
+    "detail": "Khu vực airport có tỉ lệ cầu/cung trung bình 223.49x — thiếu tài xế nghiêm trọng."
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "hospital",
+    "severity": 1716.6382498541202,
+    "detail": "Khu vực hospital có tỉ lệ cầu/cung trung bình 114.44x — thiếu tài xế nghiêm trọng."
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-1121",
+    "severity": 1480,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0393",
+    "severity": 1480,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-1473",
+    "severity": 1475,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-1656",
+    "severity": 1475,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0604",
+    "severity": 1470,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0377",
+    "severity": 1468.75,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-1472",
+    "severity": 1467.5,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-1498",
+    "severity": 1466.25,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-1275",
+    "severity": 1465,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-1092",
+    "severity": 1465,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0314",
+    "severity": 1463.75,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0423",
+    "severity": 1463.75,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  }
+]

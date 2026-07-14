@@ -15,7 +15,7 @@ const (
 	minSecretLen = 32
 
 	DefaultAccessTokenTTL  = 15 * time.Minute
-	DefaultRefreshTokenTTL = 7 * 24 * time.Hour
+	DefaultRefreshTokenTTL = 30 * 24 * time.Hour
 )
 
 // Config holds the secrets and TTLs used by TokenService.

@@ -1,0 +1,1 @@
+ALTER TABLE voucher_redemptions DROP CONSTRAINT IF EXISTS voucher_redemptions_voucher_rider_trip_key;

@@ -50,6 +50,24 @@ class ApiClient {
     return _parse(response);
   }
 
+  Future<Map<String, dynamic>> put(String path, {Map<String, dynamic>? body}) async {
+    final uri = Uri.parse('$_baseUrl$path');
+    final response = await _sendWithAuthRetry(
+      () => _httpClient
+          .put(uri, headers: _headers(), body: body != null ? jsonEncode(body) : null)
+          .timeout(_timeout, onTimeout: _throwTimeout),
+    );
+    return _parse(response);
+  }
+
+  Future<Map<String, dynamic>> delete(String path) async {
+    final uri = Uri.parse('$_baseUrl$path');
+    final response = await _sendWithAuthRetry(
+      () => _httpClient.delete(uri, headers: _headers()).timeout(_timeout, onTimeout: _throwTimeout),
+    );
+    return _parse(response);
+  }
+
   /// Fetches raw bytes with the same auth-retry behavior as [get] — used for
   /// KYC document images (Phần 2/13) and the ZIP download (Phần 3), neither
   /// of which is JSON.

@@ -188,8 +188,16 @@ func setTripFinancialsHeader(ctx context.Context, trip *entity.Trip) {
 		md.Append("x-has-commission-detail", "true")
 		md.Append("x-commission-cents", strconv.FormatInt(trip.CommissionCents, 10))
 		md.Append("x-driver-income-cents", strconv.FormatInt(trip.DriverIncomeCents, 10))
-		md.Append("x-voucher-discount-cents", strconv.FormatInt(trip.VoucherDiscountCents, 10))
 		md.Append("x-commission-rate", strconv.FormatFloat(trip.CommissionRate, 'f', -1, 64))
+	}
+	// Voucher detail is independent of Pricing V3's commission detail (a
+	// trip can have a voucher with or without HasCommissionDetail) — see
+	// entity.Trip.VoucherID's doc comment. Own gate, own header block.
+	if trip.VoucherID != "" {
+		md.Append("x-has-voucher-detail", "true")
+		md.Append("x-voucher-id", trip.VoucherID)
+		md.Append("x-voucher-code", trip.VoucherCode)
+		md.Append("x-voucher-discount-cents", strconv.FormatInt(trip.VoucherDiscountCents, 10))
 	}
 	_ = grpc.SetHeader(ctx, md)
 }
@@ -239,12 +247,40 @@ func (h *Handler) CompleteTrip(ctx context.Context, req *trippb.CompleteTripRequ
 			if v := md.Get("x-driver-income-cents"); len(v) > 0 {
 				fin.DriverIncomeCents, _ = strconv.ParseInt(v[0], 10, 64)
 			}
-			if v := md.Get("x-voucher-discount-cents"); len(v) > 0 {
-				fin.VoucherDiscountCents, _ = strconv.ParseInt(v[0], 10, 64)
-			}
 			if v := md.Get("x-commission-rate"); len(v) > 0 {
 				fin.CommissionRate, _ = strconv.ParseFloat(v[0], 64)
 			}
+		}
+		// Voucher detail — own gate, independent of commission detail (see
+		// setTripFinancialsHeader's doc comment).
+		if vals := md.Get("x-has-voucher-detail"); len(vals) > 0 && vals[0] == "true" {
+			if v := md.Get("x-voucher-id"); len(v) > 0 {
+				fin.VoucherID = v[0]
+			}
+			if v := md.Get("x-voucher-code"); len(v) > 0 {
+				fin.VoucherCode = v[0]
+			}
+			if v := md.Get("x-voucher-discount-cents"); len(v) > 0 {
+				fin.VoucherDiscountCents, _ = strconv.ParseInt(v[0], 10, 64)
+			}
+		}
+	}
+	// Trip Summary (Ride Lifecycle Fare Validation) — same proto-extension
+	// constraint as commission/voucher detail above. Own gate, independent
+	// of both: a trip always has a summary once it reaches Complete().
+	var summary entity.TripSummary
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if v := md.Get("x-travelled-distance-km"); len(v) > 0 {
+			summary.TravelledDistanceKm, _ = strconv.ParseFloat(v[0], 64)
+		}
+		if v := md.Get("x-travelled-duration-min"); len(v) > 0 {
+			summary.TravelledDurationMin, _ = strconv.ParseFloat(v[0], 64)
+		}
+		if v := md.Get("x-toll-fee-cents"); len(v) > 0 {
+			summary.TollFeeCents, _ = strconv.ParseInt(v[0], 10, 64)
+		}
+		if v := md.Get("x-extra-fee-cents"); len(v) > 0 {
+			summary.ExtraFeeCents, _ = strconv.ParseInt(v[0], 10, 64)
 		}
 	}
 	trip, err := h.completeTrip.Execute(ctx, app.CompleteTripInput{
@@ -252,6 +288,7 @@ func (h *Handler) CompleteTrip(ctx context.Context, req *trippb.CompleteTripRequ
 		FinalFareTotal: req.GetFinalFareTotal(),
 		FareCurrency:   req.GetFareCurrency(),
 		Financials:     fin,
+		Summary:        summary,
 	})
 	if err != nil {
 		return nil, toGRPCError(err)

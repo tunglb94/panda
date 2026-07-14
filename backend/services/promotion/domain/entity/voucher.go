@@ -50,8 +50,8 @@ type Voucher struct {
 	StartTime time.Time
 	EndTime   time.Time
 
-	MaxUsage         int64 // 0 = uncapped by count (still budget-capped). BRB §4.6 total issuance quota.
-	MaxUsagePerUser  int64 // BRB §4.6 "most vouchers have a usage limit of 1"; 0 is treated as 1 (single-use) by the validator, never as unlimited.
+	MaxUsage        int64 // 0 = uncapped by count (still budget-capped). BRB §4.6 total issuance quota.
+	MaxUsagePerUser int64 // BRB §4.6 "most vouchers have a usage limit of 1"; 0 is treated as 1 (single-use) by the validator, never as unlimited.
 
 	Budget          int64 // VND, total platform cost approved for this campaign. BRB §3.3 Rule 1: "No budget = no campaign."
 	RemainingBudget int64 // VND, decremented on each Redeem.
@@ -61,9 +61,27 @@ type Voucher struct {
 	MaxDiscount   int64 // VND cap, 0 = no cap. BRB §3.2.x "maximum X VND" fields.
 	MinOrder      int64 // VND, minimum trip fare required. BRB §4.8.
 
-	VehicleTypes []string // empty = all vehicle types. BRB §4.11.
+	VehicleTypes []string // empty = all vehicle types (physical: car/motorcycle/van). BRB §4.11.
 	Cities       []string // empty = nationwide. BRB §4.10.
 	Membership   []string // empty = no membership restriction. Eligibility filter only — see PromotionTypeMembership doc comment. Never used to compute a discount amount.
+
+	// ServiceTypes scopes a voucher to the Rider app's product tiers
+	// (motorcycle/bike_plus/car/car_xl — see pricing's riderServiceTypeToVehicleType).
+	// Deliberately a separate dimension from VehicleTypes: VehicleTypes is the
+	// physical vehicle class, ServiceTypes is the product/price tier — never
+	// conflate the two (a "car_xl" voucher and a "van" voucher answer
+	// different questions). Empty = all service types.
+	ServiceTypes []string
+
+	// TripTypes scopes a voucher to "ride" and/or "delivery" (see
+	// entity.TripType elsewhere in the platform). Empty = both.
+	TripTypes []string
+
+	// Campaign is a free-form marketing tag (e.g. "WELCOME", "TET2027",
+	// "AIRPORT", "BIRTHDAY", "REFERRAL") — purely for reporting/analytics
+	// grouping, never read by any eligibility or discount-calculation logic.
+	// Distinct from Type (PromotionType), which drives real business rules.
+	Campaign string
 
 	NewUserOnly bool // BRB §3.2.1 First Ride: "zero completed trips"
 
@@ -322,4 +340,25 @@ func (v *Voucher) Release(discountAmount int64, now time.Time) *errors.DomainErr
 	}
 	v.UpdatedAt = now
 	return nil
+}
+
+// EffectiveState is a pure, read-only projection of the richer internal
+// VoucherStatus lifecycle (Draft/Active/Paused/Expired/Exhausted/Cancelled)
+// onto the 4 states requested for display purposes (Active/Expired/
+// Disabled/Exhausted) — never mutates Status itself. Expiry here is
+// computed from EndTime vs now rather than stored, since nothing in this
+// engine transitions Status to VoucherStatusExhausted... err, Expired on a
+// timer (BRB has no scheduled job for it) — this keeps "expired" accurate
+// without needing one.
+func (v *Voucher) EffectiveState(now time.Time) string {
+	switch v.Status {
+	case VoucherStatusExhausted:
+		return "exhausted"
+	case VoucherStatusPaused, VoucherStatusCancelled, VoucherStatusDraft:
+		return "disabled"
+	}
+	if now.After(v.EndTime) {
+		return "expired"
+	}
+	return "active"
 }

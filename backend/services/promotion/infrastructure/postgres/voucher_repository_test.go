@@ -129,8 +129,8 @@ func TestVoucherRepository_RecordAndReleaseRedemption(t *testing.T) {
 		t.Fatalf("save: %v", err)
 	}
 
-	if err := repo.RecordRedemption(ctx, "v-redeem", "rider-1", "trip-1", 30_000); err != nil {
-		t.Fatalf("RecordRedemption: %v", err)
+	if err := repo.Reserve(ctx, "v-redeem", "rider-1", "trip-1", 30_000); err != nil {
+		t.Fatalf("Reserve: %v", err)
 	}
 
 	count, err := repo.UsageCountForRider(ctx, "v-redeem", "rider-1")
@@ -149,8 +149,8 @@ func TestVoucherRepository_RecordAndReleaseRedemption(t *testing.T) {
 		t.Fatalf("expected remaining budget 70000, got %d", got.RemainingBudget)
 	}
 
-	if err := repo.ReleaseRedemption(ctx, "v-redeem", "rider-1", "trip-1", 30_000); err != nil {
-		t.Fatalf("ReleaseRedemption: %v", err)
+	if err := repo.Release(ctx, "v-redeem", "rider-1", "trip-1", 30_000); err != nil {
+		t.Fatalf("Release: %v", err)
 	}
 
 	count, err = repo.UsageCountForRider(ctx, "v-redeem", "rider-1")
@@ -183,7 +183,7 @@ func TestVoucherRepository_RecordRedemption_BudgetExhausted(t *testing.T) {
 		t.Fatalf("save: %v", err)
 	}
 
-	err := repo.RecordRedemption(ctx, "v-tight", "rider-1", "trip-1", 30_000)
+	err := repo.Reserve(ctx, "v-tight", "rider-1", "trip-1", 30_000)
 	if !sharederrors.IsCode(err, sharederrors.CodeResourceExhausted) {
 		t.Fatalf("expected ResourceExhausted, got %v", err)
 	}

@@ -4,10 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/fairride/booking/grpc/bookingpb"
 	"github.com/fairride/gateway/http/middleware"
+	promotionapp "github.com/fairride/promotion/app"
+	promotionentity "github.com/fairride/promotion/domain/entity"
 	"github.com/fairride/trip/grpc/trippb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -44,6 +48,7 @@ type BookingHandler struct {
 	tripClient TripStatusClient
 	notifier   *TripEventNotifier
 	settlement *SettlementEngine
+	promotion  *promotionapp.PromotionService
 }
 
 func NewBookingHandler(client BookingClient, tripClient TripStatusClient) *BookingHandler {
@@ -64,6 +69,14 @@ func (h *BookingHandler) SetNotifier(n *TripEventNotifier) {
 // call has already succeeded.
 func (h *BookingHandler) SetSettlementEngine(s *SettlementEngine) {
 	h.settlement = s
+}
+
+// SetPromotionService wires voucher redemption into BookRide (Voucher &
+// Promotion phase). Additive and optional — nil (the default) means a
+// voucher_code in the request is silently ignored, identical to this
+// handler's pre-Promotion behavior.
+func (h *BookingHandler) SetPromotionService(p *promotionapp.PromotionService) {
+	h.promotion = p
 }
 
 // ─── POST /api/v1/rides ───────────────────────────────────────────────────────
@@ -92,6 +105,16 @@ type bookRideRequest struct {
 	PackageNote        string  `json:"package_note,omitempty"`
 	PackageValue       int64   `json:"package_value,omitempty"`
 	PackageWeight      float64 `json:"package_weight,omitempty"`
+
+	// VoucherCode + OrderAmount are optional — set when the rider applied a
+	// voucher in the booking screen (POST /api/v1/promo/apply already
+	// showed them the discount computed against this same OrderAmount, the
+	// estimated fare). Neither is a bookingpb.BookRideRequest field (no
+	// protoc/buf toolchain to regenerate it — see ServiceType's doc comment
+	// above); the gateway resolves and records the redemption itself,
+	// entirely independent of the Booking/Trip gRPC call. See BookRide.
+	VoucherCode string `json:"voucher_code,omitempty"`
+	OrderAmount int64  `json:"order_amount,omitempty"`
 }
 
 func (h *BookingHandler) BookRide(w http.ResponseWriter, r *http.Request) {
@@ -141,11 +164,53 @@ func (h *BookingHandler) BookRide(w http.ResponseWriter, r *http.Request) {
 		writeGRPCError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]string{
+
+	body := map[string]any{
 		"trip_id":     resp.GetTripId(),
 		"status":      resp.GetStatus(),
 		"delivery_id": resp.GetDeliveryId(),
-	})
+	}
+	if voucher := h.redeemVoucher(r.Context(), claims.UserID, resp.GetTripId(), req); voucher != nil {
+		body["voucher_id"] = voucher.VoucherID
+		body["voucher_code"] = voucher.VoucherCode
+		body["discount_amount"] = voucher.DiscountAmount
+	}
+	writeJSON(w, http.StatusCreated, body)
+}
+
+// redeemVoucher re-evaluates and reserves a voucher against the just-created
+// trip — best-effort: a booking that already succeeded must never be undone
+// over a voucher problem, so any failure here (invalid/expired code,
+// exhausted budget, promotion service unavailable) is silently treated as
+// "no voucher applied" rather than surfaced as a booking error. Re-evaluates
+// rather than trusting any client-supplied discount_amount — Reserve always
+// commits the server's own freshly-computed number, matching "Pricing chỉ
+// đọc discount từ Promotion. Không tự tính lại." The reservation becomes
+// permanent at FinishTrip (ConfirmRedeem) or is released at CancelRide
+// (Release) — see those handlers.
+func (h *BookingHandler) redeemVoucher(ctx context.Context, riderID, tripID string, req bookRideRequest) *promotionentity.PromotionResult {
+	if h.promotion == nil || req.VoucherCode == "" || req.OrderAmount <= 0 {
+		return nil
+	}
+	tripType := req.TripType
+	if tripType == "" {
+		tripType = "ride"
+	}
+	result, err := h.promotion.Evaluate(ctx, &promotionentity.PromotionRequest{
+		RiderID:     riderID,
+		ServiceType: req.ServiceType,
+		TripType:    tripType,
+		OrderAmount: req.OrderAmount,
+		VoucherCode: req.VoucherCode,
+		RequestTime: time.Now(),
+	}, time.Now())
+	if err != nil || !result.Applied {
+		return nil
+	}
+	if err := h.promotion.Reserve(ctx, result, riderID, tripID); err != nil {
+		return nil
+	}
+	return result
 }
 
 // ─── GET /api/v1/rides/{tripID} ───────────────────────────────────────────────
@@ -293,7 +358,23 @@ func (h *BookingHandler) FinishTrip(w http.ResponseWriter, r *http.Request) {
 		writeBadRequest(w, "vehicle_type is required")
 		return
 	}
-	resp, err := h.client.FinishTrip(r.Context(), &bookingpb.FinishTripRequest{
+	// ConfirmRedeem finalizes any voucher reserved at BookRide time — must
+	// happen before the FinishTrip gRPC call so the discount rides along as
+	// outgoing metadata (Booking/Trip's existing x-has-voucher-detail
+	// passthrough, see trip/grpc/handler.go). Best-effort: no reservation
+	// for this trip (the common case, no voucher used) is not an error.
+	ctx := r.Context()
+	if h.promotion != nil {
+		if rec, err := h.promotion.ConfirmRedeem(ctx, tripID); err == nil && rec != nil {
+			ctx = metadata.AppendToOutgoingContext(ctx,
+				"x-has-voucher-detail", "true",
+				"x-voucher-id", rec.VoucherID,
+				"x-voucher-code", rec.VoucherCode,
+				"x-voucher-discount-cents", strconv.FormatInt(rec.DiscountAmount, 10),
+			)
+		}
+	}
+	resp, err := h.client.FinishTrip(ctx, &bookingpb.FinishTripRequest{
 		TripId:      tripID,
 		VehicleType: req.VehicleType,
 		DistanceKm:  req.DistanceKM,
@@ -337,6 +418,12 @@ func (h *BookingHandler) CancelRide(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeGRPCError(w, err)
 		return
+	}
+	// Release reinstates any voucher reserved at BookRide time — "Khách hủy
+	// chuyến không mất voucher." Best-effort: no reservation for this trip
+	// is not an error.
+	if h.promotion != nil {
+		_ = h.promotion.Release(r.Context(), tripID)
 	}
 	if h.notifier != nil {
 		h.notifier.Notify(r.Context(), tripID, "cancelled")

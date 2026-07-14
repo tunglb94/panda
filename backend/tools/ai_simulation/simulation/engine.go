@@ -42,6 +42,12 @@ func NewEngine(cfg Config) *Engine {
 		cfg.Seed = time.Now().UnixNano()
 	}
 	rnd := rand.New(rand.NewSource(cfg.Seed))
+	// dispatchRng is a separate, independently-seeded source used only to
+	// break exact-distance ties in dispatch matching (see
+	// dispatch_fakes.go's shuffleTiedGroups) — kept apart from rnd so this
+	// fix doesn't perturb the draw sequence every other subsystem already
+	// relies on for its own --seed reproducibility.
+	dispatchRng := rand.New(rand.NewSource(cfg.Seed + 1))
 	start := time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC) // a Monday — makes IsWeekend() predictable across runs
 
 	world := &World{
@@ -59,7 +65,7 @@ func NewEngine(cfg Config) *Engine {
 		heatmapSupplyCount:   make(map[string]int),
 		Pricing:              integration.NewPricingAdapter(),
 		Promotion:            integration.NewPromotionAdapter(start),
-		Dispatch:             integration.NewDispatchAdapter(),
+		Dispatch:             integration.NewDispatchAdapter(dispatchRng),
 		Economy:              integration.NewDriverEconomy(),
 		Delivery:             integration.NewDeliveryAdapter(),
 		AI:                   aiengine.NewDecisionEngine(cfg.OllamaURL, cfg.Model, 20*time.Second),
@@ -267,7 +273,7 @@ func evaluateDriverState(ctx context.Context, w *World, d *entity.DriverAgent) {
 		if d.HoursOnlineToday > d.MaxHoursOnlineContinuous {
 			d.MaxHoursOnlineContinuous = d.HoursOnlineToday
 		}
-		d.Fatigue = clamp01(d.Fatigue + 0.012)
+		d.Fatigue = clamp01(d.Fatigue + d.FatigueGainPerTick)
 		d.PhoneBattery = clamp01(d.PhoneBattery - 0.006)
 		d.Fuel = clamp01(d.Fuel - 0.01)
 	} else {

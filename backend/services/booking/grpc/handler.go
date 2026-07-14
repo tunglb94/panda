@@ -3,6 +3,7 @@ package grpc
 
 import (
 	"context"
+	"strconv"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -11,7 +12,36 @@ import (
 
 	"github.com/fairride/booking/app"
 	"github.com/fairride/booking/grpc/bookingpb"
+	domainerrors "github.com/fairride/shared/errors"
 )
+
+// toGRPCError maps a *domainerrors.DomainError's Code onto the matching
+// gRPC status code (same pattern as trip/grpc/handler.go's toGRPCError) so
+// business errors — e.g. the FinishTrip no-movement fraud guard — surface
+// distinguishably to the gateway instead of flattening to codes.Internal.
+func toGRPCError(err error) error {
+	code := domainerrors.GetCode(err)
+	var grpcCode codes.Code
+	switch code {
+	case domainerrors.CodeNotFound:
+		grpcCode = codes.NotFound
+	case domainerrors.CodeInvalidArgument:
+		grpcCode = codes.InvalidArgument
+	case domainerrors.CodeAlreadyExists:
+		grpcCode = codes.AlreadyExists
+	case domainerrors.CodePreconditionFailed:
+		grpcCode = codes.FailedPrecondition
+	case domainerrors.CodeUnauthenticated:
+		grpcCode = codes.Unauthenticated
+	case domainerrors.CodePermissionDenied:
+		grpcCode = codes.PermissionDenied
+	case domainerrors.CodeUnavailable:
+		grpcCode = codes.Unavailable
+	default:
+		grpcCode = codes.Internal
+	}
+	return status.Error(grpcCode, err.Error())
+}
 
 // Handler implements bookingpb.BookingServiceServer.
 type Handler struct {
@@ -156,14 +186,32 @@ func (h *Handler) FinishTrip(ctx context.Context, req *bookingpb.FinishTripReque
 	if req.GetVehicleType() == "" {
 		return nil, status.Error(codes.InvalidArgument, "vehicle_type is required")
 	}
-	result, err := h.finishTrip.Execute(ctx, app.FinishTripInput{
+	// Voucher detail has no field on FinishTripRequest — carried as incoming
+	// metadata from the gateway (same proto-extension constraint as
+	// x-service-type on BookRideRequest), forwarded into FinishTripInput and
+	// on to Trip via TripAdapter.CompleteTrip.
+	in := app.FinishTripInput{
 		TripID:      req.GetTripId(),
 		VehicleType: req.GetVehicleType(),
 		DistanceKM:  req.GetDistanceKm(),
 		DurationMin: req.GetDurationMin(),
-	})
+	}
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if vals := md.Get("x-has-voucher-detail"); len(vals) > 0 && vals[0] == "true" {
+			if v := md.Get("x-voucher-id"); len(v) > 0 {
+				in.VoucherID = v[0]
+			}
+			if v := md.Get("x-voucher-code"); len(v) > 0 {
+				in.VoucherCode = v[0]
+			}
+			if v := md.Get("x-voucher-discount-cents"); len(v) > 0 {
+				in.VoucherDiscountCents, _ = strconv.ParseInt(v[0], 10, 64)
+			}
+		}
+	}
+	result, err := h.finishTrip.Execute(ctx, in)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, toGRPCError(err)
 	}
 	return &bookingpb.FinishedTripResponse{
 		TripId:      result.TripID,

@@ -67,10 +67,27 @@ func (a *TripAdapter) CompleteTrip(ctx context.Context, tripID string, fare app.
 			"x-has-commission-detail", "true",
 			"x-commission-cents", strconv.FormatInt(fare.CommissionCents, 10),
 			"x-driver-income-cents", strconv.FormatInt(fare.DriverIncomeCents, 10),
-			"x-voucher-discount-cents", strconv.FormatInt(fare.VoucherDiscountCents, 10),
 			"x-commission-rate", strconv.FormatFloat(fare.CommissionRate, 'f', -1, 64),
 		)
 	}
+	// Voucher detail — own gate, independent of commission detail (a trip
+	// can have a voucher with or without Pricing V3 commission detail).
+	if fare.VoucherID != "" {
+		ctx = metadata.AppendToOutgoingContext(ctx,
+			"x-has-voucher-detail", "true",
+			"x-voucher-id", fare.VoucherID,
+			"x-voucher-code", fare.VoucherCode,
+			"x-voucher-discount-cents", strconv.FormatInt(fare.VoucherDiscountCents, 10),
+		)
+	}
+	// Trip Summary (Ride Lifecycle Fare Validation) — always forwarded
+	// (unlike commission/voucher detail, every completed trip has a summary).
+	ctx = metadata.AppendToOutgoingContext(ctx,
+		"x-travelled-distance-km", strconv.FormatFloat(fare.TravelledDistanceKm, 'f', -1, 64),
+		"x-travelled-duration-min", strconv.FormatFloat(fare.TravelledDurationMin, 'f', -1, 64),
+		"x-toll-fee-cents", strconv.FormatInt(fare.TollFeeCents, 10),
+		"x-extra-fee-cents", strconv.FormatInt(fare.ExtraFeeCents, 10),
+	)
 	resp, err := a.client.CompleteTrip(ctx, &trippb.CompleteTripRequest{
 		TripId:         tripID,
 		FinalFareTotal: fare.Total,

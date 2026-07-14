@@ -14,6 +14,8 @@ import (
 func NewRouter(
 	bh *handlers.BookingHandler,
 	ah *handlers.AuthHandler,
+	oah *handlers.OTPAuthHandler,
+	avch *handlers.AppVersionHandler,
 	avh *handlers.AvailabilityHandler,
 	lh *handlers.LocationHandler,
 	dph *handlers.DriverProfileHandler,
@@ -24,9 +26,13 @@ func NewRouter(
 	nh *handlers.NotificationHandler,
 	kh *handlers.KYCHandler,
 	akh *handlers.AdminKYCHandler,
+	rkh *handlers.RiderKYCHandler,
+	arkh *handlers.AdminRiderKYCHandler,
 	wh *handlers.WalletHandler,
 	awh *handlers.AdminWalletHandler,
 	ph *handlers.PricingHandler,
+	proh *handlers.PromotionHandler,
+	aproh *handlers.AdminPromotionHandler,
 	authMiddleware func(http.Handler) http.Handler,
 	log zerolog.Logger,
 ) http.Handler {
@@ -35,14 +41,26 @@ func NewRouter(
 	// Health — no auth required.
 	mux.HandleFunc("GET /health", handleHealth)
 
+	// App Version startup check — no auth required (must work pre-login).
+	mux.HandleFunc("GET /api/v1/app/version", avch.GetVersion)
+
 	// Auth — no JWT required (issues the token).
 	mux.HandleFunc("POST /api/v1/auth/login", ah.Login)
 	mux.HandleFunc("POST /api/v1/auth/rider/login", ah.RiderLogin)
 	mux.HandleFunc("POST /api/v1/auth/admin/login", ah.AdminLogin)
 	mux.HandleFunc("POST /api/v1/auth/refresh", ah.Refresh)
 
+	// Phone OTP + Google Sign-In — the self-registration login path (Auth +
+	// Onboarding). No JWT required (these endpoints issue the token).
+	mux.HandleFunc("POST /api/v1/auth/otp/request", oah.RequestOTP)
+	mux.HandleFunc("POST /api/v1/auth/otp/verify", oah.VerifyOTP)
+	mux.HandleFunc("POST /api/v1/auth/google", oah.GoogleLogin)
+
 	auth := authMiddleware
 	requireAdmin := func(h http.Handler) http.Handler { return auth(middleware.RequireAdmin(h)) }
+
+	// Current account identity + capability flags (driver_enabled) — auth required.
+	mux.Handle("GET /api/v1/auth/me", auth(http.HandlerFunc(oah.Me)))
 
 	// Driver availability — auth required.
 	mux.Handle("POST /api/v1/driver/go-online", auth(http.HandlerFunc(avh.GoOnline)))
@@ -105,6 +123,13 @@ func NewRouter(
 	mux.Handle("GET /api/v1/driver/verification/documents", auth(http.HandlerFunc(kh.ListDocuments)))
 	mux.Handle("GET /api/v1/driver/verification/documents/{documentType}/versions", auth(http.HandlerFunc(kh.ListDocumentVersions)))
 
+	// Rider KYC — rider-facing (own record only, auth required). Submitting
+	// again after Rejected doubles as "resubmit" (no separate PUT — see
+	// RiderVerification.Submit, which re-opens a Rejected record).
+	mux.Handle("POST /api/v1/rider/verification/documents", auth(http.HandlerFunc(rkh.UploadDocument)))
+	mux.Handle("POST /api/v1/rider/verification", auth(http.HandlerFunc(rkh.SubmitVerification)))
+	mux.Handle("GET /api/v1/rider/verification", auth(http.HandlerFunc(rkh.GetVerification)))
+
 	// KYC review dashboard — admin-only (Phần 12).
 	mux.Handle("GET /api/v1/admin/verifications/drivers", requireAdmin(http.HandlerFunc(akh.ListDriverVerifications)))
 	mux.Handle("POST /api/v1/admin/verifications/drivers/{driverID}/approve", requireAdmin(http.HandlerFunc(akh.ApproveDriverVerification)))
@@ -118,6 +143,13 @@ func NewRouter(
 	mux.Handle("GET /api/v1/admin/verifications/drivers/{driverID}/documents.zip", requireAdmin(http.HandlerFunc(akh.DownloadDriverDocumentsZip)))
 	mux.Handle("GET /api/v1/admin/verifications/summary", requireAdmin(http.HandlerFunc(akh.GetKYCSummary)))
 
+	// Rider KYC review — admin-only. No dashboard UI in this phase (Admin
+	// app is out of scope); this is the operable API a future dashboard (or
+	// a manual call) uses to unblock a rider stuck at Pending.
+	mux.Handle("GET /api/v1/admin/verifications/riders", requireAdmin(http.HandlerFunc(arkh.ListPending)))
+	mux.Handle("POST /api/v1/admin/verifications/riders/{userID}/approve", requireAdmin(http.HandlerFunc(arkh.Approve)))
+	mux.Handle("POST /api/v1/admin/verifications/riders/{userID}/reject", requireAdmin(http.HandlerFunc(arkh.Reject)))
+
 	// Driver Finance / Settlement Engine — driver-facing (own wallet only, auth required).
 	mux.Handle("GET /api/v1/driver/wallet/summary", auth(http.HandlerFunc(wh.GetSummary)))
 	mux.Handle("GET /api/v1/driver/wallet/statement", auth(http.HandlerFunc(wh.GetStatement)))
@@ -127,6 +159,20 @@ func NewRouter(
 	mux.Handle("PUT /api/v1/driver/wallet/bank-account", auth(http.HandlerFunc(wh.SetBankAccount)))
 	mux.Handle("POST /api/v1/driver/wallet/payouts", auth(http.HandlerFunc(wh.CreatePayoutRequest)))
 	mux.Handle("GET /api/v1/driver/wallet/payouts", auth(http.HandlerFunc(wh.ListMyPayoutRequests)))
+
+	// Voucher & Promotion — rider-facing (auth required).
+	mux.Handle("POST /api/v1/promo/validate", auth(http.HandlerFunc(proh.Validate)))
+	mux.Handle("POST /api/v1/promo/apply", auth(http.HandlerFunc(proh.Apply)))
+	mux.Handle("GET /api/v1/rider/vouchers", auth(http.HandlerFunc(proh.MyVouchers)))
+
+	// Voucher & Promotion — admin CRUD.
+	mux.Handle("GET /api/v1/admin/vouchers", requireAdmin(http.HandlerFunc(aproh.ListVouchers)))
+	mux.Handle("POST /api/v1/admin/vouchers", requireAdmin(http.HandlerFunc(aproh.CreateVoucher)))
+	mux.Handle("GET /api/v1/admin/vouchers/{id}", requireAdmin(http.HandlerFunc(aproh.GetVoucher)))
+	mux.Handle("PUT /api/v1/admin/vouchers/{id}", requireAdmin(http.HandlerFunc(aproh.UpdateVoucher)))
+	mux.Handle("POST /api/v1/admin/vouchers/{id}/enable", requireAdmin(http.HandlerFunc(aproh.EnableVoucher)))
+	mux.Handle("POST /api/v1/admin/vouchers/{id}/disable", requireAdmin(http.HandlerFunc(aproh.DisableVoucher)))
+	mux.Handle("DELETE /api/v1/admin/vouchers/{id}", requireAdmin(http.HandlerFunc(aproh.DeleteVoucher)))
 
 	// Driver Finance — admin-only (Phần 10). "Không cần UI. Chỉ API."
 	mux.Handle("GET /api/v1/admin/settlements", requireAdmin(http.HandlerFunc(awh.ListSettlements)))

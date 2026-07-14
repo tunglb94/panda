@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:rider/core/network/api_client.dart';
 import 'package:rider/core/theme/app_colors.dart';
 import 'package:rider/core/theme/app_icon_sizes.dart';
 import 'package:rider/core/theme/app_radius.dart';
@@ -8,34 +9,70 @@ import 'package:rider/shared/widgets/app_bottom_sheet.dart';
 import 'package:rider/shared/widgets/app_button.dart';
 import 'package:rider/shared/widgets/app_empty_state.dart';
 
+import '../../data/promotion_repository.dart';
 import '../../domain/models/voucher.dart';
-import '../../domain/models/voucher_catalog.dart';
 import 'voucher_card.dart';
 
-/// Opens the voucher picker sheet. Returns the tapped [Voucher], or `null`
-/// if the rider dismissed the sheet or chose "Bỏ chọn voucher".
+/// Opens the voucher picker sheet — real vouchers from
+/// `GET /api/v1/rider/vouchers`'s "available" list. Returns the tapped
+/// [Voucher], or `null` if the rider dismissed the sheet or chose "Bỏ chọn
+/// voucher".
 abstract final class VoucherListSheet {
-  static Future<Voucher?> show(BuildContext context, {Voucher? selected}) {
+  static Future<Voucher?> show(BuildContext context, {required ApiClient apiClient, Voucher? selected}) {
     return AppBottomSheet.show<Voucher?>(
       context,
       title: 'Chọn voucher',
       isScrollControlled: true,
-      builder: (sheetContext) => _VoucherListBody(selected: selected),
+      builder: (sheetContext) => _VoucherListBody(apiClient: apiClient, selected: selected),
     );
   }
 }
 
-class _VoucherListBody extends StatelessWidget {
-  const _VoucherListBody({this.selected});
+class _VoucherListBody extends StatefulWidget {
+  const _VoucherListBody({required this.apiClient, this.selected});
 
+  final ApiClient apiClient;
   final Voucher? selected;
 
   @override
-  Widget build(BuildContext context) {
-    final vouchers = VoucherCatalog.mine;
+  State<_VoucherListBody> createState() => _VoucherListBodyState();
+}
 
-    if (vouchers.isEmpty) {
-      return SizedBox(
+class _VoucherListBodyState extends State<_VoucherListBody> {
+  bool _loading = true;
+  List<Voucher> _vouchers = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final body = await PromotionRepository(widget.apiClient).myVouchers();
+      final available = (body['available'] as List<dynamic>? ?? [])
+          .map((e) => Voucher.fromApi(e as Map<String, dynamic>, status: VoucherStatus.available))
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _vouchers = available;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_vouchers.isEmpty) {
+      return const SizedBox(
         height: 360,
         child: AppEmptyState(
           icon: Icons.local_offer_outlined,
@@ -54,11 +91,11 @@ class _VoucherListBody extends StatelessWidget {
           Flexible(
             child: ListView.separated(
               shrinkWrap: true,
-              itemCount: vouchers.length,
+              itemCount: _vouchers.length,
               separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
               itemBuilder: (context, i) {
-                final voucher = vouchers[i];
-                final isSelected = voucher.id == selected?.id;
+                final voucher = _vouchers[i];
+                final isSelected = voucher.id == widget.selected?.id;
                 return VoucherCard(
                   voucher: isSelected
                       ? Voucher(
@@ -81,7 +118,7 @@ class _VoucherListBody extends StatelessWidget {
               },
             ),
           ),
-          if (selected != null) ...[
+          if (widget.selected != null) ...[
             const SizedBox(height: AppSpacing.md),
             AppButton.text(
               label: 'Bỏ chọn voucher',

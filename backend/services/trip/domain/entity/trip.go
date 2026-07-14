@@ -76,18 +76,66 @@ type Trip struct {
 	DriverIncomeCents    int64
 	VoucherDiscountCents int64
 	CommissionRate       float64
+
+	// VoucherID/VoucherCode identify the voucher redeemed against this trip
+	// (Promotion Engine is the source of truth — see gateway's
+	// BookingHandler.FinishTrip, which resolves the reservation and passes
+	// it through here). Empty means no voucher was applied. Independent of
+	// HasCommissionDetail — a trip can have a voucher with or without
+	// Pricing V3 commission detail also being present.
+	VoucherID   string
+	VoucherCode string
+
+	// ArrivedAt/StartedAt are server-stamped (MarkDriverArrived/Start) —
+	// nil until reached. The only GPS-independent, server-authoritative
+	// timestamps in the trip lifecycle; WaitingDurationMin is derived from
+	// them, never from client input.
+	ArrivedAt *time.Time
+	StartedAt *time.Time
+
+	// Trip Summary — the business-data record of what actually happened,
+	// built by Complete(). Ride Lifecycle Fare Validation hardening: Pricing
+	// reads only these fields for the final fare, never raw GPS pings or a
+	// straight-line pickup/dropoff distance. TravelledDistanceKm/
+	// TravelledDurationMin are sourced from the driver app's on-device GPS
+	// tracking (industry-standard — Grab/Be/Uber all compute actual fare
+	// from device-reported driven distance, not server-side re-derivation);
+	// WaitingDurationMin is computed purely from ArrivedAt/StartedAt.
+	// TollFeeCents/ExtraFeeCents are reserved for a future fee-entry source
+	// (Known Gap — always 0 today).
+	TravelledDistanceKm  float64
+	TravelledDurationMin float64
+	WaitingDurationMin   float64
+	TollFeeCents         int64
+	ExtraFeeCents        int64
+}
+
+// TripSummary is the actual-trip business record passed to Complete().
+// WaitingDurationMin is intentionally absent here — Trip derives it itself
+// from ArrivedAt/StartedAt (see Complete), the only server-authoritative
+// timestamps available, rather than trusting a client-supplied value.
+type TripSummary struct {
+	TravelledDistanceKm  float64
+	TravelledDurationMin float64
+	TollFeeCents         int64
+	ExtraFeeCents        int64
 }
 
 // CompleteFinancials carries the commission detail Pricing V3 computed for
 // this trip's final fare (see pricing/app/feature_flag.go's
-// CalculateFinalDetailed). Zero value means "no detail available" (Pricing
-// running V2) — HasCommissionDetail distinguishes that from a real 0.
+// CalculateFinalDetailed), plus the Promotion Engine's voucher redemption
+// detail (independent of Pricing V3 — see VoucherID's doc comment on Trip).
+// Zero value means "no detail available" (Pricing running V2 / no voucher)
+// — HasCommissionDetail distinguishes that from a real 0 for the commission
+// fields specifically; VoucherID == "" is its own independent "no voucher" signal.
 type CompleteFinancials struct {
 	HasCommissionDetail  bool
 	CommissionCents      int64
 	DriverIncomeCents    int64
 	VoucherDiscountCents int64
 	CommissionRate       float64
+	VoucherID            string
+	VoucherCode          string
 }
 
 // NewTrip creates a validated Ride Trip in StatusPending. Unchanged from
@@ -139,6 +187,8 @@ func NewDeliveryTrip(tripID, riderID, pickupAddress, dropoffAddress, deliveryID 
 }
 
 // ReconstituteTrip rebuilds a Trip from a persistence record. No validation.
+// arrivedAt/startedAt may be nil (not yet reached); summary is the
+// persisted Trip Summary (zero value before Complete()).
 func ReconstituteTrip(
 	tripID, riderID, driverID string,
 	status TripStatus,
@@ -147,6 +197,9 @@ func ReconstituteTrip(
 	paymentMethod string,
 	createdAt, updatedAt time.Time,
 	fin CompleteFinancials,
+	arrivedAt, startedAt *time.Time,
+	waitingDurationMin float64,
+	summary TripSummary,
 ) *Trip {
 	return &Trip{
 		TripID:               tripID,
@@ -166,6 +219,15 @@ func ReconstituteTrip(
 		DriverIncomeCents:    fin.DriverIncomeCents,
 		VoucherDiscountCents: fin.VoucherDiscountCents,
 		CommissionRate:       fin.CommissionRate,
+		VoucherID:            fin.VoucherID,
+		VoucherCode:          fin.VoucherCode,
+		ArrivedAt:            arrivedAt,
+		StartedAt:            startedAt,
+		TravelledDistanceKm:  summary.TravelledDistanceKm,
+		TravelledDurationMin: summary.TravelledDurationMin,
+		WaitingDurationMin:   waitingDurationMin,
+		TollFeeCents:         summary.TollFeeCents,
+		ExtraFeeCents:        summary.ExtraFeeCents,
 	}
 }
 
@@ -194,6 +256,8 @@ func (t *Trip) MarkDriverArrived(now time.Time) error {
 		return errors.PreconditionFailed("driver arrived cannot be set from status: " + string(t.Status))
 	}
 	t.Status = StatusDriverArrived
+	arrivedAt := now
+	t.ArrivedAt = &arrivedAt
 	t.UpdatedAt = now
 	return nil
 }
@@ -205,13 +269,24 @@ func (t *Trip) Start(now time.Time) error {
 		return errors.PreconditionFailed("trip cannot be started from status: " + string(t.Status))
 	}
 	t.Status = StatusInProgress
+	startedAt := now
+	t.StartedAt = &startedAt
 	t.UpdatedAt = now
 	return nil
 }
 
-// Complete transitions the trip from InProgress to Completed and records the fare.
-// Returns CodePreconditionFailed if the trip is not InProgress.
-func (t *Trip) Complete(finalFareTotal int64, fareCurrency string, fin CompleteFinancials, now time.Time) error {
+// Complete transitions the trip from InProgress to Completed, records the
+// fare, and persists the Trip Summary. Returns CodePreconditionFailed if the
+// trip is not InProgress.
+//
+// Ride Lifecycle Fare Validation: abnormal-completion (no-movement fraud)
+// validation happens upstream, in booking's FinishTripUseCase, before
+// Pricing is even called — Complete trusts the summary it's given here and
+// never re-derives distance from coordinates (never straight-line pickup/
+// dropoff). WaitingDurationMin is always computed from ArrivedAt/StartedAt
+// — the only GPS-independent, server-authoritative timestamps — never taken
+// from the caller-supplied summary.
+func (t *Trip) Complete(finalFareTotal int64, fareCurrency string, fin CompleteFinancials, summary TripSummary, now time.Time) error {
 	if t.Status != StatusInProgress {
 		return errors.PreconditionFailed("trip cannot be completed from status: " + string(t.Status))
 	}
@@ -223,8 +298,29 @@ func (t *Trip) Complete(finalFareTotal int64, fareCurrency string, fin CompleteF
 	t.DriverIncomeCents = fin.DriverIncomeCents
 	t.VoucherDiscountCents = fin.VoucherDiscountCents
 	t.CommissionRate = fin.CommissionRate
+	t.VoucherID = fin.VoucherID
+	t.VoucherCode = fin.VoucherCode
+	t.TravelledDistanceKm = summary.TravelledDistanceKm
+	t.TravelledDurationMin = summary.TravelledDurationMin
+	t.TollFeeCents = summary.TollFeeCents
+	t.ExtraFeeCents = summary.ExtraFeeCents
+	t.WaitingDurationMin = t.computeWaitingDurationMin()
 	t.UpdatedAt = now
 	return nil
+}
+
+// computeWaitingDurationMin derives wait-at-pickup time from the trip's own
+// server-stamped timestamps — 0 if either is missing (e.g. a trip Started
+// directly from DriverAssigned without a recorded arrival) or non-positive.
+func (t *Trip) computeWaitingDurationMin() float64 {
+	if t.ArrivedAt == nil || t.StartedAt == nil {
+		return 0
+	}
+	d := t.StartedAt.Sub(*t.ArrivedAt).Minutes()
+	if d < 0 {
+		return 0
+	}
+	return d
 }
 
 // InitiatePayment transitions the trip from Completed to PaymentPending.

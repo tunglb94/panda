@@ -1,0 +1,302 @@
+[
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0002",
+    "severity": 97236.037,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0007",
+    "severity": 81586.984,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0004",
+    "severity": 75542.764,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0001",
+    "severity": 68481.882,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0015",
+    "severity": 67916.053,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0010",
+    "severity": 61127.737,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0013",
+    "severity": 52652.793,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0011",
+    "severity": 50084.633,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0014",
+    "severity": 48702.13,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0027",
+    "severity": 46933.464,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0003",
+    "severity": 44058.86,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0046",
+    "severity": 43642.903,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0020",
+    "severity": 43191.706,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0022",
+    "severity": 40627.324,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "driver_income_outlier",
+    "entity_id": "driver-0018",
+    "severity": 40496.277,
+    "detail": "Thu nhập/tuần vượt ngưỡng thống kê (mean + 3×độ lệch chuẩn)"
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "airport",
+    "severity": 4550.414972113266,
+    "detail": "Khu vực airport có tỉ lệ cầu/cung trung bình 303.36x — thiếu tài xế nghiêm trọng."
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "hospital",
+    "severity": 1788.7810786129971,
+    "detail": "Khu vực hospital có tỉ lệ cầu/cung trung bình 119.25x — thiếu tài xế nghiêm trọng."
+  },
+  {
+    "type": "zone_undersupplied",
+    "entity_id": "school",
+    "severity": 1653.4492860939113,
+    "detail": "Khu vực school có tỉ lệ cầu/cung trung bình 110.23x — thiếu tài xế nghiêm trọng."
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0298",
+    "severity": 1481.25,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0425",
+    "severity": 1468.75,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0226",
+    "severity": 1465,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0224",
+    "severity": 1463.75,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0296",
+    "severity": 1463.75,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0393",
+    "severity": 1461.25,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0270",
+    "severity": 1456.25,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0378",
+    "severity": 1455,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0430",
+    "severity": 1453.75,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0265",
+    "severity": 1452.5,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0451",
+    "severity": 1452.5,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0195",
+    "severity": 1450,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0495",
+    "severity": 1445,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0372",
+    "severity": 1443.75,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0291",
+    "severity": 1441.25,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0259",
+    "severity": 1441.25,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0271",
+    "severity": 1440,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0314",
+    "severity": 1440,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0166",
+    "severity": 1438.75,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0421",
+    "severity": 1436.25,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0448",
+    "severity": 1436.25,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0198",
+    "severity": 1436.25,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0349",
+    "severity": 1435,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0324",
+    "severity": 1433.75,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0422",
+    "severity": 1432.5,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0340",
+    "severity": 1428.75,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0277",
+    "severity": 1426.25,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0230",
+    "severity": 1422.5,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0474",
+    "severity": 1411.25,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0443",
+    "severity": 1410,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0294",
+    "severity": 1410,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  },
+  {
+    "type": "driver_zero_trips",
+    "entity_id": "driver-0477",
+    "severity": 1410,
+    "detail": "Có online trong lần chạy này nhưng 0 chuyến hoàn tất"
+  }
+]

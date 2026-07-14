@@ -1,0 +1,36 @@
+{
+  "by_traffic": [
+    {
+      "traffic": "accident",
+      "trip_count": 6801,
+      "average_eta_minutes": 111.09792051518264,
+      "average_pickup_minutes": 47.45519547389712,
+      "average_trip_time_minutes": 63.642725041285814,
+      "average_driver_income_vnd": 54801.816644611084
+    },
+    {
+      "traffic": "clear",
+      "trip_count": 112817,
+      "average_eta_minutes": 29.16532512201764,
+      "average_pickup_minutes": 12.450301178134534,
+      "average_trip_time_minutes": 16.715023943878705,
+      "average_driver_income_vnd": 41974.622627795456
+    },
+    {
+      "traffic": "busy",
+      "trip_count": 161035,
+      "average_eta_minutes": 39.777951138714556,
+      "average_pickup_minutes": 17.204119349836382,
+      "average_trip_time_minutes": 22.57383178890253,
+      "average_driver_income_vnd": 46316.11071506194
+    },
+    {
+      "traffic": "jammed",
+      "trip_count": 16207,
+      "average_eta_minutes": 69.0402104491273,
+      "average_pickup_minutes": 30.626916270848458,
+      "average_trip_time_minutes": 38.4132941782782,
+      "average_driver_income_vnd": 50172.95218115629
+    }
+  ]
+}

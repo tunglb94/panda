@@ -14,6 +14,7 @@ import 'package:rider/shared/widgets/app_button.dart';
 import 'package:rider/shared/widgets/app_card.dart';
 
 import '../../data/pricing_repository.dart';
+import '../../data/promotion_repository.dart';
 import '../../domain/models/fare_estimate.dart';
 import '../../domain/models/mock_booking_catalog.dart';
 import '../../domain/models/payment_method.dart';
@@ -63,6 +64,9 @@ class _BookingFormBodyState extends State<BookingFormBody> {
   late VehicleCategory _selectedCategory;
   PaymentMethod _selectedPayment = MockBookingCatalog.paymentMethods.first;
   Voucher? _selectedVoucher;
+  PromoResult? _promoResult;
+  String? _voucherError;
+  bool _applyingVoucher = false;
   String? _bookingError;
 
   FareEstimate? _fareEstimate;
@@ -86,13 +90,16 @@ class _BookingFormBodyState extends State<BookingFormBody> {
         destination: widget.tripSelection.destination,
         serviceType: _selectedCategory.backendKey,
         tripType: 'ride',
-        promoCode: _selectedVoucher?.code ?? '',
       );
       if (!mounted) return;
       setState(() {
         _fareEstimate = estimate;
         _loadingFare = false;
       });
+      // The base fare just changed (vehicle/route) — any discount computed
+      // against the old total is stale, so re-check the currently selected
+      // voucher (if any) against the new total rather than showing a wrong number.
+      if (_selectedVoucher != null) _applyVoucher(_selectedVoucher);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -103,10 +110,59 @@ class _BookingFormBodyState extends State<BookingFormBody> {
   }
 
   Future<void> _pickVoucher() async {
-    final result = await VoucherListSheet.show(context, selected: _selectedVoucher);
+    final result = await VoucherListSheet.show(context, apiClient: widget.apiClient, selected: _selectedVoucher);
     if (!mounted) return;
-    setState(() => _selectedVoucher = result);
-    _loadFare();
+    await _applyVoucher(result);
+  }
+
+  /// Calls `POST /api/v1/promo/apply` against the current fare estimate's
+  /// total — the backend is the only source of truth for the discount
+  /// amount, matching "Pricing chỉ đọc discount từ Promotion. Không tự tính lại."
+  Future<void> _applyVoucher(Voucher? voucher) async {
+    if (voucher == null) {
+      setState(() {
+        _selectedVoucher = null;
+        _promoResult = null;
+        _voucherError = null;
+      });
+      return;
+    }
+    final fare = _fareEstimate;
+    if (fare == null) return;
+
+    setState(() {
+      _selectedVoucher = voucher;
+      _applyingVoucher = true;
+      _voucherError = null;
+    });
+    try {
+      final result = await PromotionRepository(widget.apiClient).apply(
+        code: voucher.code,
+        orderAmount: fare.total,
+        serviceType: _selectedCategory.backendKey,
+        tripType: 'ride',
+      );
+      if (!mounted) return;
+      setState(() {
+        _promoResult = result.applied ? result : null;
+        _voucherError = result.applied ? null : (result.reason.isNotEmpty ? result.reason : 'Voucher không áp dụng được.');
+        _applyingVoucher = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _promoResult = null;
+        _voucherError = e.statusCode == 0 ? e.message : 'Voucher không áp dụng được.';
+        _applyingVoucher = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _promoResult = null;
+        _voucherError = 'Voucher không áp dụng được.';
+        _applyingVoucher = false;
+      });
+    }
   }
 
   Future<void> _pickVehicle() async {
@@ -129,7 +185,11 @@ class _BookingFormBodyState extends State<BookingFormBody> {
 
     try {
       final repo = BookingRepository(widget.apiClient);
-      final result = await repo.bookRide(widget.tripSelection);
+      final result = await repo.bookRide(
+        widget.tripSelection,
+        voucherCode: _promoResult != null ? _selectedVoucher?.code : null,
+        orderAmount: _promoResult != null ? _fareEstimate?.total : null,
+      );
 
       await TripStorage().saveActiveTripId(result.tripId);
 
@@ -168,6 +228,8 @@ class _BookingFormBodyState extends State<BookingFormBody> {
   Widget build(BuildContext context) {
     final trip = widget.tripSelection;
     final fare = _fareEstimate;
+    final promo = _promoResult;
+    final finalTotal = promo?.finalOrderAmount;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -197,15 +259,16 @@ class _BookingFormBodyState extends State<BookingFormBody> {
               ? const _FareLoadingSkeleton(key: ValueKey('fare-loading'))
               : fare != null
                   ? FareSummaryCard(
-                      key: ValueKey('$_selectedCategory-${_selectedVoucher?.id}'),
+                      key: ValueKey('$_selectedCategory-${_selectedVoucher?.id}-$finalTotal'),
                       breakdown: fare,
                       distanceKm: fare.distanceKm,
                       durationMin: fare.durationMinutes,
-                      voucher: _selectedVoucher,
-                      // No promotion or surge data source exists anywhere in
-                      // the backend today (see PromotionInfo/SurgeInfo doc
-                      // comments) — both stay null rather than being
-                      // fabricated.
+                      voucher: promo != null ? _selectedVoucher : null,
+                      discountAmount: promo?.discountAmount,
+                      finalTotal: finalTotal,
+                      // No surge data source exists anywhere in the backend
+                      // today (see SurgeInfo doc comment) — stays null
+                      // rather than being fabricated.
                       promotion: null,
                       surge: null,
                       cheaperThanCompetitorLabel: null,
@@ -218,7 +281,17 @@ class _BookingFormBodyState extends State<BookingFormBody> {
           onChanged: (m) => setState(() => _selectedPayment = m),
         ),
         const SizedBox(height: AppSpacing.lg),
-        VoucherPickerTile(selected: _selectedVoucher, onTap: _pickVoucher),
+        VoucherPickerTile(
+          selected: _selectedVoucher,
+          onTap: _applyingVoucher ? () {} : _pickVoucher,
+        ),
+        if (_applyingVoucher) ...[
+          const SizedBox(height: AppSpacing.xs),
+          const Text('Đang áp dụng voucher…', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+        ] else if (_voucherError != null) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Text(_voucherError!, style: const TextStyle(color: AppColors.error, fontSize: 12)),
+        ],
         if (_bookingError != null) ...[
           const SizedBox(height: AppSpacing.md),
           Text(
@@ -232,7 +305,7 @@ class _BookingFormBodyState extends State<BookingFormBody> {
           width: double.infinity,
           child: fare != null
               ? BookRideButton(
-                  label: 'Đặt ${_selectedVehicle.label} · ${formatMoney(fare.total, fare.currencyCode)}',
+                  label: 'Đặt ${_selectedVehicle.label} · ${formatMoney(finalTotal ?? fare.total, fare.currencyCode)}',
                   onConfirm: _handleBookRide,
                 )
               : AppButton.primary(

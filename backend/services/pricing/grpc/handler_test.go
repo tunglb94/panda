@@ -32,8 +32,8 @@ func TestEstimateFare_ValidCar(t *testing.T) {
 	if resp.GetFare() == nil {
 		t.Fatal("expected non-nil fare")
 	}
-	if resp.GetFare().GetTotal() != 55500 {
-		t.Errorf("Total: got %d, want 55500", resp.GetFare().GetTotal())
+	if resp.GetFare().GetTotal() != 73500 {
+		t.Errorf("Total: got %d, want 73500", resp.GetFare().GetTotal())
 	}
 	if resp.GetFare().GetIsFinal() {
 		t.Error("IsFinal should be false for EstimateFare")
@@ -100,9 +100,9 @@ func TestEstimateFare_MinimumFareReturned(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// ride_fare should be minimum (30000) + booking_fee (2000) = 32000
-	if resp.GetFare().GetTotal() != 32000 {
-		t.Errorf("Total: got %d, want 32000", resp.GetFare().GetTotal())
+	// ride_fare should be minimum (25000) + booking_fee (2000) = 27000
+	if resp.GetFare().GetTotal() != 27000 {
+		t.Errorf("Total: got %d, want 27000", resp.GetFare().GetTotal())
 	}
 }
 
@@ -121,8 +121,8 @@ func TestCalculateFinalFare_ValidCar(t *testing.T) {
 	if !resp.GetFare().GetIsFinal() {
 		t.Error("IsFinal should be true for CalculateFinalFare")
 	}
-	if resp.GetFare().GetTotal() != 55500 {
-		t.Errorf("Total: got %d, want 55500", resp.GetFare().GetTotal())
+	if resp.GetFare().GetTotal() != 73500 {
+		t.Errorf("Total: got %d, want 73500", resp.GetFare().GetTotal())
 	}
 }
 

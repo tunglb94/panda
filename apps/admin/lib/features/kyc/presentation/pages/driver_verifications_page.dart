@@ -78,17 +78,7 @@ class _DriverVerificationsPageState extends State<DriverVerificationsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Panda Admin — KYC Review'),
-        actions: [
-          IconButton(
-            tooltip: 'Đăng xuất',
-            onPressed: () => widget.authState.logout(widget.tokenStorage),
-            icon: const Icon(Icons.logout),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
+      appBar: AppBar(title: const Text('KYC Review')),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(

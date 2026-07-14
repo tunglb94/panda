@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'core/auth/auth_state.dart';
+import 'core/kyc/kyc_gate.dart';
 import 'core/network/api_client.dart';
 import 'core/router/app_router.dart';
 import 'core/storage/token_storage.dart';
@@ -26,6 +27,7 @@ class DriverApp extends StatefulWidget {
 
 class _DriverAppState extends State<DriverApp> {
   late final LocationUploadService _uploadService;
+  late final KycGate _kycGate;
   late final GoRouter _router;
 
   @override
@@ -34,8 +36,10 @@ class _DriverAppState extends State<DriverApp> {
     _uploadService = LocationUploadService(
       repository: LocationUploadRepository(apiClient: widget.apiClient),
     );
+    _kycGate = KycGate();
     _router = AppRouter.create(
       authState: widget.authState,
+      kycGate: _kycGate,
       tokenStorage: widget.tokenStorage,
       apiClient: widget.apiClient,
       uploadService: _uploadService,

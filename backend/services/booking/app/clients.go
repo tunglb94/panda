@@ -49,6 +49,23 @@ type FareInfo struct {
 	DriverIncomeCents    int64
 	VoucherDiscountCents int64
 	CommissionRate       float64
+
+	// VoucherID/VoucherCode identify the voucher redeemed against this trip
+	// (Promotion Engine, resolved by the gateway — see FinishTripInput).
+	// Independent of HasCommissionDetail; empty VoucherID means no voucher.
+	VoucherID   string
+	VoucherCode string
+
+	// Trip Summary (Ride Lifecycle Fare Validation) — rides along on FareInfo
+	// to cross the CompleteTrip boundary into Trip, independent of the fare
+	// math itself (fare.Total is computed from these same values by Pricing,
+	// but they are also persisted on Trip verbatim as the business record).
+	// TollFeeCents/ExtraFeeCents have no input source yet (Known Gap) and
+	// are always 0.
+	TravelledDistanceKm  float64
+	TravelledDurationMin float64
+	TollFeeCents         int64
+	ExtraFeeCents        int64
 }
 
 // TripSummary is a lightweight trip view used in list operations.

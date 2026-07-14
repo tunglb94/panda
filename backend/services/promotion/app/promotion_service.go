@@ -169,22 +169,54 @@ func (s *PromotionService) evaluateOne(ctx context.Context, v *entity.Voucher, r
 	return candidateOutcome{voucher: v, discount: discount}, nil
 }
 
-// Redeem commits a previously-evaluated PromotionResult against a confirmed
+// Reserve commits a previously-evaluated PromotionResult against a booked
 // trip: decrements the voucher's remaining budget and increments usage
-// counters. No-op if result.Applied is false.
-func (s *PromotionService) Redeem(ctx context.Context, result *entity.PromotionResult, riderID, tripID string) error {
+// counters, tentatively (status 'reserved' — see ConfirmRedeem/Release).
+// No-op if result.Applied is false. Also grants the rider a wallet issuance
+// for this voucher (idempotent — see VoucherIssuance's doc comment), so a
+// voucher a rider redeems via code entry also shows up in their wallet.
+func (s *PromotionService) Reserve(ctx context.Context, result *entity.PromotionResult, riderID, tripID string) error {
 	if result == nil || !result.Applied {
 		return nil
 	}
-	return s.repo.RecordRedemption(ctx, result.VoucherID, riderID, tripID, result.DiscountAmount)
+	if err := s.repo.Reserve(ctx, result.VoucherID, riderID, tripID, result.DiscountAmount); err != nil {
+		return err
+	}
+	return s.repo.IssueToRider(ctx, result.VoucherID, riderID, time.Now())
 }
 
-// ReleaseRedemption reverses a Redeem — BRB §4.13 Refund Behaviour / §4.14
-// Cancellation Behaviour: voucher is reinstated when the trip did not consume
-// it through rider fault. No-op if result.Applied is false.
-func (s *PromotionService) ReleaseRedemption(ctx context.Context, result *entity.PromotionResult, riderID, tripID string) error {
-	if result == nil || !result.Applied {
-		return nil
+// ConfirmRedeem finalizes a trip's voucher reservation once the trip
+// actually completes (BRB: discount only permanently consumed on
+// completion). Resolves riderID/voucherID internally from tripID so
+// callers (Gateway's FinishTrip hook) only need the trip ID. Returns nil,
+// nil if no voucher was ever reserved for this trip (the common case).
+func (s *PromotionService) ConfirmRedeem(ctx context.Context, tripID string) (*entity.RedemptionRecord, error) {
+	rec, err := s.repo.FindReservationByTrip(ctx, tripID)
+	if err != nil {
+		if sharederrors.IsCode(err, sharederrors.CodeNotFound) {
+			return nil, nil
+		}
+		return nil, err
 	}
-	return s.repo.ReleaseRedemption(ctx, result.VoucherID, riderID, tripID, result.DiscountAmount)
+	if err := s.repo.ConfirmRedeem(ctx, rec.VoucherID, rec.RiderID, tripID); err != nil {
+		return nil, err
+	}
+	_ = s.repo.MarkIssuanceUsed(ctx, rec.VoucherID, rec.RiderID, time.Now())
+	return rec, nil
+}
+
+// Release reverses a Reserve — BRB §4.13 Refund Behaviour / §4.14
+// Cancellation Behaviour: voucher is reinstated when the trip is cancelled
+// before completion, so the rider does not lose it. Resolves riderID/
+// voucherID internally from tripID. No-op if no voucher was ever reserved
+// for this trip.
+func (s *PromotionService) Release(ctx context.Context, tripID string) error {
+	rec, err := s.repo.FindReservationByTrip(ctx, tripID)
+	if err != nil {
+		if sharederrors.IsCode(err, sharederrors.CodeNotFound) {
+			return nil
+		}
+		return err
+	}
+	return s.repo.Release(ctx, rec.VoucherID, rec.RiderID, tripID, rec.DiscountAmount)
 }

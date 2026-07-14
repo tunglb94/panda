@@ -81,6 +81,10 @@ func domainCodeToHTTP(code domainerrors.Code) int {
 		return http.StatusForbidden
 	case domainerrors.CodePreconditionFailed:
 		return http.StatusUnprocessableEntity
+	case domainerrors.CodeResourceExhausted:
+		return http.StatusTooManyRequests
+	case domainerrors.CodeUnavailable:
+		return http.StatusServiceUnavailable
 	default:
 		return http.StatusInternalServerError
 	}

@@ -202,8 +202,8 @@ func TestPromotionService_RedeemThenPerUserLimitBlocksReuse(t *testing.T) {
 		t.Fatalf("expected first evaluate to apply, err=%v result=%+v", err, result)
 	}
 
-	if err := svc.Redeem(ctx, result, req.RiderID, "trip-1"); err != nil {
-		t.Fatalf("Redeem: %v", err)
+	if err := svc.Reserve(ctx, result, req.RiderID, "trip-1"); err != nil {
+		t.Fatalf("Reserve: %v", err)
 	}
 
 	// Same rider evaluates again (e.g. trying to reuse First Ride) — BRB §4.6
@@ -229,8 +229,8 @@ func TestPromotionService_ReleaseRedemption_ReinstatesBudget(t *testing.T) {
 	if err != nil || !result.Applied {
 		t.Fatalf("expected evaluate to apply, err=%v result=%+v", err, result)
 	}
-	if err := svc.Redeem(ctx, result, req.RiderID, "trip-1"); err != nil {
-		t.Fatalf("Redeem: %v", err)
+	if err := svc.Reserve(ctx, result, req.RiderID, "trip-1"); err != nil {
+		t.Fatalf("Reserve: %v", err)
 	}
 
 	v, err := repo.FindByID(ctx, "v-first-ride")
@@ -238,11 +238,11 @@ func TestPromotionService_ReleaseRedemption_ReinstatesBudget(t *testing.T) {
 		t.Fatalf("FindByID: %v", err)
 	}
 	if v.RemainingBudget != 1_000_000-30_000 {
-		t.Fatalf("expected budget decremented after redeem, got %d", v.RemainingBudget)
+		t.Fatalf("expected budget decremented after reserve, got %d", v.RemainingBudget)
 	}
 
-	if err := svc.ReleaseRedemption(ctx, result, req.RiderID, "trip-1"); err != nil {
-		t.Fatalf("ReleaseRedemption: %v", err)
+	if err := svc.Release(ctx, "trip-1"); err != nil {
+		t.Fatalf("Release: %v", err)
 	}
 
 	v, err = repo.FindByID(ctx, "v-first-ride")

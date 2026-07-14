@@ -1,0 +1,910 @@
+{
+  "top_100": [
+    {
+      "driver_id": "driver-0106",
+      "income_vnd": 94926276,
+      "trips": 1690,
+      "acceptance_rate_percent": 87.06852138073158,
+      "rating": 4.884397463397652,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 290.75
+    },
+    {
+      "driver_id": "driver-0096",
+      "income_vnd": 86983543,
+      "trips": 1628,
+      "acceptance_rate_percent": 85.50420168067227,
+      "rating": 4.781745103645459,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 291.25
+    },
+    {
+      "driver_id": "driver-0435",
+      "income_vnd": 86447725,
+      "trips": 1508,
+      "acceptance_rate_percent": 82.63013698630137,
+      "rating": 4.900057678955316,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 290.75
+    },
+    {
+      "driver_id": "driver-0130",
+      "income_vnd": 84361300,
+      "trips": 1598,
+      "acceptance_rate_percent": 83.40292275574113,
+      "rating": 4.3959870996373684,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 283.25
+    },
+    {
+      "driver_id": "driver-0029",
+      "income_vnd": 80628184,
+      "trips": 1442,
+      "acceptance_rate_percent": 83.01669545192861,
+      "rating": 4.834096946124136,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 282.25
+    },
+    {
+      "driver_id": "driver-0002",
+      "income_vnd": 79439928,
+      "trips": 1541,
+      "acceptance_rate_percent": 85.80178173719376,
+      "rating": 4.488531667346315,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 283.25
+    },
+    {
+      "driver_id": "driver-0464",
+      "income_vnd": 79217125,
+      "trips": 1542,
+      "acceptance_rate_percent": 83.84991843393148,
+      "rating": 4.667436348939887,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 284
+    },
+    {
+      "driver_id": "driver-0230",
+      "income_vnd": 74997390,
+      "trips": 1374,
+      "acceptance_rate_percent": 82.3247453565009,
+      "rating": 4.566617817264267,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 279.75
+    },
+    {
+      "driver_id": "driver-0045",
+      "income_vnd": 59987489,
+      "trips": 1019,
+      "acceptance_rate_percent": 80.48973143759873,
+      "rating": 4.893386383306326,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 211.5
+    },
+    {
+      "driver_id": "driver-0283",
+      "income_vnd": 57745790,
+      "trips": 1058,
+      "acceptance_rate_percent": 86.72131147540983,
+      "rating": 4.295306175578755,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 286.75
+    },
+    {
+      "driver_id": "driver-0326",
+      "income_vnd": 55906768,
+      "trips": 1103,
+      "acceptance_rate_percent": 83.49735049205148,
+      "rating": 4.394059020584682,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454545,
+      "online_hours": 287.5
+    },
+    {
+      "driver_id": "driver-0347",
+      "income_vnd": 52068075,
+      "trips": 705,
+      "acceptance_rate_percent": 85.87088915956151,
+      "rating": 4.857021971177813,
+      "fuel_efficiency_km_per_1000_vnd": 0.3571428571428571,
+      "online_hours": 290.25
+    },
+    {
+      "driver_id": "driver-0218",
+      "income_vnd": 50564375,
+      "trips": 720,
+      "acceptance_rate_percent": 85.71428571428571,
+      "rating": 4.347578538331687,
+      "fuel_efficiency_km_per_1000_vnd": 0.3571428571428572,
+      "online_hours": 283.75
+    },
+    {
+      "driver_id": "driver-0191",
+      "income_vnd": 50079788,
+      "trips": 890,
+      "acceptance_rate_percent": 81.27853881278538,
+      "rating": 4.702793899202545,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 184.75
+    },
+    {
+      "driver_id": "driver-0059",
+      "income_vnd": 49175310,
+      "trips": 753,
+      "acceptance_rate_percent": 85.27746319365798,
+      "rating": 4.317939099108914,
+      "fuel_efficiency_km_per_1000_vnd": 0.3571428571428571,
+      "online_hours": 289.75
+    },
+    {
+      "driver_id": "driver-0082",
+      "income_vnd": 48929285,
+      "trips": 695,
+      "acceptance_rate_percent": 81.86101295641932,
+      "rating": 4.618371033746479,
+      "fuel_efficiency_km_per_1000_vnd": 0.3571428571428571,
+      "online_hours": 287.25
+    },
+    {
+      "driver_id": "driver-0206",
+      "income_vnd": 48525760,
+      "trips": 680,
+      "acceptance_rate_percent": 80.18867924528301,
+      "rating": 4.882371374692381,
+      "fuel_efficiency_km_per_1000_vnd": 0.35714285714285715,
+      "online_hours": 275.75
+    },
+    {
+      "driver_id": "driver-0275",
+      "income_vnd": 47760771,
+      "trips": 1368,
+      "acceptance_rate_percent": 82.65861027190333,
+      "rating": 4.826812370961107,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714286,
+      "online_hours": 283
+    },
+    {
+      "driver_id": "driver-0468",
+      "income_vnd": 47458204,
+      "trips": 1330,
+      "acceptance_rate_percent": 85.3110968569596,
+      "rating": 4.801630956489606,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714286,
+      "online_hours": 292.25
+    },
+    {
+      "driver_id": "driver-0168",
+      "income_vnd": 46397391,
+      "trips": 874,
+      "acceptance_rate_percent": 79.23844061650045,
+      "rating": 4.321880463349118,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 165.5
+    },
+    {
+      "driver_id": "driver-0432",
+      "income_vnd": 44374575,
+      "trips": 1300,
+      "acceptance_rate_percent": 82.59212198221093,
+      "rating": 4.922736304965037,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714288,
+      "online_hours": 284.5
+    },
+    {
+      "driver_id": "driver-0080",
+      "income_vnd": 43806094,
+      "trips": 622,
+      "acceptance_rate_percent": 80.25806451612904,
+      "rating": 4.380161517212853,
+      "fuel_efficiency_km_per_1000_vnd": 0.35714285714285715,
+      "online_hours": 259
+    },
+    {
+      "driver_id": "driver-0276",
+      "income_vnd": 43033261,
+      "trips": 826,
+      "acceptance_rate_percent": 80.90107737512243,
+      "rating": 4.23888047015754,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 245.25
+    },
+    {
+      "driver_id": "driver-0056",
+      "income_vnd": 42792180,
+      "trips": 795,
+      "acceptance_rate_percent": 78.94736842105263,
+      "rating": 4.755916615588251,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 242
+    },
+    {
+      "driver_id": "driver-0202",
+      "income_vnd": 42141258,
+      "trips": 833,
+      "acceptance_rate_percent": 81.34765625,
+      "rating": 4.485607882331125,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 283
+    },
+    {
+      "driver_id": "driver-0042",
+      "income_vnd": 41469968,
+      "trips": 746,
+      "acceptance_rate_percent": 78.1151832460733,
+      "rating": 4.920902128547588,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 238.25
+    },
+    {
+      "driver_id": "driver-0140",
+      "income_vnd": 41433609,
+      "trips": 772,
+      "acceptance_rate_percent": 80.66875653082549,
+      "rating": 4.280070472832987,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 238.5
+    },
+    {
+      "driver_id": "driver-0153",
+      "income_vnd": 41408557,
+      "trips": 804,
+      "acceptance_rate_percent": 80.88531187122736,
+      "rating": 4.429920574673371,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 145
+    },
+    {
+      "driver_id": "driver-0155",
+      "income_vnd": 41065432,
+      "trips": 744,
+      "acceptance_rate_percent": 77.41935483870968,
+      "rating": 4.658605425144772,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 173.25
+    },
+    {
+      "driver_id": "driver-0069",
+      "income_vnd": 40460656,
+      "trips": 591,
+      "acceptance_rate_percent": 79.11646586345381,
+      "rating": 4.357337864888488,
+      "fuel_efficiency_km_per_1000_vnd": 0.3571428571428572,
+      "online_hours": 227.75
+    },
+    {
+      "driver_id": "driver-0013",
+      "income_vnd": 40368484,
+      "trips": 1200,
+      "acceptance_rate_percent": 79.10349373764008,
+      "rating": 4.78792904427273,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714286,
+      "online_hours": 261.25
+    },
+    {
+      "driver_id": "driver-0325",
+      "income_vnd": 39799763,
+      "trips": 712,
+      "acceptance_rate_percent": 78.93569844789357,
+      "rating": 4.503022038702956,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 234.5
+    },
+    {
+      "driver_id": "driver-0452",
+      "income_vnd": 39768356,
+      "trips": 1190,
+      "acceptance_rate_percent": 82.1256038647343,
+      "rating": 4.270235911958017,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714286,
+      "online_hours": 263.5
+    },
+    {
+      "driver_id": "driver-0395",
+      "income_vnd": 39354137,
+      "trips": 726,
+      "acceptance_rate_percent": 78.74186550976138,
+      "rating": 4.919452258561577,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 172.75
+    },
+    {
+      "driver_id": "driver-0239",
+      "income_vnd": 37867409,
+      "trips": 703,
+      "acceptance_rate_percent": 81.08419838523645,
+      "rating": 4.6751589193122545,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454545,
+      "online_hours": 236.25
+    },
+    {
+      "driver_id": "driver-0084",
+      "income_vnd": 37777556,
+      "trips": 695,
+      "acceptance_rate_percent": 81.19158878504673,
+      "rating": 4.532696734953155,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 225.25
+    },
+    {
+      "driver_id": "driver-0025",
+      "income_vnd": 37689296,
+      "trips": 1168,
+      "acceptance_rate_percent": 80.44077134986226,
+      "rating": 4.424195438290759,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714284,
+      "online_hours": 266.25
+    },
+    {
+      "driver_id": "driver-0338",
+      "income_vnd": 37658573,
+      "trips": 715,
+      "acceptance_rate_percent": 76.38888888888889,
+      "rating": 4.599960410516794,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 149.25
+    },
+    {
+      "driver_id": "driver-0014",
+      "income_vnd": 37488291,
+      "trips": 718,
+      "acceptance_rate_percent": 79.68923418423974,
+      "rating": 4.496133881222185,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454545,
+      "online_hours": 150.25
+    },
+    {
+      "driver_id": "driver-0456",
+      "income_vnd": 36627579,
+      "trips": 1102,
+      "acceptance_rate_percent": 80.26219956300073,
+      "rating": 4.553190734130403,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714286,
+      "online_hours": 247.5
+    },
+    {
+      "driver_id": "driver-0463",
+      "income_vnd": 36130170,
+      "trips": 1026,
+      "acceptance_rate_percent": 79.35034802784223,
+      "rating": 4.804546763586667,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714284,
+      "online_hours": 257.5
+    },
+    {
+      "driver_id": "driver-0368",
+      "income_vnd": 35999719,
+      "trips": 1091,
+      "acceptance_rate_percent": 78.7725631768953,
+      "rating": 4.530316880320344,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714284,
+      "online_hours": 239
+    },
+    {
+      "driver_id": "driver-0498",
+      "income_vnd": 35163747,
+      "trips": 999,
+      "acceptance_rate_percent": 81.48450244698205,
+      "rating": 4.869849948996588,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714284,
+      "online_hours": 216.75
+    },
+    {
+      "driver_id": "driver-0361",
+      "income_vnd": 34680885,
+      "trips": 659,
+      "acceptance_rate_percent": 78.73357228195938,
+      "rating": 4.697293063895553,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 239.75
+    },
+    {
+      "driver_id": "driver-0459",
+      "income_vnd": 34579992,
+      "trips": 636,
+      "acceptance_rate_percent": 76.7189384800965,
+      "rating": 4.35384217518481,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 193.5
+    },
+    {
+      "driver_id": "driver-0232",
+      "income_vnd": 33871562,
+      "trips": 605,
+      "acceptance_rate_percent": 76.00502512562814,
+      "rating": 4.913924102483204,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 142.25
+    },
+    {
+      "driver_id": "driver-0495",
+      "income_vnd": 33865275,
+      "trips": 660,
+      "acceptance_rate_percent": 79.23169267707082,
+      "rating": 4.235257391813714,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 216
+    },
+    {
+      "driver_id": "driver-0381",
+      "income_vnd": 33825731,
+      "trips": 1041,
+      "acceptance_rate_percent": 81.26463700234191,
+      "rating": 4.9370566792519615,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714286,
+      "online_hours": 213.75
+    },
+    {
+      "driver_id": "driver-0384",
+      "income_vnd": 33807750,
+      "trips": 1033,
+      "acceptance_rate_percent": 78.91520244461421,
+      "rating": 4.777680712458656,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714286,
+      "online_hours": 240
+    },
+    {
+      "driver_id": "driver-0423",
+      "income_vnd": 33176090,
+      "trips": 551,
+      "acceptance_rate_percent": 80.91042584434655,
+      "rating": 4.927260259927247,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 162.25
+    },
+    {
+      "driver_id": "driver-0094",
+      "income_vnd": 33152233,
+      "trips": 651,
+      "acceptance_rate_percent": 80.17241379310344,
+      "rating": 4.234456506649322,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 213.5
+    },
+    {
+      "driver_id": "driver-0297",
+      "income_vnd": 32777232,
+      "trips": 1009,
+      "acceptance_rate_percent": 79.6998420221169,
+      "rating": 4.370314143501086,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714288,
+      "online_hours": 200.75
+    },
+    {
+      "driver_id": "driver-0398",
+      "income_vnd": 32492040,
+      "trips": 983,
+      "acceptance_rate_percent": 80.50778050778051,
+      "rating": 4.395350675249628,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714284,
+      "online_hours": 222
+    },
+    {
+      "driver_id": "driver-0146",
+      "income_vnd": 32185531,
+      "trips": 417,
+      "acceptance_rate_percent": 81.4453125,
+      "rating": 4.839537956425994,
+      "fuel_efficiency_km_per_1000_vnd": 0.3571428571428571,
+      "online_hours": 191.75
+    },
+    {
+      "driver_id": "driver-0367",
+      "income_vnd": 32144989,
+      "trips": 592,
+      "acceptance_rate_percent": 79.78436657681941,
+      "rating": 4.321451093759734,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 177
+    },
+    {
+      "driver_id": "driver-0360",
+      "income_vnd": 31753149,
+      "trips": 427,
+      "acceptance_rate_percent": 79.07407407407408,
+      "rating": 4.870631618549122,
+      "fuel_efficiency_km_per_1000_vnd": 0.3571428571428571,
+      "online_hours": 175.5
+    },
+    {
+      "driver_id": "driver-0016",
+      "income_vnd": 31537231,
+      "trips": 562,
+      "acceptance_rate_percent": 77.94729542302358,
+      "rating": 4.635460439438009,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 129.25
+    },
+    {
+      "driver_id": "driver-0383",
+      "income_vnd": 31157351,
+      "trips": 580,
+      "acceptance_rate_percent": 80.11049723756906,
+      "rating": 4.438917495674637,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 165.25
+    },
+    {
+      "driver_id": "driver-0051",
+      "income_vnd": 30915043,
+      "trips": 585,
+      "acceptance_rate_percent": 78.84097035040432,
+      "rating": 4.675585556589632,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 185.5
+    },
+    {
+      "driver_id": "driver-0385",
+      "income_vnd": 30364446,
+      "trips": 592,
+      "acceptance_rate_percent": 79.03871829105474,
+      "rating": 4.320747295788646,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 172.75
+    },
+    {
+      "driver_id": "driver-0352",
+      "income_vnd": 30291529,
+      "trips": 542,
+      "acceptance_rate_percent": 80.29629629629629,
+      "rating": 4.686556945649115,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 156.25
+    },
+    {
+      "driver_id": "driver-0320",
+      "income_vnd": 30026812,
+      "trips": 933,
+      "acceptance_rate_percent": 77.68526228143214,
+      "rating": 4.221773384029657,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714284,
+      "online_hours": 212.5
+    },
+    {
+      "driver_id": "driver-0349",
+      "income_vnd": 30013417,
+      "trips": 447,
+      "acceptance_rate_percent": 81.71846435100548,
+      "rating": 4.911786400249753,
+      "fuel_efficiency_km_per_1000_vnd": 0.35714285714285715,
+      "online_hours": 190
+    },
+    {
+      "driver_id": "driver-0110",
+      "income_vnd": 29954850,
+      "trips": 536,
+      "acceptance_rate_percent": 79.1728212703102,
+      "rating": 4.743716235643392,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 96.75
+    },
+    {
+      "driver_id": "driver-0422",
+      "income_vnd": 29649079,
+      "trips": 435,
+      "acceptance_rate_percent": 80.40665434380776,
+      "rating": 4.362853228625349,
+      "fuel_efficiency_km_per_1000_vnd": 0.3571428571428571,
+      "online_hours": 186
+    },
+    {
+      "driver_id": "driver-0337",
+      "income_vnd": 28094305,
+      "trips": 799,
+      "acceptance_rate_percent": 80.54435483870968,
+      "rating": 4.885702353795589,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714286,
+      "online_hours": 180
+    },
+    {
+      "driver_id": "driver-0116",
+      "income_vnd": 28062710,
+      "trips": 494,
+      "acceptance_rate_percent": 80.1948051948052,
+      "rating": 4.770789456834961,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 99.25
+    },
+    {
+      "driver_id": "driver-0457",
+      "income_vnd": 27760300,
+      "trips": 375,
+      "acceptance_rate_percent": 77.1604938271605,
+      "rating": 4.744570867148015,
+      "fuel_efficiency_km_per_1000_vnd": 0.3571428571428572,
+      "online_hours": 164.75
+    },
+    {
+      "driver_id": "driver-0470",
+      "income_vnd": 27681836,
+      "trips": 351,
+      "acceptance_rate_percent": 81.62790697674419,
+      "rating": 4.948044183938562,
+      "fuel_efficiency_km_per_1000_vnd": 0.35714285714285715,
+      "online_hours": 151
+    },
+    {
+      "driver_id": "driver-0341",
+      "income_vnd": 27321285,
+      "trips": 507,
+      "acceptance_rate_percent": 78.24074074074075,
+      "rating": 4.843413069596446,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 102.5
+    },
+    {
+      "driver_id": "driver-0443",
+      "income_vnd": 26658076,
+      "trips": 372,
+      "acceptance_rate_percent": 81.40043763676148,
+      "rating": 4.5116685302010024,
+      "fuel_efficiency_km_per_1000_vnd": 0.3571428571428572,
+      "online_hours": 146.5
+    },
+    {
+      "driver_id": "driver-0333",
+      "income_vnd": 26296571,
+      "trips": 523,
+      "acceptance_rate_percent": 76.57393850658858,
+      "rating": 4.56240502889984,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 119.75
+    },
+    {
+      "driver_id": "driver-0303",
+      "income_vnd": 26165468,
+      "trips": 470,
+      "acceptance_rate_percent": 75.32051282051282,
+      "rating": 4.407783452183537,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 175.5
+    },
+    {
+      "driver_id": "driver-0049",
+      "income_vnd": 26118358,
+      "trips": 459,
+      "acceptance_rate_percent": 77.92869269949067,
+      "rating": 4.614355735546487,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 135.25
+    },
+    {
+      "driver_id": "driver-0382",
+      "income_vnd": 25913693,
+      "trips": 468,
+      "acceptance_rate_percent": 78,
+      "rating": 4.915137799322228,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 94
+    },
+    {
+      "driver_id": "driver-0178",
+      "income_vnd": 25630455,
+      "trips": 457,
+      "acceptance_rate_percent": 81.31672597864768,
+      "rating": 4.786302395898703,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 146.25
+    },
+    {
+      "driver_id": "driver-0131",
+      "income_vnd": 25570112,
+      "trips": 387,
+      "acceptance_rate_percent": 77.24550898203593,
+      "rating": 4.226187507389451,
+      "fuel_efficiency_km_per_1000_vnd": 0.35714285714285715,
+      "online_hours": 183.25
+    },
+    {
+      "driver_id": "driver-0264",
+      "income_vnd": 25446580,
+      "trips": 461,
+      "acceptance_rate_percent": 74.11575562700965,
+      "rating": 4.925327003249192,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454545,
+      "online_hours": 99
+    },
+    {
+      "driver_id": "driver-0167",
+      "income_vnd": 25434230,
+      "trips": 441,
+      "acceptance_rate_percent": 79.6028880866426,
+      "rating": 4.786688348431328,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 159.5
+    },
+    {
+      "driver_id": "driver-0433",
+      "income_vnd": 25422085,
+      "trips": 447,
+      "acceptance_rate_percent": 79.67914438502673,
+      "rating": 4.944535445000069,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 144.25
+    },
+    {
+      "driver_id": "driver-0455",
+      "income_vnd": 25084645,
+      "trips": 339,
+      "acceptance_rate_percent": 75.83892617449665,
+      "rating": 4.939730258716229,
+      "fuel_efficiency_km_per_1000_vnd": 0.35714285714285715,
+      "online_hours": 181.5
+    },
+    {
+      "driver_id": "driver-0229",
+      "income_vnd": 24899364,
+      "trips": 465,
+      "acceptance_rate_percent": 79.89690721649484,
+      "rating": 4.554415533531259,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 81.5
+    },
+    {
+      "driver_id": "driver-0371",
+      "income_vnd": 24389021,
+      "trips": 456,
+      "acceptance_rate_percent": 79.58115183246073,
+      "rating": 4.509238377053302,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 147.5
+    },
+    {
+      "driver_id": "driver-0274",
+      "income_vnd": 23931404,
+      "trips": 734,
+      "acceptance_rate_percent": 79.35135135135135,
+      "rating": 4.773105748113348,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714286,
+      "online_hours": 147
+    },
+    {
+      "driver_id": "driver-0441",
+      "income_vnd": 23838305,
+      "trips": 347,
+      "acceptance_rate_percent": 78.86363636363636,
+      "rating": 4.44870143475505,
+      "fuel_efficiency_km_per_1000_vnd": 0.3571428571428571,
+      "online_hours": 177
+    },
+    {
+      "driver_id": "driver-0224",
+      "income_vnd": 23832919,
+      "trips": 448,
+      "acceptance_rate_percent": 78.73462214411248,
+      "rating": 4.929784715202558,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 157.25
+    },
+    {
+      "driver_id": "driver-0285",
+      "income_vnd": 23720400,
+      "trips": 403,
+      "acceptance_rate_percent": 78.40466926070039,
+      "rating": 4.779985379476591,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 91
+    },
+    {
+      "driver_id": "driver-0442",
+      "income_vnd": 23491472,
+      "trips": 424,
+      "acceptance_rate_percent": 77.23132969034609,
+      "rating": 4.512486874892529,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 166
+    },
+    {
+      "driver_id": "driver-0499",
+      "income_vnd": 23462965,
+      "trips": 408,
+      "acceptance_rate_percent": 80,
+      "rating": 4.839352238769415,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 122.75
+    },
+    {
+      "driver_id": "driver-0254",
+      "income_vnd": 23331866,
+      "trips": 426,
+      "acceptance_rate_percent": 78.45303867403315,
+      "rating": 4.40875978298572,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 136.5
+    },
+    {
+      "driver_id": "driver-0161",
+      "income_vnd": 23135793,
+      "trips": 436,
+      "acceptance_rate_percent": 82.26415094339623,
+      "rating": 4.296015189631076,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 101
+    },
+    {
+      "driver_id": "driver-0141",
+      "income_vnd": 22662828,
+      "trips": 439,
+      "acceptance_rate_percent": 80.84714548802947,
+      "rating": 4.473548460364876,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 120
+    },
+    {
+      "driver_id": "driver-0033",
+      "income_vnd": 22472559,
+      "trips": 424,
+      "acceptance_rate_percent": 78.95716945996276,
+      "rating": 4.702533729836495,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 126.5
+    },
+    {
+      "driver_id": "driver-0300",
+      "income_vnd": 22369774,
+      "trips": 665,
+      "acceptance_rate_percent": 79.45041816009558,
+      "rating": 4.710473736111395,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714286,
+      "online_hours": 138.5
+    },
+    {
+      "driver_id": "driver-0212",
+      "income_vnd": 22017847,
+      "trips": 410,
+      "acceptance_rate_percent": 80.078125,
+      "rating": 4.758330587387716,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 95.25
+    },
+    {
+      "driver_id": "driver-0440",
+      "income_vnd": 21967280,
+      "trips": 399,
+      "acceptance_rate_percent": 81.42857142857143,
+      "rating": 4.874961012621829,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 88.5
+    },
+    {
+      "driver_id": "driver-0047",
+      "income_vnd": 21772175,
+      "trips": 669,
+      "acceptance_rate_percent": 80.31212484993998,
+      "rating": 4.233421780767437,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714286,
+      "online_hours": 155.5
+    },
+    {
+      "driver_id": "driver-0156",
+      "income_vnd": 21075112,
+      "trips": 417,
+      "acceptance_rate_percent": 79.42857142857143,
+      "rating": 4.5934544062702765,
+      "fuel_efficiency_km_per_1000_vnd": 0.4545454545454546,
+      "online_hours": 151.25
+    },
+    {
+      "driver_id": "driver-0065",
+      "income_vnd": 21038754,
+      "trips": 628,
+      "acceptance_rate_percent": 79.19293820933166,
+      "rating": 4.65374158481595,
+      "fuel_efficiency_km_per_1000_vnd": 1.4285714285714286,
+      "online_hours": 141.75
+    },
+    {
+      "driver_id": "driver-0251",
+      "income_vnd": 20941168,
+      "trips": 408,
+      "acceptance_rate_percent": 77.71428571428571,
+      "rating": 4.3189350455621405,
+      "fuel_efficiency_km_per_1000_vnd": 0.45454545454545453,
+      "online_hours": 131.25
+    }
+  ],
+  "assumptions": [
+    {
+      "Title": "Fuel Efficiency",
+      "Detail": "km/1.000đ chi phí nhiên liệu ước tính (xem driver_economy.json's fuel cost assumption) — không phải số liệu tiêu hao nhiên liệu thật, vì simulation không mô hình mức tiêu hao xe cụ thể."
+    }
+  ]
+}

@@ -17,6 +17,7 @@ type CompleteTripInput struct {
 	FareCurrency   string
 
 	Financials entity.CompleteFinancials
+	Summary    entity.TripSummary
 }
 
 // CompleteTripUseCase transitions a trip from InProgress to Completed and records the fare.
@@ -34,7 +35,7 @@ func (uc *CompleteTripUseCase) Execute(ctx context.Context, input CompleteTripIn
 	if err != nil {
 		return nil, err
 	}
-	if err := trip.Complete(input.FinalFareTotal, input.FareCurrency, input.Financials, time.Now().UTC()); err != nil {
+	if err := trip.Complete(input.FinalFareTotal, input.FareCurrency, input.Financials, input.Summary, time.Now().UTC()); err != nil {
 		return nil, err
 	}
 	if err := uc.repo.Save(ctx, trip); err != nil {

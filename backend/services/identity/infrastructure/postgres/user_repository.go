@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	userFields = `id, phone_number, name, email, type, status, role_id, created_at, updated_at`
+	userFields = `id, phone_number, name, email, google_sub, type, status, role_id, driver_enabled, created_at, updated_at`
 	userTable  = `identity_users`
 	userSelect = `SELECT ` + userFields + ` FROM ` + userTable
 )
@@ -35,9 +35,35 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (*entity.User,
 }
 
 // FindByPhone returns the user with the given phone number.
-// Returns CodeNotFound if no row exists.
+// Returns CodeNotFound if no row exists. Callers must pass a non-empty
+// phone — the empty string matches nothing (partial unique index over
+// non-empty phone numbers, see migration 020).
 func (r *UserRepository) FindByPhone(ctx context.Context, phoneNumber string) (*entity.User, error) {
+	if phoneNumber == "" {
+		return nil, domainerrors.InvalidArgument("phone number must not be empty")
+	}
 	return r.queryOne(ctx, userSelect+` WHERE phone_number = $1`, phoneNumber)
+}
+
+// FindByEmail returns the user with the given email.
+// Returns CodeNotFound if no row exists. Callers must pass a non-empty email
+// (see the interface doc comment) — the empty string matches nothing because
+// the underlying index is a partial unique index over non-empty emails.
+func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*entity.User, error) {
+	if email == "" {
+		return nil, domainerrors.InvalidArgument("email must not be empty")
+	}
+	return r.queryOne(ctx, userSelect+` WHERE email = $1`, email)
+}
+
+// FindByGoogleSub returns the user linked to the given Google subject ID.
+// Returns CodeNotFound if no row exists. Callers must pass a non-empty sub —
+// the empty string matches nothing (partial unique index, see migration 020).
+func (r *UserRepository) FindByGoogleSub(ctx context.Context, googleSub string) (*entity.User, error) {
+	if googleSub == "" {
+		return nil, domainerrors.InvalidArgument("google sub must not be empty")
+	}
+	return r.queryOne(ctx, userSelect+` WHERE google_sub = $1`, googleSub)
 }
 
 // FindAll returns every user ordered by created_at ascending.
@@ -48,27 +74,30 @@ func (r *UserRepository) FindAll(ctx context.Context) ([]*entity.User, error) {
 // Save upserts a user. Rows are matched by ID; on conflict the mutable fields are
 // overwritten. created_at is immutable. updated_at is taken from user.UpdatedAt,
 // which the domain entity updates when status transitions occur.
-// Returns CodeAlreadyExists when a different user already holds the same phone number.
+// Returns CodeAlreadyExists when a different user already holds the same
+// phone number, email, or google_sub.
 func (r *UserRepository) Save(ctx context.Context, user *entity.User) error {
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO identity_users
-			(id, phone_number, name, email, type, status, role_id, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			(id, phone_number, name, email, google_sub, type, status, role_id, driver_enabled, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		ON CONFLICT (id) DO UPDATE SET
-			phone_number = EXCLUDED.phone_number,
-			name         = EXCLUDED.name,
-			email        = EXCLUDED.email,
-			type         = EXCLUDED.type,
-			status       = EXCLUDED.status,
-			role_id      = EXCLUDED.role_id,
-			updated_at   = EXCLUDED.updated_at
-	`, user.ID, user.PhoneNumber, user.Name, user.Email,
-		string(user.Type), string(user.Status), user.RoleID,
+			phone_number   = EXCLUDED.phone_number,
+			name           = EXCLUDED.name,
+			email          = EXCLUDED.email,
+			google_sub     = EXCLUDED.google_sub,
+			type           = EXCLUDED.type,
+			status         = EXCLUDED.status,
+			role_id        = EXCLUDED.role_id,
+			driver_enabled = EXCLUDED.driver_enabled,
+			updated_at     = EXCLUDED.updated_at
+	`, user.ID, user.PhoneNumber, user.Name, user.Email, user.GoogleSub,
+		string(user.Type), string(user.Status), user.RoleID, user.DriverEnabled,
 		user.CreatedAt, user.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return domainerrors.AlreadyExists("user phone number already exists: " + user.PhoneNumber)
+			return domainerrors.AlreadyExists("user phone/email/google account already exists")
 		}
 		return domainerrors.Internal("save user").WithMeta("error", err.Error())
 	}
@@ -91,10 +120,11 @@ func (r *UserRepository) Delete(ctx context.Context, id string) error {
 // ─── private helpers ──────────────────────────────────────────────────────────
 
 func (r *UserRepository) queryOne(ctx context.Context, sql string, args ...any) (*entity.User, error) {
-	var id, phoneNumber, name, email, userType, status, roleID string
+	var id, phoneNumber, name, email, googleSub, userType, status, roleID string
+	var driverEnabled bool
 	var createdAt, updatedAt time.Time
 	err := r.pool.QueryRow(ctx, sql, args...).
-		Scan(&id, &phoneNumber, &name, &email, &userType, &status, &roleID, &createdAt, &updatedAt)
+		Scan(&id, &phoneNumber, &name, &email, &googleSub, &userType, &status, &roleID, &driverEnabled, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domainerrors.NotFound("user not found")
@@ -102,9 +132,9 @@ func (r *UserRepository) queryOne(ctx context.Context, sql string, args ...any) 
 		return nil, domainerrors.Internal("query user").WithMeta("error", err.Error())
 	}
 	return entity.ReconstituteUser(
-		id, phoneNumber, name, email,
+		id, phoneNumber, name, email, googleSub,
 		entity.UserType(userType), entity.UserStatus(status),
-		roleID, createdAt, updatedAt,
+		roleID, driverEnabled, createdAt, updatedAt,
 	), nil
 }
 
@@ -117,17 +147,18 @@ func (r *UserRepository) queryMany(ctx context.Context, sql string, args ...any)
 
 	var result []*entity.User
 	for rows.Next() {
-		var id, phoneNumber, name, email, userType, status, roleID string
+		var id, phoneNumber, name, email, googleSub, userType, status, roleID string
+		var driverEnabled bool
 		var createdAt, updatedAt time.Time
 		if err := rows.Scan(
-			&id, &phoneNumber, &name, &email, &userType, &status, &roleID, &createdAt, &updatedAt,
+			&id, &phoneNumber, &name, &email, &googleSub, &userType, &status, &roleID, &driverEnabled, &createdAt, &updatedAt,
 		); err != nil {
 			return nil, domainerrors.Internal("scan user").WithMeta("error", err.Error())
 		}
 		result = append(result, entity.ReconstituteUser(
-			id, phoneNumber, name, email,
+			id, phoneNumber, name, email, googleSub,
 			entity.UserType(userType), entity.UserStatus(status),
-			roleID, createdAt, updatedAt,
+			roleID, driverEnabled, createdAt, updatedAt,
 		))
 	}
 	if err := rows.Err(); err != nil {
